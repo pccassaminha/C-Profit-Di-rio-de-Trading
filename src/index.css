@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0b1326;
+  --color-surface: #0b1326;
+  --color-surface-container-lowest: #070d1a;
+  --color-surface-container-low: #111a2e;
+  --color-surface-container: #152036;
+  --color-surface-container-high: #1a2744;
+  --color-surface-container-highest: #223459;
+  
+  --color-on-surface: #e2e2e9;
+  --color-on-surface-variant: #c4c6d0;
+  --color-outline: #8e9099;
+  --color-outline-variant: #44474e;
+  
+  --color-primary: #c3f5ff;
+  --color-on-primary: #003544;
+  --color-primary-container: #004d62;
+  --color-on-primary-container: #c3f5ff;
+  --color-primary-fixed-dim: #86d1e9;
+  
+  --color-secondary: #4ae183;
+  --color-on-secondary: #003918;
+  --color-secondary-container: #005225;
+  --color-on-secondary-container: #6bffa2;
+  
+  --color-tertiary-container: #ffb4a9;
+  --color-on-tertiary-container: #690003;
+  
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+
+  --color-warning: #f59e0b;
+
+  --font-headline: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  @apply bg-background text-on-surface font-body antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-surface-container-highest); border-radius: 12px; }
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* React Day Picker Custom Styles */
+.rdp-root {
+  --rdp-accent-color: var(--color-primary);
+  --rdp-accent-background-color: var(--color-primary-container);
+  --rdp-day-height: 2.5rem;
+  --rdp-day-width: 2.5rem;
+  --rdp-today-color: var(--color-primary);
+  --rdp-range_middle-background-color: var(--color-primary-container);
+  --rdp-range_middle-color: var(--color-on-primary-container);
+  --rdp-range_start-date-background-color: var(--color-primary);
+  --rdp-range_start-color: var(--color-on-primary);
+  --rdp-range_end-date-background-color: var(--color-primary);
+  --rdp-range_end-color: var(--color-on-primary);
+}
+
+.rdp-day_button:hover:not([disabled]) {
+  background-color: var(--color-surface-container-highest);
+}
+
+.rdp-button_previous:hover,
+.rdp-button_next:hover {
+  background-color: var(--color-surface-container-highest);
+}
+
+.rdp-nav {
+  margin-bottom: 1rem;
+}
+
+.rdp-chevron {
+  fill: var(--color-on-surface);
+}

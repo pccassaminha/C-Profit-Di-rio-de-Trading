@@ -1,0 +1,170 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: accounts
+    // Document ID: auto-generated
+    // Fields:
+    //   - accountNumber: string (required)
+    //   - broker: string (required)
+    //   - initialBalance: number (required, > 0)
+    //   - accountType: string (required)
+    //   - masterPassword: string (optional)
+    //   - investorPassword: string (optional)
+    //   - userId: string (required, immutable)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // Collection: trades
+    // Document ID: auto-generated
+    // Fields:
+    //   - ticket: string (required)
+    //   - action: string (required)
+    //   - size: number (required, >= 0)
+    //   - openTime: timestamp (required)
+    //   - closeTime: timestamp (required)
+    //   - openPrice: number (required)
+    //   - closePrice: number (required)
+    //   - sl: number (optional)
+    //   - tp: number (optional)
+    //   - commission: number (optional)
+    //   - swap: number (optional)
+    //   - pnl: number (required)
+    //   - accountId: string (required)
+    //   - userId: string (required, immutable)
+    //   - symbol: string (optional)
+    //   - session: string (optional)
+    //   - notes: string (optional)
+    //   - setups: list (optional)
+    //   - planCompliance: bool (optional)
+    //   - psychology: string (optional)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    function uidUnchanged() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid;
+    }
+    function uidNotModified() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId;
+    }
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Domain Validators
+    function isValidAccount(data) {
+      return hasRequiredFields(['accountNumber', 'broker', 'initialBalance', 'accountType', 'startDate', 'userId', 'createdAt']) &&
+             hasOnlyAllowedFields(['accountNumber', 'broker', 'initialBalance', 'accountType', 'phase', 'masterPassword', 'startDate', 'currency', 'status', 'userId', 'createdAt']) &&
+             data.accountNumber is string && data.accountNumber.size() > 0 && data.accountNumber.size() < 100 &&
+             data.broker is string && data.broker.size() > 0 && data.broker.size() < 100 &&
+             data.initialBalance is number && data.initialBalance > 0 &&
+             data.accountType is string && data.accountType.size() > 0 && data.accountType.size() < 100 &&
+             data.startDate is string && data.startDate.size() > 0 && data.startDate.size() < 50 &&
+             (!('phase' in data) || (data.phase is string && data.phase.size() >= 0 && data.phase.size() < 50)) &&
+             (!('masterPassword' in data) || (data.masterPassword is string && data.masterPassword.size() >= 0 && data.masterPassword.size() < 200)) &&
+             (!('currency' in data) || (data.currency is string && data.currency.size() > 0 && data.currency.size() < 10)) &&
+             (!('status' in data) || (data.status is string && data.status.size() > 0 && data.status.size() < 20)) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidTrade(data) {
+      return hasRequiredFields(['ticket', 'action', 'size', 'openTime', 'closeTime', 'openPrice', 'closePrice', 'pnl', 'accountId', 'userId']) &&
+             hasOnlyAllowedFields(['ticket', 'action', 'size', 'openTime', 'closeTime', 'openPrice', 'closePrice', 'sl', 'tp', 'commission', 'swap', 'pnl', 'accountId', 'userId', 'symbol', 'session', 'notes', 'setups', 'planCompliance', 'psychology', 'date', 'entryTime', 'type', 'rr', 'returnAmount', 'studyLink', 'psychologyNotes', 'timeframe', 'dayOfWeek']) &&
+             data.ticket is string && data.ticket.size() > 0 && data.ticket.size() < 100 &&
+             data.action is string && data.action.size() > 0 && data.action.size() < 50 &&
+             data.size is number && data.size >= 0 &&
+             data.openTime is timestamp &&
+             data.closeTime is timestamp &&
+             data.openPrice is number &&
+             data.closePrice is number &&
+             (!('sl' in data) || data.sl is number) &&
+             (!('tp' in data) || data.tp is number) &&
+             (!('commission' in data) || data.commission is number) &&
+             (!('swap' in data) || data.swap is number) &&
+             data.pnl is number &&
+             data.accountId is string && data.accountId.size() > 0 && data.accountId.size() < 100 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             (!('symbol' in data) || (data.symbol is string && data.symbol.size() < 100)) &&
+             (!('session' in data) || (data.session is string && data.session.size() < 100)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 2000)) &&
+             (!('setups' in data) || (data.setups is list && data.setups.size() < 20)) &&
+             (!('planCompliance' in data) || data.planCompliance is bool) &&
+             (!('psychology' in data) || (data.psychology is string && data.psychology.size() < 100)) &&
+             (!('date' in data) || (data.date is string && data.date.size() < 50)) &&
+             (!('entryTime' in data) || (data.entryTime is string && data.entryTime.size() < 50)) &&
+             (!('type' in data) || (data.type is string && data.type.size() < 50)) &&
+             (!('rr' in data) || data.rr is number) &&
+             (!('returnAmount' in data) || data.returnAmount is number) &&
+             (!('studyLink' in data) || (data.studyLink is string && data.studyLink.size() < 1000)) &&
+             (!('psychologyNotes' in data) || (data.psychologyNotes is string && data.psychologyNotes.size() < 5000));
+    }
+
+    function isValidWithdrawal(data) {
+      return hasRequiredFields(['userId', 'accountId', 'amount', 'date', 'createdAt']) &&
+             hasOnlyAllowedFields(['userId', 'accountId', 'amount', 'date', 'notes', 'createdAt']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.accountId is string && data.accountId.size() > 0 && data.accountId.size() < 100 &&
+             data.amount is number && data.amount > 0 &&
+             data.date is string && data.date.size() > 0 && data.date.size() < 50 &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() >= 0 && data.notes.size() < 2000)) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidPsychologyNote(data) {
+      return hasRequiredFields(['userId', 'content', 'createdAt', 'updatedAt']) &&
+             hasOnlyAllowedFields(['userId', 'content', 'link', 'createdAt', 'updatedAt']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 5000 &&
+             (!('link' in data) || (data.link is string && data.link.size() >= 0 && data.link.size() < 1000)) &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    match /accounts/{accountId} {
+      allow read: if isAuthenticated() && isDocOwner();
+      allow create: if isAuthenticated() && isValidAccount(request.resource.data) && uidUnchanged();
+      allow update: if isAuthenticated() && isDocOwner() && isValidAccount(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['createdAt', 'userId']);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /trades/{tradeId} {
+      allow read: if isAuthenticated() && isDocOwner();
+      allow create: if isAuthenticated() && isValidTrade(request.resource.data) && uidUnchanged();
+      allow update: if isAuthenticated() && isDocOwner() && isValidTrade(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['userId']);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /withdrawals/{withdrawalId} {
+      allow read: if isAuthenticated() && isDocOwner();
+      allow create: if isAuthenticated() && isValidWithdrawal(request.resource.data) && uidUnchanged();
+      allow update: if isAuthenticated() && isDocOwner() && isValidWithdrawal(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['createdAt', 'userId']);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /psychology_notes/{noteId} {
+      allow read: if isAuthenticated() && isDocOwner();
+      allow create: if isAuthenticated() && isValidPsychologyNote(request.resource.data) && uidUnchanged();
+      allow update: if isAuthenticated() && isDocOwner() && isValidPsychologyNote(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['createdAt', 'userId']);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+  }
+}

@@ -1,0 +1,1474 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { collection, addDoc, onSnapshot, query, where, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import Papa from 'papaparse';
+import { useCurrency } from '../contexts/CurrencyContext';
+import Modal from './Modal';
+import { DatePicker } from './DatePicker';
+
+export default function TradeJournal({ currentView = 'list', onViewChange }: { currentView?: 'list' | 'form' | 'detail', onViewChange?: (view: 'list' | 'form' | 'detail') => void }) {
+  const { formatCurrency } = useCurrency();
+  const [view, setView] = useState<'list' | 'form' | 'detail'>(currentView);
+  const [tradeType, setTradeType] = useState<'forex' | 'ob' | null>(null);
+  const [listMode, setListMode] = useState<'list' | 'calendar'>('list');
+  const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(new Date());
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [trades, setTrades] = useState<any[]>([]);
+  const [selectedTrade, setSelectedTrade] = useState<any>(null);
+  const [editingTradeId, setEditingTradeId] = useState<string | null>(null);
+  const [tradeData, setTradeData] = useState({
+    accountId: '',
+    symbol: 'EUR/USD',
+    session: 'Londres (Intra Mercado)',
+    action: 'Buy',
+    openPrice: '',
+    sl: '',
+    tp: '',
+    notes: '',
+    psychology: '',
+    psychologyNotes: '',
+    setups: [] as string[],
+    pnl: '',
+    rr: '',
+    returnAmount: '',
+    commission: '',
+    size: '1.0',
+    type: 'forex', // 'forex' or 'ob'
+    studyLink: '',
+    date: new Date().toISOString().split('T')[0],
+    entryTime: new Date().toTimeString().split(' ')[0].substring(0, 5),
+    timeframe: 'M5',
+    dayOfWeek: new Date().toLocaleDateString('pt-BR', { weekday: 'long' })
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importedTradesToReview, setImportedTradesToReview] = useState<any[]>([]);
+  const [sessionType, setSessionType] = useState<'simple' | 'subdivided'>('subdivided');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [isTradeTypeModalOpen, setIsTradeTypeModalOpen] = useState(false);
+
+  const handleNewTradeClick = () => {
+    const defaultTradeType = localStorage.getItem('app_default_trade_type') as 'ask' | 'forex' | 'ob' || 'ask';
+    if (defaultTradeType === 'ask') {
+      setIsTradeTypeModalOpen(true);
+    } else {
+      handleOpenTradeForm(defaultTradeType);
+    }
+  };
+
+  const handleOpenTradeForm = (type: 'forex' | 'ob') => {
+    setTradeType(type);
+    const firstAcc = accounts.find(a => type === 'ob' ? a.tradeType === 'ob' : a.tradeType !== 'ob');
+    setTradeData(prev => ({
+      ...prev,
+      accountId: firstAcc ? firstAcc.id : '',
+      type
+    }));
+    setIsTradeTypeModalOpen(false);
+    handleViewChange('form');
+  };
+
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isError?: boolean;
+    confirmText?: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const closeModal = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
+
+  useEffect(() => {
+    setView(currentView);
+  }, [currentView]);
+
+  useEffect(() => {
+    const savedSessionType = localStorage.getItem('app_session_type') as 'simple' | 'subdivided';
+    if (savedSessionType) {
+      setSessionType(savedSessionType);
+    }
+  }, []);
+
+  const handleViewChange = (newView: 'list' | 'form' | 'detail') => {
+    setView(newView);
+    if (onViewChange) onViewChange(newView);
+  };
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const accountsQuery = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
+    const unsubscribeAccounts = onSnapshot(accountsQuery, (snapshot) => {
+      const accountsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAccounts(accountsData);
+      if (accountsData.length > 0 && !tradeData.accountId) {
+        const firstAccount = accountsData[0] as any;
+        setTradeData(prev => ({ 
+          ...prev, 
+          accountId: firstAccount.id,
+          type: firstAccount.tradeType || 'forex'
+        }));
+        setTradeType(firstAccount.tradeType || 'forex');
+      }
+    });
+
+    const tradesQuery = query(collection(db, 'trades'), where('userId', '==', auth.currentUser.uid));
+    const unsubscribeTrades = onSnapshot(tradesQuery, (snapshot) => {
+      const tradesData = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+      // Sort by date descending
+      tradesData.sort((a, b) => {
+        const dateA = a.closeTime?.toDate ? a.closeTime.toDate() : new Date(a.closeTime || 0);
+        const dateB = b.closeTime?.toDate ? b.closeTime.toDate() : new Date(b.closeTime || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      setTrades(tradesData);
+    });
+
+    return () => {
+      unsubscribeAccounts();
+      unsubscribeTrades();
+    };
+  }, []);
+
+  const handleSaveTrade = async () => {
+    if (!auth.currentUser) return;
+    if (!tradeData.accountId || !tradeData.pnl || (tradeData.type === 'forex' && !tradeData.openPrice)) {
+      setModalConfig({
+        isOpen: true,
+        title: "Atenção",
+        message: "Por favor, preencha os campos obrigatórios.",
+        isError: true,
+        onConfirm: closeModal
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const tradePayload = {
+        action: tradeData.action,
+        size: Number(tradeData.size) || 0,
+        openPrice: Number(tradeData.openPrice) || 0,
+        closePrice: Number(tradeData.openPrice) || 0, // mock
+        sl: Number(tradeData.sl) || 0,
+        tp: Number(tradeData.tp) || 0,
+        commission: Number(tradeData.commission) || 0,
+        swap: 0,
+        pnl: Number(tradeData.pnl),
+        rr: Number(tradeData.rr) || 0,
+        returnAmount: Number(tradeData.returnAmount) || 0,
+        accountId: tradeData.accountId,
+        userId: auth.currentUser.uid,
+        symbol: tradeData.symbol,
+        session: tradeData.session,
+        notes: tradeData.notes,
+        psychology: tradeData.psychology,
+        psychologyNotes: tradeData.psychologyNotes,
+        setups: tradeData.setups,
+        type: tradeData.type,
+        studyLink: tradeData.studyLink,
+        date: tradeData.date,
+        entryTime: tradeData.entryTime,
+        timeframe: tradeData.timeframe,
+        dayOfWeek: tradeData.dayOfWeek
+      };
+
+      if (editingTradeId) {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        await updateDoc(doc(db, 'trades', editingTradeId), tradePayload);
+      } else {
+        await addDoc(collection(db, 'trades'), {
+          ...tradePayload,
+          ticket: `T${Date.now()}`,
+          openTime: serverTimestamp(),
+          closeTime: serverTimestamp(),
+        });
+      }
+      
+      setTradeData({
+        ...tradeData,
+        openPrice: '',
+        sl: '',
+        tp: '',
+        notes: '',
+        psychology: '',
+        psychologyNotes: '',
+        setups: [],
+        pnl: '',
+        rr: '',
+        returnAmount: '',
+        studyLink: '',
+        date: new Date().toISOString().split('T')[0],
+        entryTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
+      });
+      setEditingTradeId(null);
+      setTradeType(null);
+      handleViewChange('list');
+
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: editingTradeId ? "Trade atualizado com sucesso!" : "Trade salvo com sucesso!",
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
+    } catch (error) {
+      console.error("Error saving trade: ", error);
+      setModalConfig({
+        isOpen: true,
+        title: "Erro",
+        message: "Erro ao salvar o trade.",
+        isError: true,
+        onConfirm: closeModal
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const parseDateStr = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const [datePart, timePart] = dateStr.split(' ');
+    if (!datePart) return new Date();
+    const [day, month, year] = datePart.split('/');
+    if (timePart) {
+      return new Date(`${year}-${month}-${day}T${timePart}`);
+    }
+    return new Date(`${year}-${month}-${day}T00:00:00`);
+  };
+
+  const saveImportedTrades = async (tradesToSave: any[]) => {
+    if (!auth.currentUser) return;
+    if (!tradeData.accountId) {
+      setModalConfig({
+        isOpen: true,
+        title: "Atenção",
+        message: "Por favor, selecione uma conta antes de importar.",
+        isError: true,
+        onConfirm: closeModal
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const promises = tradesToSave.map(trade => 
+        addDoc(collection(db, 'trades'), {
+          ...trade,
+          accountId: tradeData.accountId,
+          userId: auth.currentUser!.uid,
+        })
+      );
+      await Promise.all(promises);
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: `${tradesToSave.length} trades importados com sucesso!`,
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
+    } catch (error) {
+      console.error("Error importing trades: ", error);
+      setModalConfig({
+        isOpen: true,
+        title: "Erro",
+        message: "Erro ao importar trades.",
+        isError: true,
+        onConfirm: closeModal
+      });
+    } finally {
+      setIsSaving(false);
+      setImportedTradesToReview([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const content = e.target?.result as string;
+      let parsedTrades: any[] = [];
+
+      const calcularRR = (entryStr: string, slStr: string, tpStr: string, action: string) => {
+        const entry = parseFloat(entryStr);
+        const sl = parseFloat(slStr);
+        const tp = parseFloat(tpStr);
+    
+        if (!entry || !sl || !tp || isNaN(sl) || isNaN(tp) || sl === 0 || tp === 0) return 0;
+    
+        const risk = Math.abs(entry - sl);
+        const reward = Math.abs(tp - entry);
+        
+        if (risk === 0) return 0;
+        
+        return Number((reward / risk).toFixed(2));
+      };
+
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        const lines = content.trim().split('\n');
+        for (let i = 1; i < lines.length; i++) {
+            const data = lines[i].split(',');
+            if (data.length < 10) continue;
+    
+            const fullDateTime = data[2] || "";
+            const dateTimeParts = fullDateTime.split(' ');
+            const datePart = dateTimeParts[0] || "";
+            const timePart = dateTimeParts[1] || "";
+    
+            parsedTrades.push({
+                ticket: data[0] || `T${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                symbol: data[1],
+                action: data[4]?.toUpperCase() === 'SELL' ? 'Sell' : 'Buy',
+                date: datePart,
+                entryTime: timePart,
+                size: Number(data[3]) || 0,
+                openPrice: Number(data[6]) || 0,
+                closePrice: Number(data[6]) || 0, // mock
+                commission: parseFloat(data[11] || '0'),
+                swap: parseFloat(data[10] || '0'),
+                pnl: parseFloat(data[12] || '0'),
+                rr: calcularRR(data[6], data[8], data[9], data[4]),
+                sl: Number(data[8]) || 0,
+                tp: Number(data[9]) || 0,
+                session: 'Importado',
+                notes: '',
+                psychology: '',
+                type: 'forex',
+                openTime: parseDateStr(fullDateTime),
+                closeTime: parseDateStr(fullDateTime)
+            });
+        }
+        setImportedTradesToReview(parsedTrades);
+        setIsImporting(false);
+      } else if (file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm')) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(content, 'text/html');
+        
+        const rows = doc.querySelectorAll('tr[bgcolor="#FFFFFF"], tr[bgcolor="#F7F7F7"]');
+        
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            
+            if (cells.length > 10 && cells[0].innerText.match(/\d{4}\.\d{2}\.\d{2}/)) {
+                const validCells = Array.from(cells).filter(c => !c.classList.contains('hidden'));
+                
+                if (validCells.length >= 12) {
+                    const fullDateTime = validCells[0].innerText.trim();
+                    const dateTimeParts = fullDateTime.split(' ');
+                    const datePart = dateTimeParts[0] || "";
+                    const timePart = dateTimeParts[1] || "";
+    
+                    const action = validCells[3].innerText.trim();
+                    const openPrice = validCells[5].innerText.trim();
+                    const sl = validCells[6].innerText.trim();
+                    const tp = validCells[7].innerText.trim();
+    
+                    parsedTrades.push({
+                        ticket: validCells[1].innerText.trim() || `T${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                        symbol: validCells[2].innerText.trim(),
+                        action: action?.toUpperCase() === 'SELL' ? 'Sell' : 'Buy',
+                        date: datePart,
+                        entryTime: timePart,
+                        size: Number(validCells[4].innerText.trim()) || 0,
+                        openPrice: Number(openPrice) || 0,
+                        closePrice: Number(openPrice) || 0, // mock
+                        commission: parseFloat(validCells[10].innerText.trim() || '0'),
+                        swap: parseFloat(validCells[11].innerText.trim() || '0'),
+                        pnl: parseFloat(validCells[12].innerText.trim() || '0'),
+                        rr: calcularRR(openPrice, sl, tp, action),
+                        sl: Number(sl) || 0,
+                        tp: Number(tp) || 0,
+                        session: 'Importado',
+                        notes: '',
+                        psychology: '',
+                        type: 'forex',
+                        openTime: parseDateStr(fullDateTime),
+                        closeTime: parseDateStr(fullDateTime)
+                    });
+                }
+            }
+        });
+        setImportedTradesToReview(parsedTrades);
+        setIsImporting(false);
+      } else {
+        setIsImporting(false);
+        setModalConfig({
+          isOpen: true,
+          title: "Erro",
+          message: "Formato de arquivo não suportado. Por favor, use CSV ou HTML.",
+          isError: true,
+          onConfirm: closeModal
+        });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const [customSetup, setCustomSetup] = useState('');
+  const [availableSetups, setAvailableSetups] = useState(['OB', 'FVG', 'BOS', 'CHoCH', 'Liq Sweep', 'OTE', 'CISD']);
+
+  const toggleSetup = (setup: string) => {
+    setTradeData(prev => {
+      if (prev.setups.includes(setup)) {
+        return { ...prev, setups: prev.setups.filter(s => s !== setup) };
+      } else {
+        return { ...prev, setups: [...prev.setups, setup] };
+      }
+    });
+  };
+
+  const handleAddCustomSetup = () => {
+    if (customSetup.trim() && !availableSetups.includes(customSetup.trim())) {
+      setAvailableSetups([...availableSetups, customSetup.trim()]);
+      setTradeData(prev => ({...prev, setups: [...prev.setups, customSetup.trim()]}));
+      setCustomSetup('');
+    }
+  };
+
+  const groupedTrades = trades.reduce((acc, trade) => {
+    let dateStr = 'Data Desconhecida';
+    if (trade.date) {
+      dateStr = trade.date.split('.').join('/'); // Replace . with / if it comes from MT5
+    } else if (trade.closeTime?.toDate) {
+      dateStr = trade.closeTime.toDate().toLocaleDateString('pt-BR');
+    } else if (trade.closeTime) {
+      dateStr = new Date(trade.closeTime).toLocaleDateString('pt-BR');
+    }
+    
+    if (!acc[dateStr]) acc[dateStr] = [];
+    acc[dateStr].push(trade);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  // Calendar logic
+  const currentYear = selectedCalendarDate.getFullYear();
+  const currentMonth = selectedCalendarDate.getMonth();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate();
+  
+  const calendarCells = [];
+  
+  // Dias do mês anterior
+  for (let i = firstDayOfMonth - 1; i >= 0; i--) {
+    calendarCells.push(
+      <div key={`prev-${i}`} className="min-h-[120px] p-3 border-r border-b border-outline-variant/20 relative bg-surface-container-low">
+        <span className="absolute top-3 right-3 text-xs font-medium text-outline-variant/50">{daysInPrevMonth - i}</span>
+      </div>
+    );
+  }
+  
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(currentYear, currentMonth, day);
+    const dateStr = date.toLocaleDateString('pt-BR');
+    const isoDateStr = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    const dayTrades = groupedTrades[dateStr] || [];
+    const dayPnl = dayTrades.reduce((sum, t) => sum + (Number(t.pnl) || 0), 0);
+    const isWin = dayPnl > 0;
+    const isLoss = dayPnl < 0;
+    const active = isoDateStr === todayStr;
+    
+    calendarCells.push(
+      <div 
+        key={`day-${day}`} 
+        onClick={() => {
+          if (dayTrades.length > 0) {
+            setExpandedTradeId(expandedTradeId === dateStr ? null : dateStr);
+            setListMode('list');
+          }
+        }}
+        className={`min-h-[120px] p-3 border-r border-b border-outline-variant/20 relative transition-colors ${active ? 'bg-surface-container border-l-2 border-l-secondary' : 'bg-surface-container-low'} ${dayTrades.length > 0 ? 'cursor-pointer hover:bg-surface-container-highest' : ''}`}
+      >
+        <span className="absolute top-3 right-3 text-xs font-medium text-on-surface-variant">{day}</span>
+        {dayTrades.length > 0 && (
+          <div className="mt-8 space-y-1.5">
+            <div className="flex justify-between text-[10px]">
+              <span className="text-on-surface-variant">Trades:</span>
+              <span className="text-on-surface font-bold">{dayTrades.length}</span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <span className="text-on-surface-variant">P&L:</span>
+              <span className={`font-bold ${isWin ? 'text-secondary' : isLoss ? 'text-error' : 'text-on-surface'}`}>
+                {isWin ? '+' : ''}{formatCurrency(dayPnl)}
+              </span>
+            </div>
+            <div className={`h-1 w-full rounded-full mt-2 ${isWin ? 'bg-secondary' : isLoss ? 'bg-error' : 'bg-outline-variant'}`} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Dias do próximo mês para completar a grade
+  const totalCells = calendarCells.length;
+  const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let i = 1; i <= remainingCells; i++) {
+    calendarCells.push(
+      <div key={`next-${i}`} className="min-h-[120px] p-3 border-r border-b border-outline-variant/20 relative bg-surface-container-low">
+        <span className="absolute top-3 right-3 text-xs font-medium text-outline-variant/50">{i}</span>
+      </div>
+    );
+  }
+
+  if (view === 'list') {
+    return (
+      <>
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
+          <div>
+            <span className="text-xs font-label uppercase tracking-[0.2em] text-primary-fixed-dim">Diário de Trades</span>
+            <h2 className="text-4xl font-bold font-headline mt-2 text-on-surface">Seus Registros</h2>
+          </div>
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex gap-1 bg-surface-container p-1 rounded-lg mr-2">
+              <button 
+                onClick={() => setListMode('list')}
+                className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${listMode === 'list' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                Lista
+              </button>
+              <button 
+                onClick={() => setListMode('calendar')}
+                className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${listMode === 'calendar' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                Calendário
+              </button>
+            </div>
+            <button 
+              onClick={handleNewTradeClick}
+              className="px-4 md:px-8 py-2.5 rounded-lg bg-primary text-on-primary font-bold shadow-xl shadow-primary/10 hover:scale-[1.02] active:scale-95 transition-all"
+            >
+              Novo Trade
+            </button>
+          </div>
+        </div>
+
+        {listMode === 'calendar' ? (
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
+              <button 
+                onClick={() => setSelectedCalendarDate(new Date(currentYear, currentMonth - 1, 1))}
+                className="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors text-2xl"
+              >
+                chevron_left
+              </button>
+              <span className="text-on-surface font-bold text-lg md:text-xl font-headline capitalize">
+                {selectedCalendarDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
+              </span>
+              <button 
+                onClick={() => setSelectedCalendarDate(new Date(currentYear, currentMonth + 1, 1))}
+                className="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors text-2xl"
+              >
+                chevron_right
+              </button>
+            </div>
+            <div className="w-full overflow-x-auto">
+              <div className="min-w-[700px]">
+                <div className="grid grid-cols-7 text-center border-b border-outline-variant/20 bg-surface-container">
+                  {['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO'].map(day => (
+                    <div key={day} className="py-4 text-xs font-bold text-on-surface-variant border-r border-outline-variant/20 last:border-0">{day}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7">
+                  {calendarCells}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {Object.keys(groupedTrades).length === 0 ? (
+              <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-8 text-center text-on-surface-variant">
+                Nenhum trade registrado ainda.
+              </div>
+            ) : (
+              (Object.entries(groupedTrades) as [string, any[]][]).sort((a, b) => {
+                // Sort dates descending
+                const [dayA, monthA, yearA] = a[0].split('/');
+                const [dayB, monthB, yearB] = b[0].split('/');
+                return new Date(`${yearB}-${monthB}-${dayB}`).getTime() - new Date(`${yearA}-${monthA}-${dayA}`).getTime();
+              }).map(([date, dayTrades]) => {
+                const dayPnl = dayTrades.reduce((sum, t) => sum + (Number(t.pnl) || 0), 0);
+                const isExpanded = expandedTradeId === date;
+
+                return (
+                  <div key={date} className="bg-surface-container-low border border-outline-variant/20 rounded-2xl overflow-hidden transition-all">
+                    <div 
+                      className="p-4 md:p-6 cursor-pointer hover:bg-surface-container transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+                      onClick={() => setExpandedTradeId(isExpanded ? null : date)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center">
+                          <span className="material-symbols-outlined text-primary">calendar_today</span>
+                        </div>
+                        <div>
+                          <h3 className="text-lg md:text-xl font-bold text-on-surface font-headline">Diário de trade do dia {date}</h3>
+                          <p className="text-sm text-on-surface-variant">{dayTrades.length} {dayTrades.length === 1 ? 'trade' : 'trades'} registrado(s)</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
+                        <div className="text-right">
+                          <p className="text-xs text-on-surface-variant uppercase tracking-widest mb-1">Resultado do Dia</p>
+                          <p className={`font-bold text-lg ${dayPnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                            {dayPnl >= 0 ? '+' : ''}{formatCurrency(dayPnl)}
+                          </p>
+                        </div>
+                        <span className={`material-symbols-outlined text-on-surface-variant transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                          expand_more
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {isExpanded && (
+                      <div className="p-4 md:p-6 border-t border-outline-variant/20 bg-surface-container-lowest space-y-4">
+                        {dayTrades.map((trade, idx) => (
+                          <div 
+                            key={idx}
+                            onClick={() => {
+                              setSelectedTrade(trade);
+                              handleViewChange('detail');
+                            }}
+                            className="bg-surface-container hover:bg-surface-container-highest transition-colors cursor-pointer rounded-xl p-4 border border-outline-variant/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className={`w-2 h-12 rounded-full ${trade.pnl >= 0 ? 'bg-secondary' : 'bg-error'}`}></div>
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-bold text-on-surface">{trade.symbol}</span>
+                                  <span className={`text-xs px-2 py-0.5 rounded-sm font-bold ${trade.action === 'Buy' ? 'bg-secondary/20 text-secondary' : 'bg-error/20 text-error'}`}>
+                                    {trade.type === 'ob' ? (trade.action === 'Buy' ? 'Acima' : 'Abaixo') : trade.action}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-on-surface-variant">Ticket: {trade.ticket} • {trade.type === 'ob' ? 'Valor: ' : 'Lotes: '}{trade.size}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
+                              <div className="hidden md:block text-right">
+                                <p className="text-xs text-on-surface-variant">Sessão</p>
+                                <p className="text-sm font-bold text-on-surface">{trade.session}</p>
+                              </div>
+                              <div className="hidden md:block text-right">
+                                <p className="text-xs text-on-surface-variant">R:R</p>
+                                <p className="text-sm font-bold text-primary">{trade.rr ? `1:${trade.rr}` : '-'}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-on-surface-variant">P&L</p>
+                                <p className={`font-bold ${trade.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                                  {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl)}
+                                </p>
+                              </div>
+                              <span className="material-symbols-outlined text-on-surface-variant text-sm">arrow_forward_ios</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Trade Type Selection Modal */}
+      {isTradeTypeModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-surface-container border border-outline-variant/20 rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="text-center">
+              <h3 className="text-2xl font-bold text-on-surface mb-2 font-headline">Novo Trade</h3>
+              <p className="text-on-surface-variant text-sm mb-8">Selecione o tipo de mercado para este registro.</p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => handleOpenTradeForm('forex')}
+                  className="flex flex-col items-center justify-center gap-4 p-6 rounded-xl border-2 border-outline-variant/20 hover:border-primary hover:bg-primary/5 transition-all group"
+                >
+                  <span className="material-symbols-outlined text-4xl text-on-surface-variant group-hover:text-primary transition-colors">candlestick_chart</span>
+                  <span className="font-bold text-on-surface">Forex / Índices</span>
+                </button>
+                <button
+                  onClick={() => handleOpenTradeForm('ob')}
+                  className="flex flex-col items-center justify-center gap-4 p-6 rounded-xl border-2 border-outline-variant/20 hover:border-primary hover:bg-primary/5 transition-all group"
+                >
+                  <span className="material-symbols-outlined text-4xl text-on-surface-variant group-hover:text-primary transition-colors">timer</span>
+                  <span className="font-bold text-on-surface">Opções Binárias</span>
+                </button>
+              </div>
+
+              <button 
+                onClick={() => setIsTradeTypeModalOpen(false)}
+                className="mt-8 px-6 py-2 rounded-lg text-on-surface-variant font-bold hover:bg-surface-container transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
+    );
+  }
+
+  if (view === 'detail' && selectedTrade) {
+    return (
+      <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8">
+        <div className="flex justify-between items-center mb-6">
+          <button 
+            onClick={() => {
+              handleViewChange('list');
+              setSelectedTrade(null);
+            }}
+            className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors font-bold"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+            Voltar para a Lista
+          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => {
+                setEditingTradeId(selectedTrade.id);
+                setTradeType(selectedTrade.type || 'forex');
+                setTradeData({
+                  accountId: selectedTrade.accountId || '',
+                  symbol: selectedTrade.symbol || '',
+                  session: selectedTrade.session || '',
+                  action: selectedTrade.action || 'Buy',
+                  openPrice: selectedTrade.openPrice?.toString() || '',
+                  sl: selectedTrade.sl?.toString() || '',
+                  tp: selectedTrade.tp?.toString() || '',
+                  notes: selectedTrade.notes || '',
+                  psychology: selectedTrade.psychology || '',
+                  psychologyNotes: selectedTrade.psychologyNotes || '',
+                  setups: selectedTrade.setups || [],
+                  pnl: selectedTrade.pnl?.toString() || '',
+                  rr: selectedTrade.rr?.toString() || '',
+                  returnAmount: selectedTrade.returnAmount?.toString() || '',
+                  size: selectedTrade.size?.toString() || '1.0',
+                  type: selectedTrade.type || 'forex',
+                  studyLink: selectedTrade.studyLink || '',
+                  commission: selectedTrade.commission?.toString() || '',
+                  date: selectedTrade.date || new Date().toISOString().split('T')[0],
+                  entryTime: selectedTrade.entryTime || new Date().toTimeString().split(' ')[0].substring(0, 5),
+                  timeframe: selectedTrade.timeframe || 'M5'
+                });
+                handleViewChange('form');
+              }}
+              className="px-4 py-1.5 rounded-full font-bold text-sm bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">edit</span>
+              Editar
+            </button>
+            <span className={`px-4 py-1.5 rounded-full font-bold text-sm ${selectedTrade.pnl >= 0 ? 'bg-secondary/20 text-secondary' : 'bg-error/20 text-error'}`}>
+              {selectedTrade.pnl >= 0 ? 'WIN' : 'LOSS'}
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-8 pb-8 border-b border-outline-variant/20">
+            <div>
+              <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Ticket</p>
+              <p className="text-xl font-bold text-on-surface truncate">{selectedTrade.ticket}</p>
+            </div>
+            <div>
+              <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Ativo</p>
+              <p className="text-xl font-bold text-on-surface">{selectedTrade.symbol}</p>
+            </div>
+            <div>
+              <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Direção</p>
+              <p className={`text-xl font-bold ${selectedTrade.action === 'Buy' ? 'text-secondary' : 'text-error'}`}>
+                {selectedTrade.type === 'ob' ? (selectedTrade.action === 'Buy' ? 'Acima (Call)' : 'Abaixo (Put)') : selectedTrade.action}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">R:R</p>
+              <p className="text-xl font-bold text-primary">
+                {selectedTrade.rr ? `1:${selectedTrade.rr}` : '-'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">P&L</p>
+              <p className={`text-xl font-bold ${selectedTrade.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                {selectedTrade.pnl >= 0 ? '+' : ''}{formatCurrency(selectedTrade.pnl)}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold font-headline uppercase tracking-wider text-on-surface-variant">Detalhes da Execução</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-surface-container p-4 rounded-xl">
+                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Data</p>
+                  <p className="font-bold text-on-surface">{selectedTrade.date || '-'}</p>
+                </div>
+                <div className="bg-surface-container p-4 rounded-xl">
+                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Hora de Entrada</p>
+                  <p className="font-bold text-on-surface">{selectedTrade.entryTime || '-'}</p>
+                </div>
+                <div className="bg-surface-container p-4 rounded-xl">
+                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Sessão</p>
+                  <p className="font-bold text-on-surface">{selectedTrade.session}</p>
+                </div>
+                <div className="bg-surface-container p-4 rounded-xl">
+                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">
+                    {selectedTrade.type === 'ob' ? 'Valor Investido' : 'Lotes / Valor'}
+                  </p>
+                  <p className="font-bold text-on-surface">{selectedTrade.size}</p>
+                </div>
+                {selectedTrade.type !== 'ob' && (
+                  <>
+                    <div className="bg-surface-container p-4 rounded-xl">
+                      <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Preço Entrada</p>
+                      <p className="font-bold text-on-surface">{selectedTrade.openPrice || '-'}</p>
+                    </div>
+                    <div className="bg-surface-container p-4 rounded-xl">
+                      <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Preço Fecho</p>
+                      <p className="font-bold text-on-surface">{selectedTrade.closePrice || '-'}</p>
+                    </div>
+                    <div className="bg-surface-container p-4 rounded-xl">
+                      <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Stop Loss</p>
+                      <p className="font-bold text-on-surface">{selectedTrade.sl || '-'}</p>
+                    </div>
+                    <div className="bg-surface-container p-4 rounded-xl">
+                      <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Take Profit</p>
+                      <p className="font-bold text-on-surface">{selectedTrade.tp || '-'}</p>
+                    </div>
+                  </>
+                )}
+                {selectedTrade.type === 'ob' && (
+                  <div className="bg-surface-container p-4 rounded-xl">
+                    <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Retorno (Payout %)</p>
+                    <p className="font-bold text-on-surface">{selectedTrade.tp || '-'}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold font-headline uppercase tracking-wider text-on-surface-variant">Análise e Psicologia</h3>
+              
+              {selectedTrade.setups && selectedTrade.setups.length > 0 && (
+                <div>
+                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-2">Setups Utilizados</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTrade.setups.map((s: string) => (
+                      <span key={s} className="px-3 py-1 bg-primary/20 text-primary rounded font-bold text-xs">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedTrade.psychology && (
+                <div>
+                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-2">Estado Psicológico</p>
+                  <span className="px-4 py-2 bg-surface-container-highest rounded-lg font-bold text-sm inline-flex items-center gap-2">
+                    {selectedTrade.psychology === 'Calmo' && '🧘'}
+                    {selectedTrade.psychology === 'Entusiasmado' && '⚡'}
+                    {selectedTrade.psychology === 'Ansioso' && '😰'}
+                    {selectedTrade.psychology === 'Cansado' && '😴'}
+                    {selectedTrade.psychology}
+                  </span>
+                </div>
+              )}
+
+              {selectedTrade.notes && (
+                <div>
+                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-2">Notas / Razão</p>
+                  <div className="bg-surface-container p-4 rounded-xl text-sm text-on-surface-variant whitespace-pre-wrap">
+                    {selectedTrade.notes}
+                  </div>
+                </div>
+              )}
+              
+              {selectedTrade.psychologyNotes && (
+                <div>
+                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-2">Notas Psicológicas</p>
+                  <div className="bg-surface-container p-4 rounded-xl text-sm text-on-surface-variant whitespace-pre-wrap">
+                    {selectedTrade.psychologyNotes}
+                  </div>
+                </div>
+              )}
+
+              {selectedTrade.studyLink && (
+                <div>
+                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-2">Estudo / Imagem</p>
+                  {selectedTrade.studyLink.match(/\.(jpeg|jpg|gif|png)$/) || selectedTrade.studyLink.includes('tradingview.com/x/') ? (
+                    <a 
+                      href={selectedTrade.studyLink} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block rounded-xl overflow-hidden border border-outline-variant/20 hover:border-primary/50 transition-colors group relative"
+                    >
+                      <img 
+                        src={selectedTrade.studyLink} 
+                        alt="Estudo do Trade" 
+                        className="w-full h-auto object-cover max-h-[300px]"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                          <span className="material-symbols-outlined">open_in_new</span>
+                          Ampliar Imagem
+                        </span>
+                      </div>
+                    </a>
+                  ) : (
+                    <a 
+                      href={selectedTrade.studyLink} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg font-bold text-sm hover:bg-primary/20 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">link</span>
+                      Acessar Link do Estudo
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+      <div className="flex justify-between items-end mb-10">
+        <div>
+          <span className="text-xs font-label uppercase tracking-[0.2em] text-primary-fixed-dim">Entrada no Diário</span>
+          <h2 className="text-4xl font-bold font-headline mt-2 text-on-surface">
+            {tradeType === 'ob' ? 'Registro de Operações OB' : 'Registro de Operações Forex'}
+          </h2>
+        </div>
+        <div className="flex gap-3 items-center">
+          <button 
+            type="button"
+            onClick={() => handleViewChange('list')}
+            className="px-6 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant font-medium hover:bg-surface-container transition-all flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-sm">arrow_back</span>
+            Voltar
+          </button>
+
+          <select 
+            value={tradeData.accountId}
+            onChange={(e) => {
+              const newAccountId = e.target.value;
+              const selectedAcc = accounts.find(a => a.id === newAccountId);
+              const newTradeType = selectedAcc?.tradeType || 'forex';
+              setTradeData({
+                ...tradeData, 
+                accountId: newAccountId,
+                type: newTradeType
+              });
+              setTradeType(newTradeType);
+            }}
+            className="bg-surface-container-low border border-outline-variant/20 text-on-surface px-4 py-2.5 rounded-lg text-sm font-bold outline-none cursor-pointer"
+          >
+            <option value="" disabled>Selecione a Conta</option>
+            {accounts.filter(acc => (tradeType === 'ob' ? acc.tradeType === 'ob' : acc.tradeType !== 'ob')).map(acc => (
+              <option key={acc.id} value={acc.id} disabled={acc.status === 'inactive'}>
+                Conta {acc.accountNumber} {acc.status === 'inactive' ? '(Desativada)' : ''}
+              </option>
+            ))}
+          </select>
+          <button 
+            type="button"
+            onClick={() => {
+              const newType = tradeType === 'ob' ? 'forex' : 'ob';
+              handleOpenTradeForm(newType);
+            }}
+            className="px-6 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant font-medium hover:bg-surface-container transition-all flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-sm">swap_horiz</span>
+            Mudar para {tradeType === 'ob' ? 'Forex' : 'OB'}
+          </button>
+          <button 
+            type="button"
+            onClick={() => {
+              setTradeData({
+                accountId: '',
+                symbol: '',
+                session: '',
+                action: 'Buy',
+                openPrice: '',
+                sl: '',
+                tp: '',
+                notes: '',
+                psychology: '',
+                psychologyNotes: '',
+                setups: [],
+                pnl: '',
+                rr: '',
+                returnAmount: '',
+                commission: '',
+                size: '1.0',
+                type: tradeType || 'forex',
+                studyLink: '',
+                date: new Date().toISOString().split('T')[0],
+                entryTime: new Date().toTimeString().split(' ')[0].substring(0, 5),
+                timeframe: 'M5'
+              });
+            }}
+            className="px-6 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant font-medium hover:bg-surface-container transition-all"
+          >
+            Descartar Rascunho
+          </button>
+          
+          {tradeType === 'forex' && (
+            <>
+              <input 
+                type="file" 
+                accept=".csv, .html, .htm" 
+                onChange={handleFileUpload} 
+                ref={fileInputRef}
+                className="hidden" 
+                id="file-upload"
+              />
+              <label 
+                htmlFor="file-upload"
+                className={`px-6 py-2.5 rounded-lg border border-primary/50 text-primary font-bold hover:bg-primary/10 transition-all cursor-pointer flex items-center gap-2 ${isSaving ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                <span className="material-symbols-outlined text-sm">upload_file</span>
+                Importar CSV/HTML
+              </label>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-12 gap-8">
+        {/* Left Column */}
+        <div className="col-span-12 lg:col-span-8 space-y-8">
+          <section className="bg-surface-container-low rounded-xl p-8 shadow-sm">
+            <div className="flex items-center gap-3 mb-8">
+              <span className="material-symbols-outlined text-primary">analytics</span>
+              <h3 className="text-lg font-bold font-headline uppercase tracking-wider text-on-surface-variant">Parâmetros Principais</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Data</label>
+                <DatePicker 
+                  date={tradeData.date ? new Date(tradeData.date + 'T12:00:00') : undefined}
+                  onDateChange={(d) => {
+                    if (d) {
+                      setTradeData({...tradeData, date: d.toISOString().split('T')[0]});
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Hora de Entrada</label>
+                <input 
+                  type="time"
+                  value={tradeData.entryTime}
+                  onChange={(e) => setTradeData({...tradeData, entryTime: e.target.value})}
+                  className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Par de Ativos</label>
+                <input 
+                  type="text"
+                  list="symbols-list"
+                  value={tradeData.symbol}
+                  onChange={(e) => setTradeData({...tradeData, symbol: e.target.value})}
+                  className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface"
+                  placeholder="Ex: EUR/USD, GER30"
+                />
+                <datalist id="symbols-list">
+                  <option value="EUR/USD" />
+                  <option value="GBP/JPY" />
+                  <option value="XAU/USD" />
+                  <option value="BTC/USDT" />
+                  <option value="NAS100" />
+                  <option value="GER30" />
+                  <option value="US30" />
+                </datalist>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Timeframe</label>
+                <select 
+                  value={tradeData.timeframe}
+                  onChange={(e) => setTradeData({...tradeData, timeframe: e.target.value})}
+                  className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface"
+                >
+                  <option value="M1">M1</option>
+                  <option value="M5">M5</option>
+                  <option value="M15">M15</option>
+                  <option value="M30">M30</option>
+                  <option value="H1">H1</option>
+                  <option value="H4">H4</option>
+                  <option value="D1">D1</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">
+                  {tradeType === 'ob' ? 'Período' : 'Sessão'}
+                </label>
+                <select 
+                  value={tradeData.session}
+                  onChange={(e) => setTradeData({...tradeData, session: e.target.value})}
+                  className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface"
+                >
+                  {tradeType === 'ob' ? (
+                    <>
+                      <option value="Dia">Dia</option>
+                      <option value="Noite">Noite</option>
+                    </>
+                  ) : sessionType === 'simple' ? (
+                    <>
+                      <option value="Londres">Londres</option>
+                      <option value="Nova Iorque">Nova Iorque</option>
+                      <option value="Asiática">Asiática</option>
+                      <option value="Importado">Importado</option>
+                    </>
+                  ) : (
+                    <>
+                      <optgroup label="Londres">
+                        <option>Londres (Pré-Mercado)</option>
+                        <option>Londres (Intra Mercado)</option>
+                        <option>Londres (Zona Não Operável)</option>
+                        <option>Londres (Fechamento)</option>
+                      </optgroup>
+                      <optgroup label="Nova Iorque">
+                        <option>Nova Iorque (Pré-Mercado)</option>
+                        <option>Nova Iorque (Intra Mercado)</option>
+                        <option>Nova Iorque (Zona Não Operável)</option>
+                        <option>Nova Iorque (Fechamento)</option>
+                      </optgroup>
+                      <optgroup label="Asiática">
+                        <option>Asiática (Pré-Mercado)</option>
+                        <option>Asiática (Intra Mercado)</option>
+                        <option>Asiática (Zona Não Operável)</option>
+                        <option>Asiática (Fechamento)</option>
+                      </optgroup>
+                      <option>Importado</option>
+                    </>
+                  )}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Direção</label>
+                <div className="grid grid-cols-2 gap-2 bg-surface-container-highest p-1 rounded-lg">
+                  <button 
+                    type="button"
+                    onClick={() => setTradeData({...tradeData, action: 'Buy'})}
+                    className={`${tradeData.action === 'Buy' ? 'bg-secondary text-on-secondary' : 'text-slate-500 hover:bg-surface-container'} py-2 rounded font-bold text-xs uppercase transition-colors`}
+                  >
+                    {tradeType === 'ob' ? 'Acima (Call)' : 'Long (Compra)'}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setTradeData({...tradeData, action: 'Sell'})}
+                    className={`${tradeData.action === 'Sell' ? 'bg-error text-on-error' : 'text-slate-500 hover:bg-surface-container'} py-2 rounded font-bold text-xs uppercase transition-colors`}
+                  >
+                    {tradeType === 'ob' ? 'Abaixo (Put)' : 'Short (Venda)'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
+              {tradeType === 'forex' ? (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Preço de Entrada</label>
+                    <input 
+                      type="number"
+                      value={tradeData.openPrice}
+                      onChange={(e) => setTradeData({...tradeData, openPrice: e.target.value})}
+                      className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface" 
+                      placeholder="1.08450" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Stop Loss</label>
+                    <input 
+                      type="number"
+                      value={tradeData.sl}
+                      onChange={(e) => setTradeData({...tradeData, sl: e.target.value})}
+                      className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface" 
+                      placeholder="1.08210" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Take Profit</label>
+                    <input 
+                      type="number"
+                      value={tradeData.tp}
+                      onChange={(e) => setTradeData({...tradeData, tp: e.target.value})}
+                      className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface" 
+                      placeholder="1.08950" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Volume (Lotes / Valor)</label>
+                    <input 
+                      type="number"
+                      value={tradeData.size}
+                      onChange={(e) => setTradeData({...tradeData, size: e.target.value})}
+                      className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface" 
+                      placeholder="1.0" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Valor Arriscado</label>
+                    <input 
+                      type="number"
+                      value={tradeData.returnAmount}
+                      onChange={(e) => setTradeData({...tradeData, returnAmount: e.target.value})}
+                      className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface" 
+                      placeholder="Ex: 50" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Lucro/Prejuízo (P&L)</label>
+                    <input 
+                      type="number"
+                      value={tradeData.pnl}
+                      onChange={(e) => setTradeData({...tradeData, pnl: e.target.value})}
+                      className={`w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 font-bold ${Number(tradeData.pnl) > 0 ? 'text-secondary' : Number(tradeData.pnl) < 0 ? 'text-error' : 'text-on-surface'}`} 
+                      placeholder="0.00" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Risco/Retorno (R:R)</label>
+                    <div className="flex items-center bg-surface-container-highest rounded-lg px-4 focus-within:ring-2 focus-within:ring-primary/20">
+                      <span className="text-primary font-bold">1:</span>
+                      <input 
+                        type="number"
+                        step="0.1"
+                        value={tradeData.rr}
+                        onChange={(e) => setTradeData({...tradeData, rr: e.target.value})}
+                        className="w-full bg-transparent border-none py-3 px-2 text-primary font-bold focus:ring-0" 
+                        placeholder="2.5" 
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Lucro/Prejuízo (P&L)</label>
+                    <input 
+                      type="number"
+                      value={tradeData.pnl}
+                      onChange={(e) => setTradeData({...tradeData, pnl: e.target.value})}
+                      className={`w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 font-bold ${Number(tradeData.pnl) > 0 ? 'text-secondary' : Number(tradeData.pnl) < 0 ? 'text-error' : 'text-on-surface'}`} 
+                      placeholder="0.00" 
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+          <section className="bg-surface-container-low rounded-xl p-8 shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary">image</span>
+                <h3 className="text-lg font-bold font-headline uppercase tracking-wider text-on-surface-variant">Prova Visual</h3>
+              </div>
+              <span className="text-xs font-label text-slate-500">Máx 10MB por ficheiro</span>
+            </div>
+            <div className="border-2 border-dashed border-outline-variant/20 rounded-xl p-12 text-center group hover:border-primary/40 transition-colors cursor-pointer bg-surface-container-lowest/50">
+              <span className="material-symbols-outlined text-5xl text-slate-600 group-hover:text-primary transition-colors">cloud_upload</span>
+              <p className="mt-4 text-on-surface-variant font-medium">Arraste os seus prints do TradingView aqui</p>
+              <p className="text-sm text-slate-600 mt-1">ou clique para procurar ficheiros locais</p>
+            </div>
+          </section>
+        </div>
+        {/* Right Column */}
+        <div className="col-span-12 lg:col-span-4 space-y-8">
+          <section className="bg-surface-container-low rounded-xl p-6 shadow-sm">
+            <h3 className="text-sm font-bold font-headline uppercase tracking-widest text-slate-500 mb-6">Setups Técnicos</h3>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {availableSetups.map(setup => (
+                <button 
+                  key={setup}
+                  type="button"
+                  onClick={() => toggleSetup(setup)}
+                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${
+                    tradeData.setups.includes(setup) 
+                      ? 'bg-primary-container text-on-primary-container border-primary/20' 
+                      : 'bg-surface-container-highest text-on-surface-variant border-transparent hover:bg-primary/10'
+                  }`}
+                >
+                  {setup}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customSetup}
+                onChange={(e) => setCustomSetup(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddCustomSetup()}
+                placeholder="Adicionar setup manual..."
+                className="flex-1 bg-surface-container-highest border-none rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary/20 text-on-surface"
+              />
+              <button
+                type="button"
+                onClick={handleAddCustomSetup}
+                className="bg-primary/10 text-primary hover:bg-primary/20 px-3 py-2 rounded-lg transition-colors flex items-center justify-center"
+              >
+                <span className="material-symbols-outlined text-sm">add</span>
+              </button>
+            </div>
+          </section>
+          <section className="bg-surface-container-low rounded-xl p-6 shadow-sm border border-tertiary-container/10">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-bold font-headline uppercase tracking-widest text-slate-500">Conformidade com o Plano</h3>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" />
+                <div className="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-error-container"></div>
+              </label>
+            </div>
+            <div className="space-y-4">
+              <p className="text-[11px] text-tertiary-container/80 font-medium">Aviso: Registo de desvio ativado. Por favor, explique por que quebrou as regras de trading.</p>
+              <textarea 
+                value={tradeData.notes}
+                onChange={(e) => setTradeData({...tradeData, notes: e.target.value})}
+                className="w-full bg-surface-container-highest border-none rounded-lg p-3 text-sm min-h-[100px] focus:ring-1 focus:ring-tertiary-container/50 text-on-surface-variant placeholder:text-slate-600" 
+                placeholder="ex: Entrada antecipada por FOMO, faltou confirmação..."
+              ></textarea>
+            </div>
+            <div className="mt-6 space-y-2">
+              <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Link do Estudo (TradingView, etc)</label>
+              <input 
+                type="url"
+                value={tradeData.studyLink || ''}
+                onChange={(e) => setTradeData({...tradeData, studyLink: e.target.value})}
+                className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface text-sm" 
+                placeholder="https://www.tradingview.com/x/..." 
+              />
+            </div>
+          </section>
+          <section className="bg-surface-container-low rounded-xl p-6 shadow-sm">
+            <h3 className="text-sm font-bold font-headline uppercase tracking-widest text-slate-500 mb-6">Estado Psicológico</h3>
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <button 
+                type="button"
+                onClick={() => setTradeData({...tradeData, psychology: 'Calmo'})}
+                className={`p-3 rounded-lg flex flex-col items-center gap-2 transition-all border ${tradeData.psychology === 'Calmo' ? 'bg-secondary/10 border-secondary/20 grayscale-0' : 'bg-surface-container-highest border-transparent grayscale hover:grayscale-0 hover:bg-secondary/10 hover:border-secondary/20'}`}
+              >
+                <span className="text-xl">🧘</span>
+                <span className="text-[10px] font-label uppercase">Calmo</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => setTradeData({...tradeData, psychology: 'Entusiasmado'})}
+                className={`p-3 rounded-lg flex flex-col items-center gap-2 transition-all border ${tradeData.psychology === 'Entusiasmado' ? 'bg-primary/10 border-primary/20 grayscale-0' : 'bg-surface-container-highest border-transparent grayscale hover:grayscale-0 hover:bg-primary/10 hover:border-primary/20'}`}
+              >
+                <span className="text-xl">⚡</span>
+                <span className="text-[10px] font-label uppercase">Entusiasmado</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => setTradeData({...tradeData, psychology: 'Ansioso'})}
+                className={`p-3 rounded-lg flex flex-col items-center gap-2 transition-all border ${tradeData.psychology === 'Ansioso' ? 'bg-tertiary-container/10 border-tertiary-container/20 grayscale-0' : 'bg-surface-container-highest border-transparent grayscale hover:grayscale-0 hover:bg-tertiary-container/10 hover:border-tertiary-container/20'}`}
+              >
+                <span className="text-xl">😰</span>
+                <span className="text-[10px] font-label uppercase">Ansioso</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => setTradeData({...tradeData, psychology: 'Cansado'})}
+                className={`p-3 rounded-lg flex flex-col items-center gap-2 transition-all border ${tradeData.psychology === 'Cansado' ? 'bg-surface-bright border-transparent grayscale-0' : 'bg-surface-container-highest border-transparent grayscale hover:grayscale-0 hover:bg-surface-bright'}`}
+              >
+                <span className="text-xl">😴</span>
+                <span className="text-[10px] font-label uppercase">Cansado</span>
+              </button>
+            </div>
+            <textarea 
+              value={tradeData.psychologyNotes}
+              onChange={(e) => setTradeData({...tradeData, psychologyNotes: e.target.value})}
+              className="w-full bg-surface-container-highest border-none rounded-lg p-3 text-sm min-h-[150px] focus:ring-1 focus:ring-primary/50 text-on-surface-variant placeholder:text-slate-600" 
+              placeholder="Notas detalhadas sobre como se sentiu antes e durante a execução..."
+            ></textarea>
+          </section>
+        </div>
+      </div>
+      <section className="mt-8 bg-gradient-to-r from-surface-container-low to-surface-container rounded-xl p-8 border border-outline-variant/10">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex-1">
+            <h3 className="text-sm font-bold font-headline uppercase tracking-widest text-slate-500 mb-4">Resultado Final</h3>
+            <p className="text-on-surface-variant text-sm">Revise as informações acima e clique em salvar para registrar o trade.</p>
+          </div>
+          <div className="w-full md:w-auto">
+            <button 
+              type="button"
+              onClick={handleSaveTrade}
+              disabled={isSaving}
+              className="w-full md:w-auto px-12 py-4 bg-surface-container-highest rounded-lg font-bold text-on-surface border border-outline-variant/20 hover:border-primary/50 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined">save_as</span>
+              {isSaving ? 'Salvando...' : 'Guardar para Revisão'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Import Modal */}
+      {(isImporting || importedTradesToReview.length > 0) && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-surface-container border border-outline-variant/20 rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="text-center">
+              {isImporting ? (
+                <>
+                  <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+                  <h3 className="text-xl font-bold text-on-surface mb-2">Lendo Arquivo...</h3>
+                  <p className="text-on-surface-variant text-sm">Por favor, aguarde enquanto processamos os dados.</p>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <span className="material-symbols-outlined text-3xl text-primary">check_circle</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-on-surface mb-2">Arquivo Processado</h3>
+                  <p className="text-on-surface-variant text-sm mb-8">
+                    Foram encontrados <strong className="text-primary">{importedTradesToReview.length}</strong> trades no arquivo. Deseja importá-los para a sua conta?
+                  </p>
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={() => {
+                        setImportedTradesToReview([]);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      className="flex-1 px-4 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant font-bold hover:bg-surface-container transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      onClick={() => saveImportedTrades(importedTradesToReview)}
+                      className="flex-1 px-4 py-2.5 rounded-lg bg-primary text-on-primary font-bold hover:scale-[1.02] active:scale-95 transition-all"
+                    >
+                      Salvar Importação
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Modal {...modalConfig} />
+    </div>
+  );
+}

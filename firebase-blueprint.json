@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "Account": {
+      "title": "Account",
+      "description": "Trading account details",
+      "type": "object",
+      "properties": {
+        "accountNumber": { "type": "string" },
+        "broker": { "type": "string" },
+        "initialBalance": { "type": "number" },
+        "accountType": { "type": "string" },
+        "phase": { "type": "string" },
+        "masterPassword": { "type": "string" },
+        "investorPassword": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["accountNumber", "broker", "initialBalance", "accountType", "userId", "createdAt"]
+    },
+    "Trade": {
+      "title": "Trade",
+      "description": "A single trade record",
+      "type": "object",
+      "properties": {
+        "ticket": { "type": "string" },
+        "action": { "type": "string" },
+        "size": { "type": "number" },
+        "openTime": { "type": "string", "format": "date-time" },
+        "closeTime": { "type": "string", "format": "date-time" },
+        "openPrice": { "type": "number" },
+        "closePrice": { "type": "number" },
+        "sl": { "type": "number" },
+        "tp": { "type": "number" },
+        "commission": { "type": "number" },
+        "swap": { "type": "number" },
+        "pnl": { "type": "number" },
+        "accountId": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["ticket", "action", "size", "openTime", "closeTime", "openPrice", "closePrice", "pnl", "accountId", "userId"]
+    }
+  },
+  "firestore": {
+    "/accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/Account" },
+      "description": "User trading accounts"
+    },
+    "/trades/{tradeId}": {
+      "schema": { "$ref": "#/entities/Trade" },
+      "description": "User trades"
+    }
+  }
+}
