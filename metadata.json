@@ -1,5 +1,6 @@
 {
-  "name": "C Trade Diário",
+  "name": "C Profit - Diário de Trading",
   "description": "",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }

@@ -24,30 +24,130 @@
       "properties": {
         "ticket": { "type": "string" },
         "action": { "type": "string" },
+        "account_login": { "type": "string" },
         "size": { "type": "number" },
         "openTime": { "type": "string", "format": "date-time" },
         "closeTime": { "type": "string", "format": "date-time" },
         "openPrice": { "type": "number" },
         "closePrice": { "type": "number" },
-        "sl": { "type": "number" },
-        "tp": { "type": "number" },
-        "commission": { "type": "number" },
-        "swap": { "type": "number" },
         "pnl": { "type": "number" },
         "accountId": { "type": "string" },
-        "userId": { "type": "string" }
+        "userId": { "type": "string" },
+        "source": { "type": "string" }
       },
-      "required": ["ticket", "action", "size", "openTime", "closeTime", "openPrice", "closePrice", "pnl", "accountId", "userId"]
+      "required": ["ticket", "action", "size", "openTime", "closeTime", "openPrice", "closePrice", "pnl"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and subscription data",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "plan_type": { "type": "string" },
+        "account_limit": { "type": "number" },
+        "expiry_date": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "GlobalSettings": {
+      "title": "Global Settings",
+      "description": "Platform settings for admin",
+      "type": "object",
+      "properties": {
+        "whatsappNumber": { "type": "string" },
+        "iban": { "type": "string" },
+        "multicaixaEntity": { "type": "string" },
+        "multicaixaReference": { "type": "string" },
+        "showIban": { "type": "boolean" },
+        "showMulticaixa": { "type": "boolean" },
+        "multicaixaLogoUrl": { "type": "string" }
+      }
+    },
+    "CommunityPost": {
+      "title": "Community Post",
+      "description": "User shared analysis or post",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "legend": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "type": { "type": "string", "enum": ["forex", "ob"] },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CommunityComment": {
+      "title": "Community Comment",
+      "description": "Comment on a post",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "PaymentRequest": {
+      "title": "Payment Request",
+      "description": "User requests for payment approval",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "planId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "proofUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "firestore": {
+    "/settings/global": {
+      "schema": { "$ref": "#/entities/GlobalSettings" },
+      "description": "Global platform configurations"
+    },
+    "/community_posts/{postId}": {
+      "schema": { "$ref": "#/entities/CommunityPost" },
+      "description": "Shared posts from users in the community"
+    },
+    "/community_posts/{postId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/CommunityComment" },
+      "description": "Comments on community posts"
+    },
+    "/community_posts/{postId}/likes/{userId}": {
+      "schema": { "type": "object" },
+      "description": "User likes on a specific post"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/PaymentRequest" },
+      "description": "Payment requests and history"
+    },
     "/accounts/{accountId}": {
       "schema": { "$ref": "#/entities/Account" },
       "description": "User trading accounts"
     },
     "/trades/{tradeId}": {
       "schema": { "$ref": "#/entities/Trade" },
-      "description": "User trades"
+      "description": "Legacy trades storage"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile data (legacy)"
+    },
+    "/usuarios/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile data (SaaS)"
+    },
+    "/usuarios/{userId}/trades/{ticket}": {
+      "schema": { "$ref": "#/entities/Trade" },
+      "description": "SaaS trades storage"
     }
   }
 }
