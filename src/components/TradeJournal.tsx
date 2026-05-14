@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, onSnapshot, query, where, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage } from '../firebase';
 import Papa from 'papaparse';
 import { useCurrency } from '../contexts/CurrencyContext';
+import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import { DatePicker } from './DatePicker';
 
@@ -14,9 +16,17 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(new Date());
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [trades, setTrades] = useState<any[]>([]);
+  
+  const [isImporting, setIsImporting] = useState(false);
+  const [importedTradesToReview, setImportedTradesToReview] = useState<any[]>([]);
+  
+  // Usando o novo hook para gerenciar os trades (sincronização + deduplicação)
+  const { allTrades: trades, loading: loadingTrades } = useTrades(importedTradesToReview);
+  
   const [selectedTrade, setSelectedTrade] = useState<any>(null);
   const [editingTradeId, setEditingTradeId] = useState<string | null>(null);
+  const [tradeTypeFilter, setTradeTypeFilter] = useState<'all' | 'forex' | 'ob'>('all');
+  const [selectedAccountFilter, setSelectedAccountFilter] = useState<string>('all');
   const [tradeData, setTradeData] = useState({
     accountId: '',
     symbol: 'EUR/USD',
@@ -42,8 +52,9 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     dayOfWeek: new Date().toLocaleDateString('pt-BR', { weekday: 'long' })
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importedTradesToReview, setImportedTradesToReview] = useState<any[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [sessionType, setSessionType] = useState<'simple' | 'subdivided'>('subdivided');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,6 +86,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     title: string;
     message: string;
     onConfirm: () => void;
+    onCancel?: () => void;
     isError?: boolean;
     confirmText?: string;
   }>({
@@ -104,12 +116,36 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
 
   useEffect(() => {
     if (!auth.currentUser) return;
-    const accountsQuery = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
-    const unsubscribeAccounts = onSnapshot(accountsQuery, (snapshot) => {
-      const accountsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAccounts(accountsData);
-      if (accountsData.length > 0 && !tradeData.accountId) {
-        const firstAccount = accountsData[0] as any;
+
+    const unsubscribes: (() => void)[] = [];
+
+    // Path 1: root accounts (old)
+    const qOld = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
+    const unsubOld = onSnapshot(qOld, (snapshot) => {
+      const accountsOld = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateAccounts(accountsOld, 'old');
+    });
+    unsubscribes.push(unsubOld);
+
+    // Path 2: usuarios/{uid}/accounts (new SaaS)
+    const qNew = query(collection(db, 'usuarios', auth.currentUser.uid, 'accounts'));
+    const unsubNew = onSnapshot(qNew, (snapshot) => {
+      const accountsNew = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateAccounts(accountsNew, 'new');
+    });
+    unsubscribes.push(unsubNew);
+
+    const accountsByPath: Record<string, any[]> = { old: [], new: [] };
+    const updateAccounts = (data: any[], path: 'old' | 'new') => {
+      accountsByPath[path] = data;
+      const combined = [...accountsByPath.new, ...accountsByPath.old];
+      const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+      
+      setAccounts(unique);
+      
+      // Auto-select first account if none selected
+      if (unique.length > 0 && !tradeData.accountId) {
+        const firstAccount = unique[0] as any;
         setTradeData(prev => ({ 
           ...prev, 
           accountId: firstAccount.id,
@@ -117,33 +153,71 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
         }));
         setTradeType(firstAccount.tradeType || 'forex');
       }
-    });
-
-    const tradesQuery = query(collection(db, 'trades'), where('userId', '==', auth.currentUser.uid));
-    const unsubscribeTrades = onSnapshot(tradesQuery, (snapshot) => {
-      const tradesData = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-      // Sort by date descending
-      tradesData.sort((a, b) => {
-        const dateA = a.closeTime?.toDate ? a.closeTime.toDate() : new Date(a.closeTime || 0);
-        const dateB = b.closeTime?.toDate ? b.closeTime.toDate() : new Date(b.closeTime || 0);
-        return dateB.getTime() - dateA.getTime();
-      });
-      setTrades(tradesData);
-    });
-
-    return () => {
-      unsubscribeAccounts();
-      unsubscribeTrades();
     };
+
+    return () => unsubscribes.forEach(unsub => unsub());
   }, []);
+
+  const handleDeleteTrade = async (tradeId: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: "Confirmar Exclusão",
+      message: "Tem certeza que deseja excluir este trade? Esta ação não pode ser desfeita.",
+      confirmText: "Excluir",
+      isError: true,
+      onCancel: closeModal,
+      onConfirm: async () => {
+        try {
+          // Tentar deletar em ambos os caminhos para garantir
+          try {
+            await deleteDoc(doc(db, 'trades', tradeId));
+          } catch (e) {}
+          
+          if (auth.currentUser) {
+            try {
+              await deleteDoc(doc(db, 'usuarios', auth.currentUser.uid, 'trades', tradeId));
+            } catch (e) {}
+          }
+
+          closeModal();
+          if (view === 'detail') {
+            handleViewChange('list');
+          }
+        } catch (error) {
+          console.error("Error deleting trade: ", error);
+          setModalConfig({
+            isOpen: true,
+            title: "Erro",
+            message: "Erro ao excluir o trade.",
+            isError: true,
+            onConfirm: closeModal
+          });
+        }
+      }
+    });
+  };
 
   const handleSaveTrade = async () => {
     if (!auth.currentUser) return;
-    if (!tradeData.accountId || !tradeData.pnl || (tradeData.type === 'forex' && !tradeData.openPrice)) {
+    
+    const isManual = !tradeData.symbol || !tradeData.openPrice || !tradeData.entryTime;
+    
+    // Validations based on user requests for Manual Entry
+    const missingFields = [];
+    if (!tradeData.accountId) missingFields.push("Conta");
+    if (!tradeData.date) missingFields.push("Data (Calendário)");
+    if (!tradeData.entryTime) missingFields.push("Hora de Entrada");
+    if (!tradeData.symbol) missingFields.push("Par de Ativos");
+    if (!tradeData.session) missingFields.push("Sessão");
+    if (!tradeData.action) missingFields.push("Direção (Long/Short)");
+    if (!tradeData.size) missingFields.push("Volume (Lotes/Valor)");
+    if (!tradeData.pnl) missingFields.push("Lucro/Prejuízo (P&L)");
+
+    if (missingFields.length > 0) {
       setModalConfig({
         isOpen: true,
-        title: "Atenção",
-        message: "Por favor, preencha os campos obrigatórios.",
+        title: "Campos Obrigatórios Faltando",
+        message: `Para registrar uma trade manualmente, os seguintes campos são obrigatórios: ${missingFields.join(', ')}`,
         isError: true,
         onConfirm: closeModal
       });
@@ -152,6 +226,18 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
 
     setIsSaving(true);
     try {
+      let finalStudyLink = tradeData.studyLink;
+
+      // Handle File Upload if present
+      if (selectedFile) {
+        const fileRef = ref(storage, `trades/${auth.currentUser.uid}/${Date.now()}_${selectedFile.name}`);
+        await uploadBytes(fileRef, selectedFile);
+        finalStudyLink = await getDownloadURL(fileRef);
+      }
+
+      // Ensure dayOfWeek is never undefined
+      const resolvedDayOfWeek = tradeData.dayOfWeek || new Date(tradeData.date).toLocaleDateString('pt-BR', { weekday: 'long' }) || 'unknown';
+
       const tradePayload = {
         action: tradeData.action,
         size: Number(tradeData.size) || 0,
@@ -173,20 +259,29 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
         psychologyNotes: tradeData.psychologyNotes,
         setups: tradeData.setups,
         type: tradeData.type,
-        studyLink: tradeData.studyLink,
+        studyLink: finalStudyLink,
         date: tradeData.date,
         entryTime: tradeData.entryTime,
         timeframe: tradeData.timeframe,
-        dayOfWeek: tradeData.dayOfWeek
+        dayOfWeek: resolvedDayOfWeek
       };
 
       if (editingTradeId) {
         const { doc, updateDoc } = await import('firebase/firestore');
-        await updateDoc(doc(db, 'trades', editingTradeId), tradePayload);
+        // Try both paths for update
+        try {
+          await updateDoc(doc(db, 'trades', editingTradeId), tradePayload);
+        } catch (e) {
+          // If not in old path, try new path
+          const ticket = selectedTrade?.ticket || `T${Date.now()}`;
+          await updateDoc(doc(db, 'usuarios', auth.currentUser.uid, 'trades', editingTradeId), tradePayload);
+        }
       } else {
-        await addDoc(collection(db, 'trades'), {
+        const ticket = `T${Date.now()}`;
+        // Save to the new SaaS path
+        await setDoc(doc(db, 'usuarios', auth.currentUser.uid, 'trades', ticket), {
           ...tradePayload,
-          ticket: `T${Date.now()}`,
+          ticket,
           openTime: serverTimestamp(),
           closeTime: serverTimestamp(),
         });
@@ -210,6 +305,8 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
       });
       setEditingTradeId(null);
       setTradeType(null);
+      setSelectedFile(null);
+      setPreviewUrl(null);
       handleViewChange('list');
 
       setModalConfig({
@@ -257,22 +354,62 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
       return;
     }
 
+    // Check for duplicates
+    const existingTickets = new Set(trades.filter(t => t.accountId === tradeData.accountId).map(t => t.ticket));
+    const newTrades = tradesToSave.filter(t => !existingTickets.has(t.ticket));
+
+    if (newTrades.length === 0) {
+      setModalConfig({
+        isOpen: true,
+        title: "Aviso",
+        message: "Todos os trades deste arquivo já foram importados anteriormente para esta conta.",
+        isError: true,
+        onConfirm: () => {
+           closeModal();
+           setImportedTradesToReview([]);
+        }
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const promises = tradesToSave.map(trade => 
-        addDoc(collection(db, 'trades'), {
-          ...trade,
+      const promises = newTrades.map(trade => {
+        let dateForDay = trade.date ? trade.date.replace(/\./g, '-').replace(/\//g, '-') : null;
+        if (dateForDay && dateForDay.split('-').length === 3) {
+          const parts = dateForDay.split('-');
+          if (parts[0].length === 2 && parts[2].length === 4) { // DD-MM-YYYY to YYYY-MM-DD
+            dateForDay = `${parts[2]}-${parts[1]}-${parts[0]}`;
+          }
+        }
+        
+        const resolvedDayOfWeek = trade.dayOfWeek || (dateForDay ? new Date(dateForDay + "T00:00:00").toLocaleDateString('pt-BR', { weekday: 'long' }) : 'unknown');
+
+        // Also normalize trade.date so it's always YYYY-MM-DD in the database
+        const normalizedTrade = { ...trade, date: dateForDay || trade.date };
+
+        return addDoc(collection(db, 'trades'), {
+          ...normalizedTrade,
           accountId: tradeData.accountId,
           userId: auth.currentUser!.uid,
-        })
-      );
+          dayOfWeek: resolvedDayOfWeek
+        });
+      });
       await Promise.all(promises);
+      const skipped = tradesToSave.length - newTrades.length;
+      let msg = `${newTrades.length} trades importados com sucesso!`;
+      if (skipped > 0) {
+          msg += `\n${skipped} trades foram ignorados pois já existem na conta.`;
+      }
       setModalConfig({
         isOpen: true,
         title: "Sucesso",
-        message: `${tradesToSave.length} trades importados com sucesso!`,
+        message: msg,
         confirmText: "OK",
-        onConfirm: closeModal
+        onConfirm: () => {
+            closeModal();
+            setImportedTradesToReview([]);
+        }
       });
     } catch (error) {
       console.error("Error importing trades: ", error);
@@ -317,30 +454,101 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
 
       if (file.name.toLowerCase().endsWith('.csv')) {
         const lines = content.trim().split('\n');
-        for (let i = 1; i < lines.length; i++) {
-            const data = lines[i].split(',');
-            if (data.length < 10) continue;
-    
-            const fullDateTime = data[2] || "";
+        if (lines.length > 0) {
+          let separator = ',';
+          let tIdx = -1, tkIdx = -1, symIdx = -1, typeIdx = -1, volIdx = -1, priceIdx = -1;
+          let slIdx = -1, tpIdx = -1, commIdx = -1, swapIdx = -1, pnlIdx = -1;
+          
+          for (let i = 0; i < lines.length; i++) {
+            let rawLine = lines[i].trim();
+            if (!rawLine) continue;
+            
+            const lowerLine = rawLine.toLowerCase();
+            // Detect header line
+            if (lowerLine.includes('time') || lowerLine.includes('date') || lowerLine.includes('data') || lowerLine.includes('ticket') || lowerLine.includes('order') || lowerLine.includes('profit')) {
+                  separator = lowerLine.includes(';') ? ';' : (lowerLine.includes('\t') ? '\t' : ',');
+                  const header = lowerLine.split(separator).map(s => s.replace(/"/g, '').trim());
+                  
+                  // Ignore lines that are just single words like "Orders", "Positions", "Deals"
+                  if (header.length > 3) {
+                      const getIdx = (keywords: string[]) => header.findIndex(col => keywords.some(kw => col.includes(kw)));
+                      
+                      tIdx = getIdx(['time', 'date', 'data', 'hora']);
+                      tkIdx = getIdx(['ticket', 'position', 'deal', 'order', 'ordem']);
+                      symIdx = getIdx(['symbol', 'item', 'asset', 'ativo', 'símbolo']);
+                      typeIdx = getIdx(['type', 'action', 'side', 'tipo', 'ação']);
+                      volIdx = getIdx(['size', 'volume', 'tamanho']);
+                      // sometimes deal has direction! if so, use 'type' for action 
+                      priceIdx = getIdx(['price', 'open', 'preço', 'abertura']);
+                      slIdx = getIdx(['s/l', 'stop', 's / l']);
+                      tpIdx = getIdx(['t/p', 'target', 't / p', 'alvo']);
+                      commIdx = getIdx(['commission', 'fee', 'comissão', 'taxa']);
+                      swapIdx = getIdx(['swap']);
+                      pnlIdx = getIdx(['profit', 'pnl', 'p/l', 'lucro']);
+                      continue; // skip the header
+                  }
+            }
+
+            const data = rawLine.split(separator).map(s => s.replace(/"/g, '').trim());
+            if (data.length < 5) continue; // Skip empty/invalid lines
+
+            // If we couldn't detect columns perfectly, fallback to MT5-ish / generic indices
+            const rawTime = tIdx >= 0 ? data[tIdx] : (data[0] || "");
+            
+            // Validate that we actually have a date-like string (e.g. 2026.05.01 or 2026-05-01 or DD/MM/YYYY)
+            if (!rawTime.match(/\d{2,4}[./\-]\d{2}[./\-]\d{2,4}/)) continue;
+
+            const fullDateTime = rawTime.trim();
             const dateTimeParts = fullDateTime.split(' ');
             const datePart = dateTimeParts[0] || "";
             const timePart = dateTimeParts[1] || "";
-    
+            
+            let rawType = (typeIdx >= 0 ? data[typeIdx] : data[3]) || "";
+            
+            const parseNumber = (val: string) => {
+               if (!val) return 0;
+               val = val.replace(/ /g, '');
+               if (val.includes(',') && val.includes('.')) {
+                  if (val.lastIndexOf(',') > val.lastIndexOf('.')) {
+                      val = val.replace(/\./g, '').replace(',', '.');
+                  } else {
+                      val = val.replace(/,/g, '');
+                  }
+               } else if (val.includes(',')) {
+                  val = val.replace(',', '.');
+               }
+               return Number(val) || 0;
+            };
+
+            const size = parseNumber(volIdx >= 0 ? data[volIdx] : data[4]);
+            if (rawType.toLowerCase().includes('balance') || size === 0) continue;
+
+            const isSell = rawType.toLowerCase().includes('sell') || rawType.toLowerCase().includes('venda');
+
+            const commission = parseNumber((commIdx >= 0 ? data[commIdx] : data[10]) || '0');
+            const swap = parseNumber((swapIdx >= 0 ? data[swapIdx] : data[11]) || '0');
+            const grossPnl = parseNumber((pnlIdx >= 0 ? data[pnlIdx] : data[12]) || '0');
+
             parsedTrades.push({
-                ticket: data[0] || `T${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                symbol: data[1],
-                action: data[4]?.toUpperCase() === 'SELL' ? 'Sell' : 'Buy',
+                ticket: (tkIdx >= 0 ? data[tkIdx] : data[1]) || `T${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                symbol: (symIdx >= 0 ? data[symIdx] : data[2]) || 'Unknown',
+                action: isSell ? 'Sell' : 'Buy',
                 date: datePart,
                 entryTime: timePart,
-                size: Number(data[3]) || 0,
-                openPrice: Number(data[6]) || 0,
-                closePrice: Number(data[6]) || 0, // mock
-                commission: parseFloat(data[11] || '0'),
-                swap: parseFloat(data[10] || '0'),
-                pnl: parseFloat(data[12] || '0'),
-                rr: calcularRR(data[6], data[8], data[9], data[4]),
-                sl: Number(data[8]) || 0,
-                tp: Number(data[9]) || 0,
+                size: size,
+                openPrice: parseNumber(priceIdx >= 0 ? data[priceIdx] : data[5]),
+                closePrice: parseNumber(priceIdx >= 0 ? data[priceIdx] : data[5]),
+                commission: commission,
+                swap: swap,
+                pnl: grossPnl + commission + swap,
+                rr: calcularRR(
+                  (priceIdx >= 0 ? data[priceIdx] : data[5]) || '0', 
+                  (slIdx >= 0 ? data[slIdx] : data[6]) || '0', 
+                  (tpIdx >= 0 ? data[tpIdx] : data[7]) || '0', 
+                  rawType
+                ),
+                sl: parseNumber(slIdx >= 0 ? data[slIdx] : data[6]),
+                tp: parseNumber(tpIdx >= 0 ? data[tpIdx] : data[7]),
                 session: 'Importado',
                 notes: '',
                 psychology: '',
@@ -348,19 +556,52 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 openTime: parseDateStr(fullDateTime),
                 closeTime: parseDateStr(fullDateTime)
             });
+          }
         }
-        setImportedTradesToReview(parsedTrades);
+        if (parsedTrades.length > 0) {
+          setImportedTradesToReview(parsedTrades);
+          setTradeData(prev => {
+             const latestTrade = parsedTrades[parsedTrades.length - 1];
+             if (prev.accountId) return prev;
+             const bestAccount = accounts.find(a => latestTrade.type === 'ob' ? a.tradeType === 'ob' : (a.tradeType === 'forex' || !a.tradeType));
+             return bestAccount ? { ...prev, accountId: bestAccount.id, type: latestTrade.type } : prev;
+          });
+        } else {
+          setModalConfig({
+            isOpen: true,
+            title: "Aviso",
+            message: "Nenhum trade válido foi encontrado. Verifique se o arquivo possui colunas/linhas com as informações da operação.",
+            isError: true,
+            onConfirm: closeModal
+          });
+        }
         setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
       } else if (file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm')) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(content, 'text/html');
         
-        const rows = doc.querySelectorAll('tr[bgcolor="#FFFFFF"], tr[bgcolor="#F7F7F7"]');
+        const rows = doc.querySelectorAll('tr');
         
+        const parseHTMLNumber = (str: string) => {
+           if (!str) return 0;
+           str = str.replace(/&nbsp;/g, '').replace(/\s/g, ''); // remove spaces
+           if (str.includes(',') && str.includes('.')) {
+              if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+                 str = str.replace(/\./g, '').replace(',', '.');
+              } else {
+                 str = str.replace(/,/g, '');
+              }
+           } else if (str.includes(',')) {
+              str = str.replace(',', '.');
+           }
+           return Number(str) || 0;
+        };
+
         rows.forEach(row => {
             const cells = row.querySelectorAll('td');
             
-            if (cells.length > 10 && cells[0].innerText.match(/\d{4}\.\d{2}\.\d{2}/)) {
+            if (cells.length > 10 && cells[0].innerText.match(/\d{2,4}[./\-]\d{2}[./\-]\d{2,4}/)) {
                 const validCells = Array.from(cells).filter(c => !c.classList.contains('hidden'));
                 
                 if (validCells.length >= 12) {
@@ -370,9 +611,16 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                     const timePart = dateTimeParts[1] || "";
     
                     const action = validCells[3].innerText.trim();
+                    const size = parseHTMLNumber(validCells[4].innerText);
+                    
+                    if (action.toLowerCase().includes('balance') || size === 0) return;
+
                     const openPrice = validCells[5].innerText.trim();
                     const sl = validCells[6].innerText.trim();
                     const tp = validCells[7].innerText.trim();
+                    const commission = parseHTMLNumber(validCells[10].innerText);
+                    const swap = parseHTMLNumber(validCells[11].innerText);
+                    const grossPnl = parseHTMLNumber(validCells[12].innerText);
     
                     parsedTrades.push({
                         ticket: validCells[1].innerText.trim() || `T${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -380,15 +628,15 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                         action: action?.toUpperCase() === 'SELL' ? 'Sell' : 'Buy',
                         date: datePart,
                         entryTime: timePart,
-                        size: Number(validCells[4].innerText.trim()) || 0,
-                        openPrice: Number(openPrice) || 0,
-                        closePrice: Number(openPrice) || 0, // mock
-                        commission: parseFloat(validCells[10].innerText.trim() || '0'),
-                        swap: parseFloat(validCells[11].innerText.trim() || '0'),
-                        pnl: parseFloat(validCells[12].innerText.trim() || '0'),
+                        size: size,
+                        openPrice: parseHTMLNumber(openPrice),
+                        closePrice: parseHTMLNumber(openPrice), // mock
+                        commission: commission,
+                        swap: swap,
+                        pnl: grossPnl + commission + swap,
                         rr: calcularRR(openPrice, sl, tp, action),
-                        sl: Number(sl) || 0,
-                        tp: Number(tp) || 0,
+                        sl: parseHTMLNumber(sl),
+                        tp: parseHTMLNumber(tp),
                         session: 'Importado',
                         notes: '',
                         psychology: '',
@@ -399,8 +647,26 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 }
             }
         });
-        setImportedTradesToReview(parsedTrades);
+
+        if (parsedTrades.length > 0) {
+          setImportedTradesToReview(parsedTrades);
+          setTradeData(prev => {
+             const latestTrade = parsedTrades[parsedTrades.length - 1];
+             if (prev.accountId) return prev;
+             const bestAccount = accounts.find(a => latestTrade.type === 'ob' ? a.tradeType === 'ob' : (a.tradeType === 'forex' || !a.tradeType));
+             return bestAccount ? { ...prev, accountId: bestAccount.id, type: latestTrade.type } : prev;
+          });
+        } else {
+          setModalConfig({
+            isOpen: true,
+            title: "Aviso",
+            message: "Nenhum trade válido foi encontrado. Verifique se o arquivo possui colunas/linhas com as informações da operação.",
+            isError: true,
+            onConfirm: closeModal
+          });
+        }
         setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
       } else {
         setIsImporting(false);
         setModalConfig({
@@ -417,7 +683,26 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
   };
 
   const [customSetup, setCustomSetup] = useState('');
-  const [availableSetups, setAvailableSetups] = useState(['OB', 'FVG', 'BOS', 'CHoCH', 'Liq Sweep', 'OTE', 'CISD']);
+  
+  const [forexSetups, setForexSetups] = useState<string[]>(() => {
+    const saved = localStorage.getItem('app_forex_setups');
+    return saved ? JSON.parse(saved) : ['OB', 'FVG', 'BOS', 'CHoCH', 'Liq Sweep', 'OTE', 'CISD'];
+  });
+  
+  const [obSetups, setObSetups] = useState<string[]>(() => {
+    const saved = localStorage.getItem('app_ob_setups');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('app_forex_setups', JSON.stringify(forexSetups));
+  }, [forexSetups]);
+
+  useEffect(() => {
+    localStorage.setItem('app_ob_setups', JSON.stringify(obSetups));
+  }, [obSetups]);
+
+  const availableSetups = tradeType === 'forex' ? forexSetups : obSetups;
 
   const toggleSetup = (setup: string) => {
     setTradeData(prev => {
@@ -431,20 +716,66 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
 
   const handleAddCustomSetup = () => {
     if (customSetup.trim() && !availableSetups.includes(customSetup.trim())) {
-      setAvailableSetups([...availableSetups, customSetup.trim()]);
+      if (tradeType === 'forex') {
+        setForexSetups(prev => [...prev, customSetup.trim()]);
+      } else {
+        setObSetups(prev => [...prev, customSetup.trim()]);
+      }
       setTradeData(prev => ({...prev, setups: [...prev.setups, customSetup.trim()]}));
       setCustomSetup('');
     }
   };
 
+  const handleDeleteSelectedSetups = () => {
+    if (tradeData.setups.length === 0) {
+      setModalConfig({
+        isOpen: true,
+        title: "Nenhum Setup Selecionado",
+        message: "Para excluir um ou mais setups, selecione-os primeiro na lista acima tocando neles.",
+        isError: true,
+        onConfirm: closeModal
+      });
+      return;
+    }
+    setModalConfig({
+      isOpen: true,
+      title: "Excluir Setups",
+      message: `Tem certeza que deseja excluir ${tradeData.setups.length} setup(s) da sua lista de opções?`,
+      confirmText: "Excluir",
+      isError: true,
+      onCancel: closeModal,
+      onConfirm: () => {
+        if (tradeType === 'forex') {
+          setForexSetups(prev => prev.filter(s => !tradeData.setups.includes(s)));
+        } else {
+          setObSetups(prev => prev.filter(s => !tradeData.setups.includes(s)));
+        }
+        setTradeData(prev => ({...prev, setups: []}));
+        closeModal();
+      }
+    });
+  };
+
   const groupedTrades = trades.reduce((acc, trade) => {
+    // Filter by Market
+    if (tradeTypeFilter !== 'all' && trade.type !== tradeTypeFilter) return acc;
+    // Filter by Account
+    if (selectedAccountFilter !== 'all' && trade.accountId !== selectedAccountFilter) return acc;
+
     let dateStr = 'Data Desconhecida';
     if (trade.date) {
-      dateStr = trade.date.split('.').join('/'); // Replace . with / if it comes from MT5
+      if (trade.date.includes('-')) {
+        const [year, month, day] = trade.date.split('-');
+        dateStr = `${day}/${month}/${year}`;
+      } else {
+        dateStr = trade.date.split('.').join('/'); // Replace . with / if it comes from MT5
+      }
     } else if (trade.closeTime?.toDate) {
-      dateStr = trade.closeTime.toDate().toLocaleDateString('pt-BR');
+      const d = trade.closeTime.toDate();
+      dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
     } else if (trade.closeTime) {
-      dateStr = new Date(trade.closeTime).toLocaleDateString('pt-BR');
+      const d = new Date(trade.closeTime);
+      dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
     }
     
     if (!acc[dateStr]) acc[dateStr] = [];
@@ -470,11 +801,12 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     );
   }
   
-  const todayStr = new Date().toISOString().split('T')[0];
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(currentYear, currentMonth, day);
-    const dateStr = date.toLocaleDateString('pt-BR');
+    const dateStr = `${day.toString().padStart(2, '0')}/${(currentMonth + 1).toString().padStart(2, '0')}/${currentYear}`;
     const isoDateStr = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
     const dayTrades = groupedTrades[dateStr] || [];
     const dayPnl = dayTrades.reduce((sum, t) => sum + (Number(t.pnl) || 0), 0);
@@ -529,9 +861,37 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
       <>
         <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
-          <div>
+          <div className="flex-1">
             <span className="text-xs font-label uppercase tracking-[0.2em] text-primary-fixed-dim">Diário de Trades</span>
-            <h2 className="text-4xl font-bold font-headline mt-2 text-on-surface">Seus Registros</h2>
+            <div className="flex flex-col md:flex-row md:items-center gap-4 mt-2">
+              <h2 className="text-4xl font-bold font-headline text-on-surface">Seus Registros</h2>
+              
+              <div className="flex flex-wrap gap-2 md:ml-4">
+                <select 
+                  value={tradeTypeFilter}
+                  onChange={(e) => setTradeTypeFilter(e.target.value as any)}
+                  className="bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-2 rounded-full text-xs font-bold outline-none cursor-pointer hover:bg-surface-container-highest transition-colors"
+                >
+                  <option value="all">Todos Mercados</option>
+                  <option value="forex">Forex</option>
+                  <option value="ob">Opções Binárias</option>
+                </select>
+
+                <select 
+                  value={selectedAccountFilter}
+                  onChange={(e) => setSelectedAccountFilter(e.target.value)}
+                  className="bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-2 rounded-full text-xs font-bold outline-none cursor-pointer hover:bg-surface-container-highest transition-colors"
+                >
+                  <option value="all">Todas Contas</option>
+                  {accounts
+                    .filter(acc => acc.status !== 'inactive')
+                    .filter(acc => tradeTypeFilter === 'all' || acc.tradeType === tradeTypeFilter || (!acc.tradeType && tradeTypeFilter === 'forex'))
+                    .map(acc => (
+                    <option key={acc.id} value={acc.id}>Conta {acc.accountNumber}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex gap-1 bg-surface-container p-1 rounded-lg mr-2">
@@ -671,7 +1031,17 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                                   {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl)}
                                 </p>
                               </div>
-                              <span className="material-symbols-outlined text-on-surface-variant text-sm">arrow_forward_ios</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteTrade(trade.id);
+                                }}
+                                className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-colors ml-2"
+                                title="Apagar trade"
+                              >
+                                <span className="material-symbols-outlined">delete</span>
+                              </button>
+                              <span className="material-symbols-outlined text-on-surface-variant text-sm ml-2">arrow_forward_ios</span>
                             </div>
                           </div>
                         ))}
@@ -739,6 +1109,13 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
             Voltar para a Lista
           </button>
           <div className="flex gap-3">
+            <button 
+              onClick={() => handleDeleteTrade(selectedTrade.id)}
+              className="px-6 py-2 bg-error/10 text-error rounded-lg font-bold hover:bg-error/20 transition-colors flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined">delete</span>
+              Apagar
+            </button>
             <button 
               onClick={() => {
                 setEditingTradeId(selectedTrade.id);
@@ -868,7 +1245,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                   <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-2">Setups Utilizados</p>
                   <div className="flex flex-wrap gap-2">
                     {selectedTrade.setups.map((s: string) => (
-                      <span key={s} className="px-3 py-1 bg-primary/20 text-primary rounded font-bold text-xs">{s}</span>
+                      <span key={s} className="px-3 py-1 bg-primary text-on-primary rounded font-bold text-xs">{s}</span>
                     ))}
                   </div>
                 </div>
@@ -907,38 +1284,90 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
 
               {selectedTrade.studyLink && (
                 <div>
-                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-2">Estudo / Imagem</p>
-                  {selectedTrade.studyLink.match(/\.(jpeg|jpg|gif|png)$/) || selectedTrade.studyLink.includes('tradingview.com/x/') ? (
-                    <a 
-                      href={selectedTrade.studyLink} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="block rounded-xl overflow-hidden border border-outline-variant/20 hover:border-primary/50 transition-colors group relative"
-                    >
-                      <img 
-                        src={selectedTrade.studyLink} 
-                        alt="Estudo do Trade" 
-                        className="w-full h-auto object-cover max-h-[300px]"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2">
-                          <span className="material-symbols-outlined">open_in_new</span>
-                          Ampliar Imagem
-                        </span>
-                      </div>
-                    </a>
-                  ) : (
-                    <a 
-                      href={selectedTrade.studyLink} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg font-bold text-sm hover:bg-primary/20 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-sm">link</span>
-                      Acessar Link do Estudo
-                    </a>
-                  )}
+                  <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-2">Estudo / Media</p>
+                  {(() => {
+                    const link = selectedTrade.studyLink.toLowerCase();
+                    const isVideo = link.match(/\.(mp4|webm|ogg|mov)$/) || 
+                                    link.includes('youtube.com') || 
+                                    link.includes('youtu.be') || 
+                                    link.includes('vimeo.com');
+                    
+                    if (isVideo) {
+                      if (link.includes('youtube.com') || link.includes('youtu.be')) {
+                        const videoId = link.includes('v=') ? link.split('v=')[1]?.split('&')[0] : link.split('/').pop();
+                        return (
+                          <div className="aspect-video w-full rounded-xl overflow-hidden border border-outline-variant/20 shadow-lg">
+                            <iframe 
+                              src={`https://www.youtube.com/embed/${videoId}`}
+                              className="w-full h-full"
+                              allowFullScreen
+                              title="Trade Analysis Video"
+                            ></iframe>
+                          </div>
+                        );
+                      }
+                      if (link.includes('vimeo.com')) {
+                        const videoId = link.split('/').pop();
+                        return (
+                          <div className="aspect-video w-full rounded-xl overflow-hidden border border-outline-variant/20 shadow-lg">
+                            <iframe 
+                              src={`https://player.vimeo.com/video/${videoId}`}
+                              className="w-full h-full"
+                              allowFullScreen
+                              title="Trade Analysis Video"
+                            ></iframe>
+                          </div>
+                        );
+                      }
+                      return (
+                        <video 
+                          src={selectedTrade.studyLink} 
+                          controls 
+                          className="w-full h-auto rounded-xl border border-outline-variant/20 shadow-lg"
+                        />
+                      );
+                    }
+
+                    const isImage = link.match(/\.(jpeg|jpg|gif|png|webp)$/) || 
+                                    selectedTrade.studyLink.includes('tradingview.com/x/') ||
+                                    selectedTrade.studyLink.includes('firebasestorage.googleapis.com');
+
+                    if (isImage) {
+                      return (
+                        <a 
+                          href={selectedTrade.studyLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="block rounded-xl overflow-hidden border border-outline-variant/20 hover:border-primary/50 transition-colors group relative"
+                        >
+                          <img 
+                            src={selectedTrade.studyLink} 
+                            alt="Estudo do Trade" 
+                            className="w-full h-auto object-cover max-h-[500px]"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span className="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                              <span className="material-symbols-outlined">open_in_new</span>
+                              Ampliar Imagem
+                            </span>
+                          </div>
+                        </a>
+                      );
+                    }
+
+                    return (
+                      <a 
+                        href={selectedTrade.studyLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg font-bold text-sm hover:brightness-110 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-sm">link</span>
+                        Acessar Link do Estudo
+                      </a>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -983,23 +1412,25 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
             className="bg-surface-container-low border border-outline-variant/20 text-on-surface px-4 py-2.5 rounded-lg text-sm font-bold outline-none cursor-pointer"
           >
             <option value="" disabled>Selecione a Conta</option>
-            {accounts.filter(acc => (tradeType === 'ob' ? acc.tradeType === 'ob' : acc.tradeType !== 'ob')).map(acc => (
-              <option key={acc.id} value={acc.id} disabled={acc.status === 'inactive'}>
-                Conta {acc.accountNumber} {acc.status === 'inactive' ? '(Desativada)' : ''}
+            {accounts.filter(acc => (tradeType === 'ob' ? acc.tradeType === 'ob' : acc.tradeType !== 'ob') && acc.status !== 'inactive').map(acc => (
+              <option key={acc.id} value={acc.id}>
+                Conta {acc.accountNumber}
               </option>
             ))}
           </select>
-          <button 
-            type="button"
-            onClick={() => {
-              const newType = tradeType === 'ob' ? 'forex' : 'ob';
-              handleOpenTradeForm(newType);
-            }}
-            className="px-6 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant font-medium hover:bg-surface-container transition-all flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-sm">swap_horiz</span>
-            Mudar para {tradeType === 'ob' ? 'Forex' : 'OB'}
-          </button>
+          {localStorage.getItem('app_default_trade_type') === 'ask' && (
+            <button 
+              type="button"
+              onClick={() => {
+                const newType = tradeType === 'ob' ? 'forex' : 'ob';
+                handleOpenTradeForm(newType);
+              }}
+              className="px-6 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant font-medium hover:bg-surface-container transition-all flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">swap_horiz</span>
+              Mudar para {tradeType === 'ob' ? 'Forex' : 'OB'}
+            </button>
+          )}
           <button 
             type="button"
             onClick={() => {
@@ -1057,11 +1488,29 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
         {/* Left Column */}
         <div className="col-span-12 lg:col-span-8 space-y-8">
           <section className="bg-surface-container-low rounded-xl p-8 shadow-sm">
-            <div className="flex items-center gap-3 mb-8">
-              <span className="material-symbols-outlined text-primary">analytics</span>
-              <h3 className="text-lg font-bold font-headline uppercase tracking-wider text-on-surface-variant">Parâmetros Principais</h3>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary">analytics</span>
+                <h3 className="text-lg font-bold font-headline uppercase tracking-wider text-on-surface-variant flex items-center gap-2">
+                  Parâmetros Principais
+                </h3>
+              </div>
+              {(() => {
+                const selectedAcc = accounts.find(a => a.id === tradeData.accountId);
+                if (selectedAcc) {
+                  return (
+                    <div className="bg-primary px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg shadow-primary/20">
+                      <span className="w-2 h-2 rounded-full bg-on-primary animate-pulse"></span>
+                      <span className="text-on-primary font-bold text-sm">
+                        Registrando na Conta: <span>{selectedAcc.accountNumber}</span> | Balanço: <span>{formatCurrency(selectedAcc.initialBalance)}</span>
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+            <div className={`grid grid-cols-1 ${tradeType === 'ob' ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-6`}>
               <div className="space-y-2">
                 <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Data</label>
                 <DatePicker 
@@ -1102,22 +1551,24 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                   <option value="US30" />
                 </datalist>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Timeframe</label>
-                <select 
-                  value={tradeData.timeframe}
-                  onChange={(e) => setTradeData({...tradeData, timeframe: e.target.value})}
-                  className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface"
-                >
-                  <option value="M1">M1</option>
-                  <option value="M5">M5</option>
-                  <option value="M15">M15</option>
-                  <option value="M30">M30</option>
-                  <option value="H1">H1</option>
-                  <option value="H4">H4</option>
-                  <option value="D1">D1</option>
-                </select>
-              </div>
+              {tradeType === 'ob' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Timeframe</label>
+                  <select 
+                    value={tradeData.timeframe}
+                    onChange={(e) => setTradeData({...tradeData, timeframe: e.target.value})}
+                    className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface"
+                  >
+                    <option value="M1">M1</option>
+                    <option value="M5">M5</option>
+                    <option value="M15">M15</option>
+                    <option value="M30">M30</option>
+                    <option value="H1">H1</option>
+                    <option value="H4">H4</option>
+                    <option value="D1">D1</option>
+                  </select>
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">
                   {tradeType === 'ob' ? 'Período' : 'Sessão'}
@@ -1164,27 +1615,30 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                   )}
                 </select>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Direção</label>
-                <div className="grid grid-cols-2 gap-2 bg-surface-container-highest p-1 rounded-lg">
-                  <button 
-                    type="button"
-                    onClick={() => setTradeData({...tradeData, action: 'Buy'})}
-                    className={`${tradeData.action === 'Buy' ? 'bg-secondary text-on-secondary' : 'text-slate-500 hover:bg-surface-container'} py-2 rounded font-bold text-xs uppercase transition-colors`}
-                  >
-                    {tradeType === 'ob' ? 'Acima (Call)' : 'Long (Compra)'}
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setTradeData({...tradeData, action: 'Sell'})}
-                    className={`${tradeData.action === 'Sell' ? 'bg-error text-on-error' : 'text-slate-500 hover:bg-surface-container'} py-2 rounded font-bold text-xs uppercase transition-colors`}
-                  >
-                    {tradeType === 'ob' ? 'Abaixo (Put)' : 'Short (Venda)'}
-                  </button>
-                </div>
+            </div>
+            
+            <div className="mt-8 space-y-2">
+              <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Direção</label>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  type="button"
+                  onClick={() => setTradeData({...tradeData, action: 'Buy'})}
+                  className={`${tradeData.action === 'Buy' ? 'bg-secondary text-on-secondary shadow-lg shadow-secondary/20' : 'bg-surface-container-highest text-slate-400 hover:bg-surface-container hover:text-slate-300'} py-4 rounded-xl font-bold text-sm uppercase transition-all flex items-center justify-center gap-2`}
+                >
+                  <span className="material-symbols-outlined text-lg">trending_up</span>
+                  {tradeType === 'ob' ? 'Acima (Call)' : 'Long (Compra)'}
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setTradeData({...tradeData, action: 'Sell'})}
+                  className={`${tradeData.action === 'Sell' ? 'bg-error text-on-error shadow-lg shadow-error/20' : 'bg-surface-container-highest text-slate-400 hover:bg-surface-container hover:text-slate-300'} py-4 rounded-xl font-bold text-sm uppercase transition-all flex items-center justify-center gap-2`}
+                >
+                  <span className="material-symbols-outlined text-lg">trending_down</span>
+                  {tradeType === 'ob' ? 'Abaixo (Put)' : 'Short (Venda)'}
+                </button>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
+            <div className={`grid grid-cols-1 ${tradeType === 'forex' ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-6 mt-8`}>
               {tradeType === 'forex' ? (
                 <>
                   <div className="space-y-2">
@@ -1225,16 +1679,6 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                       onChange={(e) => setTradeData({...tradeData, size: e.target.value})}
                       className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface" 
                       placeholder="1.0" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Valor Arriscado</label>
-                    <input 
-                      type="number"
-                      value={tradeData.returnAmount}
-                      onChange={(e) => setTradeData({...tradeData, returnAmount: e.target.value})}
-                      className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface" 
-                      placeholder="Ex: 50" 
                     />
                   </div>
                   <div className="space-y-2">
@@ -1286,11 +1730,49 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
               </div>
               <span className="text-xs font-label text-slate-500">Máx 10MB por ficheiro</span>
             </div>
-            <div className="border-2 border-dashed border-outline-variant/20 rounded-xl p-12 text-center group hover:border-primary/40 transition-colors cursor-pointer bg-surface-container-lowest/50">
-              <span className="material-symbols-outlined text-5xl text-slate-600 group-hover:text-primary transition-colors">cloud_upload</span>
-              <p className="mt-4 text-on-surface-variant font-medium">Arraste os seus prints do TradingView aqui</p>
-              <p className="text-sm text-slate-600 mt-1">ou clique para procurar ficheiros locais</p>
-            </div>
+            
+            <input 
+              type="file"
+              id="trade-image-upload"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setSelectedFile(file);
+                  setPreviewUrl(URL.createObjectURL(file));
+                }
+              }}
+            />
+            
+            {!previewUrl ? (
+              <label 
+                htmlFor="trade-image-upload"
+                className="border-2 border-dashed border-outline-variant/20 rounded-xl p-12 text-center group hover:border-primary/40 transition-colors cursor-pointer bg-surface-container-lowest/50 block"
+              >
+                <span className="material-symbols-outlined text-5xl text-slate-600 group-hover:text-primary transition-colors">cloud_upload</span>
+                <p className="mt-4 text-on-surface-variant font-medium">Carregue o seu print (TradingView, MT5, etc) aqui</p>
+                <p className="text-sm text-slate-600 mt-1">Clique para procurar fotos locais</p>
+              </label>
+            ) : (
+              <div className="relative rounded-xl overflow-hidden border border-outline-variant/20">
+                <img src={previewUrl} alt="Preview" className="w-full h-auto max-h-[400px] object-cover" />
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setPreviewUrl(null);
+                  }}
+                  className="absolute top-2 right-2 w-10 h-10 rounded-full bg-error text-white flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+                <div className="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-md p-3 rounded-lg flex items-center justify-between">
+                  <span className="text-white text-xs font-bold truncate max-w-[200px]">{selectedFile?.name}</span>
+                  <span className="text-primary text-[10px] font-black uppercase">Pronto para Upload</span>
+                </div>
+              </div>
+            )}
           </section>
         </div>
         {/* Right Column */}
@@ -1318,7 +1800,12 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 type="text"
                 value={customSetup}
                 onChange={(e) => setCustomSetup(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddCustomSetup()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddCustomSetup();
+                  }
+                }}
                 placeholder="Adicionar setup manual..."
                 className="flex-1 bg-surface-container-highest border-none rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary/20 text-on-surface"
               />
@@ -1328,6 +1815,14 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 className="bg-primary/10 text-primary hover:bg-primary/20 px-3 py-2 rounded-lg transition-colors flex items-center justify-center"
               >
                 <span className="material-symbols-outlined text-sm">add</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSelectedSetups}
+                className="bg-error/10 text-error hover:bg-error/20 px-3 py-2 rounded-lg transition-colors flex items-center justify-center"
+                title="Excluir o(s) setup(s) selecionado(s)"
+              >
+                <span className="material-symbols-outlined text-sm">delete</span>
               </button>
             </div>
           </section>

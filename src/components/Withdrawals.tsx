@@ -25,48 +25,56 @@ export default function Withdrawals() {
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    // Fetch accounts
-    const accountsQuery = query(
-      collection(db, 'accounts'),
-      where('userId', '==', auth.currentUser.uid)
-    );
+    const unsubscribes: (() => void)[] = [];
 
-    const unsubscribeAccounts = onSnapshot(accountsQuery, (snapshot) => {
-      const accountsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAccounts(accountsData);
-      if (accountsData.length > 0 && !newWithdrawal.accountId) {
-        setNewWithdrawal(prev => ({ ...prev, accountId: accountsData[0].id }));
-      }
+    // --- ACCOUNTS ---
+    // Path 1 (old)
+    const qAccOld = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
+    const unsubAccOld = onSnapshot(qAccOld, (snapshot) => {
+      const accountsOld = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateAccounts(accountsOld, 'old');
     });
+    unsubscribes.push(unsubAccOld);
 
-    // Fetch withdrawals
+    // Path 2 (new)
+    const qAccNew = query(collection(db, 'usuarios', auth.currentUser.uid, 'accounts'));
+    const unsubAccNew = onSnapshot(qAccNew, (snapshot) => {
+      const accountsNew = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateAccounts(accountsNew, 'new');
+    });
+    unsubscribes.push(unsubAccNew);
+
+    const accountsByPath: Record<string, any[]> = { old: [], new: [] };
+    const updateAccounts = (data: any[], path: 'old' | 'new') => {
+      accountsByPath[path] = data;
+      const combined = [...accountsByPath.new, ...accountsByPath.old];
+      const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+      setAccounts(unique);
+      if (unique.length > 0 && !newWithdrawal.accountId) {
+        setNewWithdrawal(prev => ({ ...prev, accountId: unique[0].id }));
+      }
+    };
+
+    // --- WITHDRAWALS ---
     const withdrawalsQuery = query(
       collection(db, 'withdrawals'),
       where('userId', '==', auth.currentUser.uid),
       orderBy('date', 'desc')
     );
+    unsubscribes.push(onSnapshot(withdrawalsQuery, (snapshot) => {
+      setWithdrawals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }));
 
-    const unsubscribeWithdrawals = onSnapshot(withdrawalsQuery, (snapshot) => {
-      const withdrawalsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setWithdrawals(withdrawalsData);
-    });
-
-    // Fetch trades
+    // --- TRADES ---
     const tradesQuery = query(
       collection(db, 'trades'),
       where('userId', '==', auth.currentUser.uid)
     );
+    unsubscribes.push(onSnapshot(tradesQuery, (snapshot) => {
+      setTrades(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }));
 
-    const unsubscribeTrades = onSnapshot(tradesQuery, (snapshot) => {
-      const tradesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTrades(tradesData);
-    });
-
-    return () => {
-      unsubscribeAccounts();
-      unsubscribeWithdrawals();
-      unsubscribeTrades();
-    };
+    return () => unsubscribes.forEach(unsub => unsub());
   }, [auth.currentUser]);
 
   const handleSave = async () => {

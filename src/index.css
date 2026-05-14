@@ -1,42 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0b1326;
-  --color-surface: #0b1326;
-  --color-surface-container-lowest: #070d1a;
-  --color-surface-container-low: #111a2e;
-  --color-surface-container: #152036;
-  --color-surface-container-high: #1a2744;
-  --color-surface-container-highest: #223459;
+  --color-background: #080e1a;
+  --color-surface: #080e1a;
+  --color-surface-container-lowest: #0d1526;
+  --color-surface-container-low: #111d35;
+  --color-surface-container: #0f1b30;
+  --color-surface-container-high: #132040;
+  --color-surface-container-highest: rgba(255,255,255,0.07);
   
-  --color-on-surface: #e2e2e9;
-  --color-on-surface-variant: #c4c6d0;
-  --color-outline: #8e9099;
-  --color-outline-variant: #44474e;
+  --color-on-surface: #f0f4ff;
+  --color-on-surface-variant: #8a9bc0;
+  --color-outline: rgba(255,255,255,0.07);
+  --color-outline-variant: rgba(255,255,255,0.12);
   
-  --color-primary: #c3f5ff;
-  --color-on-primary: #003544;
-  --color-primary-container: #004d62;
-  --color-on-primary-container: #c3f5ff;
-  --color-primary-fixed-dim: #86d1e9;
+  --color-primary: #00f5a0;
+  --color-on-primary: #080e1a;
+  --color-primary-container: rgba(0,245,160,0.12);
+  --color-on-primary-container: #00f5a0;
+  --color-primary-fixed-dim: #00e593;
   
-  --color-secondary: #4ae183;
-  --color-on-secondary: #003918;
-  --color-secondary-container: #005225;
-  --color-on-secondary-container: #6bffa2;
+  --color-secondary: #00c2ff;
+  --color-on-secondary: #080e1a;
+  --color-secondary-container: rgba(0,194,255,0.1);
+  --color-on-secondary-container: #00c2ff;
   
   --color-tertiary-container: #ffb4a9;
   --color-on-tertiary-container: #690003;
   
-  --color-error: #ffb4ab;
-  --color-error-container: #93000a;
-  --color-on-error-container: #ffdad6;
+  --color-error: #ff4b6e;
+  --color-error-container: rgba(255,75,110,0.15);
+  --color-on-error-container: #ff4b6e;
 
   --color-warning: #f59e0b;
 
-  --font-headline: "Manrope", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-label: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer utilities {
+  .text-on-primary {
+    color: var(--color-on-primary) !important;
+  }
+  .bg-on-primary {
+    background-color: var(--color-on-primary) !important;
+  }
 }
 
 body {
@@ -82,3 +92,77 @@ body {
 .rdp-chevron {
   fill: var(--color-on-surface);
 }
+
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2s infinite;
+}
+
+/* Landing Page Styles */
+.noise-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+}
+
+.grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,245,160,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,245,160,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+}
+
+.hero-glow {
+  position: absolute;
+  width: 700px;
+  height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,245,160,0.08) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.hero-glow2 {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,194,255,0.06) 0%, transparent 70%);
+  top: 30%;
+  right: 10%;
+  pointer-events: none;
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.ticker-track {
+  display: flex;
+  gap: 60px;
+  animation: ticker 20s linear infinite;
+  white-space: nowrap;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.animate-pulse-dot {
+  animation: pulse 2s infinite;
+}
+

@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { collection, addDoc, onSnapshot, query, where, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
+import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 
 // --- COMPONENTES AUXILIARES ---
@@ -31,9 +32,16 @@ function CalendarCell({ date, muted, trades, pnl, isWin, isLoss, active }: any) 
 
 const CustomTooltip = ({ active, payload, label, formatCurrency }: any) => {
   if (active && payload && payload.length) {
+    let formattedLabel = label;
+    if (label && typeof label === 'string') {
+      const parts = label.split('-');
+      if (parts.length === 3) {
+        formattedLabel = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
     return (
       <div className="bg-surface-container-high border border-outline-variant/20 p-4 rounded-xl shadow-xl">
-        <p className="text-on-surface-variant text-xs mb-3 font-medium">{label}</p>
+        <p className="text-on-surface-variant text-xs mb-3 font-medium">{formattedLabel}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center justify-between gap-6 mb-2 last:mb-0">
             <div className="flex items-center gap-2">
@@ -56,6 +64,9 @@ export default function Dashboard() {
   const [selectedAccount, setSelectedAccount] = useState(() => {
     return localStorage.getItem('dashboard_selectedAccount') || 'all';
   });
+  const [selectedAccountLogin, setSelectedAccountLogin] = useState(() => {
+    return localStorage.getItem('dashboard_selectedAccountLogin') || 'all';
+  });
   const [tradeTypeFilter, setTradeTypeFilter] = useState<'all' | 'forex' | 'ob'>(() => {
     return (localStorage.getItem('dashboard_tradeTypeFilter') as any) || 'all';
   });
@@ -63,10 +74,9 @@ export default function Dashboard() {
   const [activeDashboardTab, setActiveDashboardTab] = useState('objectives'); // 'objectives', 'history', 'analysis', 'info'
   const [analysisDateRange, setAnalysisDateRange] = useState<DateRange | undefined>();
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
-  const [showMasterPassword, setShowMasterPassword] = useState(false);
-  const [showInvestorPassword, setShowInvestorPassword] = useState(false);
   const [objectives, setObjectives] = useState<any[]>([]);
   const [forceShowObFilter, setForceShowObFilter] = useState(false);
+  const [defaultTradeType, setDefaultTradeType] = useState<'ask' | 'forex' | 'ob'>('ask');
 
   // Load settings
   useEffect(() => {
@@ -78,6 +88,13 @@ export default function Dashboard() {
     if (savedForceShowObFilter) {
       setForceShowObFilter(savedForceShowObFilter === 'true');
     }
+    const savedDefaultTradeType = localStorage.getItem('app_default_trade_type') as 'ask' | 'forex' | 'ob';
+    if (savedDefaultTradeType) {
+      setDefaultTradeType(savedDefaultTradeType);
+      if (savedDefaultTradeType === 'forex' || savedDefaultTradeType === 'ob') {
+        setTradeTypeFilter(savedDefaultTradeType);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -85,12 +102,23 @@ export default function Dashboard() {
   }, [selectedAccount]);
 
   useEffect(() => {
+    localStorage.setItem('dashboard_selectedAccountLogin', selectedAccountLogin);
+  }, [selectedAccountLogin]);
+
+  useEffect(() => {
     localStorage.setItem('dashboard_tradeTypeFilter', tradeTypeFilter);
   }, [tradeTypeFilter]);
 
   // Firebase Data State
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [trades, setTrades] = useState<any[]>([]);
+  const { 
+    allTrades: trades, 
+    loading: loadingTrades, 
+    uniqueAccounts, 
+    limitReached, 
+    userPlan,
+    isExpired 
+  } = useTrades();
 
   // Add Account Form State
   const [newAccount, setNewAccount] = useState({
@@ -99,7 +127,6 @@ export default function Dashboard() {
     initialBalance: '',
     accountType: '10K Challenge',
     phase: 'Fase 1',
-    masterPassword: '',
     startDate: '',
     currency: 'USD',
     tradeType: 'forex'
@@ -125,26 +152,35 @@ export default function Dashboard() {
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    const accountsQuery = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
-    const unsubscribeAccounts = onSnapshot(accountsQuery, (snapshot) => {
-      const accountsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAccounts(accountsData);
-    }, (error) => {
-      console.error("Error fetching accounts: ", error);
-    });
+    const unsubscribes: (() => void)[] = [];
 
-    const tradesQuery = query(collection(db, 'trades'), where('userId', '==', auth.currentUser.uid));
-    const unsubscribeTrades = onSnapshot(tradesQuery, (snapshot) => {
-      const tradesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTrades(tradesData);
-    }, (error) => {
-      console.error("Error fetching trades: ", error);
+    // Path 1: root accounts (old)
+    const qOld = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
+    const unsubOld = onSnapshot(qOld, (snapshot) => {
+      const accountsOld = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateAccounts(accountsOld, 'old');
     });
+    unsubscribes.push(unsubOld);
 
-    return () => {
-      unsubscribeAccounts();
-      unsubscribeTrades();
+    // Path 2: usuarios/{uid}/accounts (new SaaS)
+    const qNew = query(collection(db, 'usuarios', auth.currentUser.uid, 'accounts'));
+    const unsubNew = onSnapshot(qNew, (snapshot) => {
+      const accountsNew = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateAccounts(accountsNew, 'new');
+    });
+    unsubscribes.push(unsubNew);
+
+    const accountsByPath: Record<string, any[]> = { old: [], new: [] };
+    const updateAccounts = (data: any[], path: 'old' | 'new') => {
+      accountsByPath[path] = data;
+      // Deduplicate by accountNumber if needed, or just combine
+      const combined = [...accountsByPath.new, ...accountsByPath.old];
+      // Simple deduplication by ID
+      const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+      setAccounts(unique);
     };
+
+    return () => unsubscribes.forEach(unsub => unsub());
   }, []);
 
   const hasObAccount = accounts.some(a => a.tradeType === 'ob');
@@ -189,17 +225,18 @@ export default function Dashboard() {
 
     setIsSaving(true);
     try {
+      const integrationToken = Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
       await addDoc(collection(db, 'accounts'), {
         accountNumber: newAccount.accountNumber,
         broker: newAccount.broker,
         initialBalance: Number(newAccount.initialBalance),
         accountType: newAccount.accountType,
         phase: newAccount.phase,
-        masterPassword: newAccount.masterPassword,
         startDate: newAccount.startDate,
         currency: newAccount.currency,
         tradeType: newAccount.tradeType,
         status: 'active',
+        integrationToken,
         userId: auth.currentUser.uid,
         createdAt: serverTimestamp()
       });
@@ -210,7 +247,6 @@ export default function Dashboard() {
         initialBalance: '',
         accountType: '10K Challenge',
         phase: 'Fase 1',
-        masterPassword: '',
         startDate: '',
         currency: 'USD',
         tradeType: 'forex'
@@ -238,10 +274,33 @@ export default function Dashboard() {
 
   // --- LÓGICA DE AGREGAÇÃO ---
   const data = useMemo(() => {
-    const accountsToProcess = selectedAccount === 'all' ? accounts : accounts.filter(a => a.id === selectedAccount);
-    const baseTradesToProcess = selectedAccount === 'all' ? trades : trades.filter(t => t.accountId === selectedAccount);
+    // Filter out inactive accounts if not explicitly selected
+    const activeAccounts = accounts.filter(a => a.status !== 'inactive');
+    
+    let accountsToProcess = selectedAccount === 'all' 
+      ? activeAccounts 
+      : accounts.filter(a => a.id === selectedAccount);
 
-    let tradesToProcess = baseTradesToProcess;
+    // If an inactive account was selected (from old state), fallback to all
+    const currentAccObj = accounts.find(a => a.id === selectedAccount);
+    if (selectedAccount !== 'all' && currentAccObj?.status === 'inactive') {
+      accountsToProcess = activeAccounts;
+    }
+
+    const baseTradesToProcess = selectedAccount === 'all' 
+      ? trades.filter(t => activeAccounts.some(a => a.id === t.accountId) || !t.accountId)
+      : trades.filter(t => t.accountId === selectedAccount);
+
+    let tradesToProcess = baseTradesToProcess.map(t => ({
+      ...t,
+      pnl: Number(t.pnl) || 0,
+      type: t.type || 'forex'
+    }));
+
+    if (selectedAccountLogin !== 'all') {
+      tradesToProcess = tradesToProcess.filter(t => String(t.account_login) === selectedAccountLogin || String(t.accountId) === selectedAccountLogin);
+    }
+
     if (tradeTypeFilter !== 'all') {
       tradesToProcess = tradesToProcess.filter(t => t.type === tradeTypeFilter);
     }
@@ -253,103 +312,60 @@ export default function Dashboard() {
     let hasProfitTarget = false;
     let hasMaxLoss = false;
     let hasDailyLoss = false;
+    let maxLossPeriod = 'Mês';
     
     // Calculate total size from accounts
     accountsToProcess.forEach(acc => {
       const accTradeType = acc.tradeType || 'forex'; // Default to forex if missing
       if (tradeTypeFilter === 'all' || accTradeType === tradeTypeFilter) {
-        totalSize += Number(acc.initialBalance || 0);
+        totalSize += Number(acc.initialBalance) || 0;
       }
     });
 
-    // Calculate total profit target from objectives
+    // Calculate targets
     if (selectedAccount === 'all') {
-      let hasMarketObj = false;
-      if (tradeTypeFilter === 'all') {
-        // Sum all market objectives
-        objectives.forEach(obj => {
-          if (obj.type === 'market') {
-            if (obj.profitTarget) {
-              totalProfitTarget += Number(obj.profitTarget);
-              hasProfitTarget = true;
-              hasMarketObj = true;
-            }
-            if (obj.maxLoss) {
-              totalMaxLoss += Number(obj.maxLoss);
-              hasMaxLoss = true;
-              hasMarketObj = true;
-            }
-            if (obj.dailyLoss) {
-              totalDailyLoss += Number(obj.dailyLoss);
-              hasDailyLoss = true;
-              hasMarketObj = true;
-            }
-          }
-        });
-      } else {
-        // Sum objectives for the selected market type
-        objectives.forEach(obj => {
-          if (obj.type === 'market' && obj.targetId === tradeTypeFilter) {
-            if (obj.profitTarget) {
-              totalProfitTarget += Number(obj.profitTarget);
-              hasProfitTarget = true;
-              hasMarketObj = true;
-            }
-            if (obj.maxLoss) {
-              totalMaxLoss += Number(obj.maxLoss);
-              hasMaxLoss = true;
-              hasMarketObj = true;
-            }
-            if (obj.dailyLoss) {
-              totalDailyLoss += Number(obj.dailyLoss);
-              hasDailyLoss = true;
-              hasMarketObj = true;
-            }
-          }
-        });
-      }
-
-      // Fallback: If no market objectives are set, sum the account objectives for the relevant accounts
-      if (!hasMarketObj) {
-        accountsToProcess.forEach(acc => {
-          const accTradeType = acc.tradeType || 'forex';
-          if (tradeTypeFilter === 'all' || accTradeType === tradeTypeFilter) {
-            const accObj = objectives.find(obj => obj.type === 'account' && obj.targetId === acc.id);
-            if (accObj) {
-              if (accObj.profitTarget) {
-                totalProfitTarget += Number(accObj.profitTarget);
-                hasProfitTarget = true;
-              }
-              if (accObj.maxLoss) {
-                totalMaxLoss += Number(accObj.maxLoss);
-                hasMaxLoss = true;
-              }
-              if (accObj.dailyLoss) {
-                totalDailyLoss += Number(accObj.dailyLoss);
-                hasDailyLoss = true;
+      // Check if we have market-level objectives for each market type we are interested in
+      const relevantMarketTypes = tradeTypeFilter === 'all' ? ['forex', 'ob'] : [tradeTypeFilter];
+      
+      relevantMarketTypes.forEach(mType => {
+        const marketObj = objectives.find(obj => obj.type === 'market' && obj.targetId === mType);
+        
+        if (marketObj) {
+          // Use Market-level objective for this type
+          if (marketObj.profitTarget) totalProfitTarget += Number(marketObj.profitTarget) || 0;
+          if (marketObj.maxLoss) totalMaxLoss += Number(marketObj.maxLoss) || 0;
+          if (marketObj.dailyLoss) totalDailyLoss += Number(marketObj.dailyLoss) || 0;
+          if (marketObj.maxLossPeriod) maxLossPeriod = marketObj.maxLossPeriod;
+        } else {
+          // Fallback: Sum account-level objectives for this market type
+          accountsToProcess.forEach(acc => {
+            const accTradeType = acc.tradeType || 'forex';
+            if (accTradeType === mType) {
+              const accObj = objectives.find(obj => obj.type === 'account' && obj.targetId === acc.id);
+              if (accObj) {
+                if (accObj.profitTarget) totalProfitTarget += Number(accObj.profitTarget) || 0;
+                if (accObj.maxLoss) totalMaxLoss += Number(accObj.maxLoss) || 0;
+                if (accObj.dailyLoss) totalDailyLoss += Number(accObj.dailyLoss) || 0;
+                if (accObj.maxLossPeriod) maxLossPeriod = accObj.maxLossPeriod;
               }
             }
-          }
-        });
-      }
+          });
+        }
+      });
     } else {
-      // Find objective for the specific account
+      // Specific account selected
       const accountObjective = objectives.find(obj => obj.type === 'account' && obj.targetId === selectedAccount);
       if (accountObjective) {
-        if (accountObjective.profitTarget) {
-          totalProfitTarget = Number(accountObjective.profitTarget);
-          hasProfitTarget = true;
-        }
-        if (accountObjective.maxLoss) {
-          totalMaxLoss = Number(accountObjective.maxLoss);
-          hasMaxLoss = true;
-        }
-        if (accountObjective.dailyLoss) {
-          totalDailyLoss = Number(accountObjective.dailyLoss);
-          hasDailyLoss = true;
-        }
+        totalProfitTarget = Number(accountObjective.profitTarget) || 0;
+        totalMaxLoss = Number(accountObjective.maxLoss) || 0;
+        if (accountObjective.maxLossPeriod) maxLossPeriod = accountObjective.maxLossPeriod;
+        totalDailyLoss = Number(accountObjective.dailyLoss) || 0;
       }
     }
+
+    hasProfitTarget = totalProfitTarget > 0;
+    hasMaxLoss = totalMaxLoss > 0;
+    hasDailyLoss = totalDailyLoss > 0;
 
     let totalTrades = 0;
     let totalWins = 0;
@@ -360,7 +376,6 @@ export default function Dashboard() {
     // Para o comparativo mensal
     let prevMonthPnl = 0;
     let currentMonthPnl = 0;
-    let currentMonthLosses = 0;
     let prevMonthTrades = 0;
     let currentMonthTrades = 0;
     let currentMonthTradingDays = new Set<string>();
@@ -420,7 +435,7 @@ export default function Dashboard() {
         return;
       }
 
-      const dateStr = tradeDate.toISOString().split('T')[0];
+      const dateStr = `${tradeDate.getFullYear()}-${(tradeDate.getMonth() + 1).toString().padStart(2, '0')}-${tradeDate.getDate().toString().padStart(2, '0')}`;
 
       if (!historyMap[dateStr]) {
         historyMap[dateStr] = { pnl: 0, trades: 0, wins: 0 };
@@ -435,7 +450,7 @@ export default function Dashboard() {
       totalTrades += 1;
       if (trade.pnl > 0) totalWins += 1;
       totalPnl += trade.pnl;
-      if (trade.rr) {
+      if (trade.rr && !isNaN(Number(trade.rr))) {
         totalRr += Number(trade.rr);
         tradesWithRr += 1;
       }
@@ -462,7 +477,7 @@ export default function Dashboard() {
 
       const tMonth = tradeDate.getMonth();
       const tYear = tradeDate.getFullYear();
-      const dateStr = tradeDate.toISOString().split('T')[0];
+      const dateStr = `${tradeDate.getFullYear()}-${(tradeDate.getMonth() + 1).toString().padStart(2, '0')}-${tradeDate.getDate().toString().padStart(2, '0')}`;
       
       const dayOfWeek = tradeDate.getDay();
       const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -582,13 +597,10 @@ export default function Dashboard() {
 
       const tMonth = tradeDate.getMonth();
       const tYear = tradeDate.getFullYear();
-      const dateStr = tradeDate.toISOString().split('T')[0];
+      const dateStr = `${tradeDate.getFullYear()}-${(tradeDate.getMonth() + 1).toString().padStart(2, '0')}-${tradeDate.getDate().toString().padStart(2, '0')}`;
 
       if (tMonth === currentMonth && tYear === currentYear) {
         currentMonthPnl += trade.pnl;
-        if (trade.pnl < 0) {
-          currentMonthLosses += Math.abs(trade.pnl);
-        }
         currentMonthTrades += 1;
         currentMonthTradingDays.add(dateStr);
       } else if (tMonth === prevMonth && tYear === prevYear) {
@@ -596,6 +608,8 @@ export default function Dashboard() {
         prevMonthTrades += 1;
       }
     });
+
+    const currentMonthLosses = currentMonthPnl < 0 ? Math.abs(currentMonthPnl) : 0;
 
     const totalBalance = totalSize + totalPnl;
     const winRate = totalTrades > 0 ? ((totalWins / totalTrades) * 100).toFixed(1) : '0.0';
@@ -666,7 +680,8 @@ export default function Dashboard() {
       .sort((a, b) => b.pnl - a.pnl)
       .slice(0, 3);
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayDate = new Date();
+    const todayStr = `${todayDate.getFullYear()}-${(todayDate.getMonth() + 1).toString().padStart(2, '0')}-${todayDate.getDate().toString().padStart(2, '0')}`;
     const todayPnl = historyMap[todayStr]?.pnl || 0;
 
     return {
@@ -677,7 +692,9 @@ export default function Dashboard() {
       hasProfitTarget,
       hasMaxLoss,
       hasDailyLoss,
+      maxLossPeriod,
       totalBalance, 
+      totalPnl,
       todayPnl,
       totalTrades, 
       winRate, 
@@ -705,7 +722,7 @@ export default function Dashboard() {
       analysisBestDaysOfWeek,
       analysisTotalTrades
     };
-  }, [selectedAccount, calendarDate, accounts, trades, analysisDateRange, tradeTypeFilter]);
+  }, [selectedAccount, calendarDate, accounts, trades, analysisDateRange, tradeTypeFilter, objectives]);
 
   // --- LÓGICA DO CALENDÁRIO ---
   const calendarCells = useMemo(() => {
@@ -724,7 +741,8 @@ export default function Dashboard() {
     }
 
     // Dias do mês atual
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayDate = new Date();
+    const todayStr = `${todayDate.getFullYear()}-${(todayDate.getMonth() + 1).toString().padStart(2, '0')}-${todayDate.getDate().toString().padStart(2, '0')}`;
     for (let i = 1; i <= daysInMonth; i++) {
       const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
       const dayData = data.historyMap[dateStr];
@@ -763,16 +781,60 @@ export default function Dashboard() {
   const prevMonthName = prevDate.toLocaleString('pt-BR', { month: 'long' });
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-  // Ensure active tab is valid when switching accounts
-  useEffect(() => {
-    if (selectedAccount === 'all' && activeDashboardTab === 'info') {
-      setActiveDashboardTab('objectives');
-    }
-  }, [selectedAccount, activeDashboardTab]);
+  const handleMulticaixa = () => {
+    window.open('https://wa.me/244921319200', '_blank');
+  };
 
   return (
-    <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8">
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8 relative">
+      {isExpired && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 backdrop-blur-md bg-background/80">
+          <div className="bg-surface-container border border-error/30 p-10 rounded-[32px] max-w-xl w-full text-center shadow-2xl shadow-error/20 animate-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto mb-6">
+              <span className="material-symbols-outlined text-5xl">lock</span>
+            </div>
+            <h2 className="text-3xl font-black text-on-surface mb-4 font-headline">Plano Expirado</h2>
+            <p className="text-on-surface-variant mb-8 leading-relaxed">
+              Sua assinatura <span className="text-on-surface font-bold">{(userPlan?.plan_type || 'Mensal').toUpperCase()}</span> expirou. 
+              Para continuar analisando seus trades e visualizando os gráficos de performance, realize a atualização do seu plano.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button 
+                onClick={handleMulticaixa}
+                className="flex-1 bg-primary text-on-primary py-4 rounded-2xl font-black hover:scale-105 transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3"
+              >
+                <span className="material-symbols-outlined">payments</span>
+                Renovar Subscription
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Nav / Tabs */}
+      {limitReached && (
+        <div className="bg-error/10 border border-error/50 p-6 rounded-[24px] mb-6 flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top duration-500">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-error/20 rounded-full flex items-center justify-center text-error">
+              <span className="material-symbols-outlined">warning</span>
+            </div>
+            <div>
+              <p className="text-error font-black text-lg">Limite de Contas Atingido!</p>
+              <p className="text-on-surface-variant text-sm max-w-lg">
+                O seu plano {userPlan?.plan_type} permite apenas {userPlan?.account_limit} contas MT5. 
+                Faça upgrade agora para desbloquear o monitoramento de mais contas simultâneas.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={handleMulticaixa}
+            className="w-full md:w-auto bg-error-container text-on-error-container px-8 py-3 rounded-xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2"
+          >
+            <span>Fazer Upgrade</span>
+            <span className="material-symbols-outlined text-sm">rocket_launch</span>
+          </button>
+        </div>
+      )}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div className="flex flex-wrap gap-2 bg-surface-container-low border border-outline-variant/20 p-1.5 rounded-2xl md:rounded-full w-full lg:w-auto" style={{
           display: 'flex',
@@ -799,31 +861,26 @@ export default function Dashboard() {
           >
             Análises
           </button>
-          {selectedAccount !== 'all' && (
-            <button 
-              onClick={() => setActiveDashboardTab('info')}
-              className={`${activeDashboardTab === 'info' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'} px-4 py-2.5 md:px-6 md:py-3 rounded-xl md:rounded-full text-sm md:text-base font-bold transition-colors flex-1 lg:flex-none text-center`}
-            >
-              Info da Conta
-            </button>
-          )}
+          <button 
+            onClick={() => setActiveDashboardTab('info')}
+            className={`${activeDashboardTab === 'info' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'} px-4 py-2.5 md:px-6 md:py-3 rounded-xl md:rounded-full text-sm md:text-base font-bold transition-colors flex-1 lg:flex-none text-center`}
+          >
+            {selectedAccount === 'all' ? 'Contas' : 'Info da Conta'}
+          </button>
         </div>
         <div className="flex gap-4 items-center w-full lg:w-auto justify-between lg:justify-end">
-          <span className="bg-secondary text-on-secondary px-6 py-2.5 md:px-8 md:py-3 rounded-full text-sm md:text-base font-bold">Ativa</span>
-          {activeDashboardTab !== 'info' && (showObFilter || activeDashboardTab === 'objectives') && (
-            <div className="relative flex-1 lg:flex-none">
-              <select 
-                value={tradeTypeFilter}
-                onChange={(e) => setTradeTypeFilter(e.target.value as any)}
-                className="w-full bg-surface-container-low border border-outline-variant/20 text-on-surface pl-6 pr-12 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold outline-none appearance-none cursor-pointer"
-              >
-                {activeDashboardTab === 'objectives' && <option value="all">Todos os Mercados</option>}
-                <option value="forex">Forex & Índices</option>
-                {showObFilter && <option value="ob">Opções Binárias</option>}
-              </select>
-              <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface text-lg pointer-events-none">expand_more</span>
-            </div>
-          )}
+          <div className="relative flex-1 lg:flex-none">
+            <select 
+              value={tradeTypeFilter}
+              onChange={(e) => setTradeTypeFilter(e.target.value as any)}
+              className="w-full bg-surface-container-low border border-outline-variant/20 text-on-surface pl-6 pr-12 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold outline-none appearance-none cursor-pointer"
+            >
+              <option value="all">Soma (FX + OB)</option>
+              <option value="forex">Forex & Índices</option>
+              {showObFilter && <option value="ob">Opções Binárias</option>}
+            </select>
+            <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface text-lg pointer-events-none">expand_more</span>
+          </div>
           <div className="relative flex-1 lg:flex-none">
             <select 
               value={selectedAccount}
@@ -831,9 +888,9 @@ export default function Dashboard() {
               className="w-full bg-surface-container-low border border-outline-variant/20 text-on-surface pl-6 pr-12 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold outline-none appearance-none cursor-pointer"
             >
               <option value="all">Todas as Contas (Soma)</option>
-              {accounts.filter(acc => tradeTypeFilter === 'all' || acc.tradeType === tradeTypeFilter || (!acc.tradeType && tradeTypeFilter === 'forex')).map(acc => (
+              {accounts.filter(acc => acc.status !== 'inactive' && (tradeTypeFilter === 'all' || acc.tradeType === tradeTypeFilter || (!acc.tradeType && tradeTypeFilter === 'forex'))).map(acc => (
                 <option key={acc.id} value={acc.id}>
-                  Conta {acc.accountNumber} - {acc.accountType} {(acc.status === 'inactive') ? '(Desativada)' : ''}
+                  Conta {acc.accountNumber} - {acc.accountType}
                 </option>
               ))}
             </select>
@@ -882,7 +939,7 @@ export default function Dashboard() {
           )}
           <div>
             <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Capital Geral</p>
-            <p className="text-on-surface font-bold text-2xl md:text-4xl font-headline">{formatCurrency(data.totalSize)}</p>
+            <p className="text-on-surface font-bold text-2xl md:text-4xl font-headline">{formatCurrency(data.totalBalance)}</p>
             {data.hasProfitTarget && (
               <p className="text-on-surface-variant text-xs md:text-sm mt-2">
                 Meta: {formatCurrency(data.totalProfitTarget)}
@@ -893,8 +950,7 @@ export default function Dashboard() {
       </div>
 
       {/* Monthly Comparison */}
-      {tradeTypeFilter !== 'all' ? (
-        <div className="space-y-8 md:space-y-12">
+      <div className="space-y-8 md:space-y-12">
         {(data.hasProfitTarget || data.hasMaxLoss || data.hasDailyLoss) && (
           <>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 md:mb-6">
@@ -912,20 +968,20 @@ export default function Dashboard() {
                   <div>
                     <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Remanescente</p>
                     <p className="text-on-surface font-bold text-base md:text-xl">
-                      {data.hasProfitTarget ? formatCurrency(Math.max(0, data.totalProfitTarget - Math.max(0, data.currentMonthPnl))) : '-'}
+                      {data.hasProfitTarget ? formatCurrency(Math.max(0, data.totalProfitTarget - data.totalPnl)) : '-'}
                     </p>
                   </div>
                   <div className="hidden md:block">
                     <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Atual</p>
-                    <p className="text-secondary font-bold text-base md:text-xl">
-                      {formatCurrency(Math.max(0, data.currentMonthPnl))}
+                    <p className={`${data.totalPnl >= 0 ? 'text-secondary' : 'text-error'} font-bold text-base md:text-xl`}>
+                      {data.totalPnl >= 0 ? '+' : ''}{formatCurrency(data.totalPnl)}
                     </p>
                   </div>
                 </div>
                 {data.hasProfitTarget && (
                   <>
                     <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
-                      <div className="absolute left-0 top-0 h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Math.max(0, data.currentMonthPnl) / data.totalProfitTarget) * 100)}%` }}></div>
+                      <div className="absolute left-0 top-0 h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, (data.totalPnl / data.totalProfitTarget) * 100))}%` }}></div>
                     </div>
                     <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
                       <span>$0.00</span>
@@ -947,20 +1003,20 @@ export default function Dashboard() {
                     <div>
                       <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Máxima Restante</p>
                       <p className="text-on-surface font-bold text-base md:text-xl">
-                        {data.hasMaxLoss ? formatCurrency(Math.max(0, data.totalMaxLoss - data.currentMonthLosses)) : '-'}
+                        {data.hasMaxLoss ? formatCurrency(Math.max(0, data.totalMaxLoss - (data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0))) : '-'}
                       </p>
                     </div>
                     <div className="hidden md:block">
                       <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
                       <p className="text-error font-bold text-base md:text-xl">
-                        {formatCurrency(data.currentMonthLosses)}
+                        {formatCurrency(data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0)}
                       </p>
                     </div>
                   </div>
                   {data.hasMaxLoss && (
                     <>
                       <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
-                        <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (data.currentMonthLosses / data.totalMaxLoss) * 100)}%` }}></div>
+                        <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0) / data.totalMaxLoss) * 100)}%` }}></div>
                       </div>
                       <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
                         <span>$0.00</span>
@@ -1133,56 +1189,38 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-      ) : (
-        <div className="space-y-8 md:space-y-12">
+
+      <div className="space-y-8 md:space-y-12 mt-8 md:mt-12">
+        {!data.hasProfitTarget && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
               <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">history</span>
                 Lucro mês de {capitalize(prevMonthName)}
               </h4>
-              <div className="flex flex-col items-center justify-center h-full min-h-[150px]">
-                <p className="text-on-surface font-bold text-4xl mb-2">{formatCurrency(data.prevMonthPnl)}</p>
+                <div className="flex flex-col items-center justify-center h-full min-h-[150px]">
+                  <p className="text-on-surface font-bold text-4xl mb-2">{formatCurrency(data.prevMonthPnl)}</p>
+                </div>
               </div>
-            </div>
-            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary">account_balance_wallet</span>
-                Lucro mês de {capitalize(currentMonthName)}
-              </h4>
-              <div className="flex flex-col justify-center h-full min-h-[150px]">
-                <div className="flex justify-between items-end mb-4">
-                  <div>
-                    <p className="text-on-surface-variant text-sm mb-1">Saldo Atual</p>
-                    <p className={`font-bold text-4xl ${data.currentMonthPnl >= 0 ? 'text-secondary' : 'text-error'}`}>
-                      {formatCurrency(data.currentMonthPnl)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-on-surface-variant text-sm mb-1">Meta a alcançar</p>
-                    <p className="text-on-surface font-bold text-2xl">{data.hasProfitTarget ? formatCurrency(data.totalProfitTarget) : 'Não definida'}</p>
+              <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
+                <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
+                  <span className="material-symbols-outlined text-secondary">account_balance_wallet</span>
+                  Lucro mês de {capitalize(currentMonthName)}
+                </h4>
+                <div className="flex flex-col justify-center h-full min-h-[150px]">
+                  <div className="flex justify-between items-end mb-4">
+                    <div>
+                      <p className="text-on-surface-variant text-sm mb-1">Saldo Atual</p>
+                      <p className={`font-bold text-4xl ${data.totalPnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                        {data.totalPnl >= 0 ? '+' : ''}{formatCurrency(data.totalPnl)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                
-                {data.hasProfitTarget && (
-                  <>
-                    <div className="relative w-full h-3 bg-surface-container-highest rounded-full mt-4">
-                      <div 
-                        className="absolute left-0 top-0 h-full bg-secondary rounded-full transition-all duration-500" 
-                        style={{ width: `${Math.min(100, Math.max(0, (data.currentMonthPnl / data.totalProfitTarget) * 100))}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between text-xs text-on-surface-variant mt-2">
-                      <span>{((Math.max(0, data.currentMonthPnl) / data.totalProfitTarget) * 100).toFixed(1)}% alcançado</span>
-                      <span>Falta {formatCurrency(Math.max(0, data.totalProfitTarget - data.currentMonthPnl))}</span>
-                    </div>
-                  </>
-                )}
               </div>
             </div>
-          </div>
+        )}
         </div>
-      )}
 
       {/* Financial Performance Chart */}
       <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
@@ -1196,14 +1234,26 @@ export default function Dashboard() {
         </div>
         <div className="h-[400px] md:h-[500px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.chartData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+            <LineChart data={data.chartData} margin={{ top: 10, right: 30, left: 40, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#44474e" />
-              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#c4c6d0' }} dy={15} padding={{ left: 30, right: 30 }} />
-              <YAxis domain={['auto', 'auto']} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#c4c6d0' }} tickFormatter={(val) => formatCurrency(val)} />
+              <XAxis 
+                dataKey="date" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fontSize: 12, fill: '#c4c6d0' }} 
+                dy={15} 
+                padding={{ left: 30, right: 30 }} 
+                tickFormatter={(val) => {
+                  if (!val) return '';
+                  const parts = val.split('-');
+                  if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+                  return val;
+                }}
+              />
+              <YAxis domain={['auto', 'auto']} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#c4c6d0' }} tickFormatter={(val) => formatCurrency(val)} width={80} />
               <Tooltip content={<CustomTooltip formatCurrency={formatCurrency} />} cursor={{ stroke: '#44474e', strokeWidth: 1, strokeDasharray: '3 3' }} />
               <Legend verticalAlign="top" height={48} iconType="circle" wrapperStyle={{ fontSize: '14px', color: '#e2e2e9' }} />
               <Line type="monotone" dataKey="balance" name="Saldo (Balance)" stroke="#c3f5ff" strokeWidth={4} dot={{ r: 5, fill: '#c3f5ff', strokeWidth: 0 }} activeDot={{ r: 8, strokeWidth: 0 }} />
-              <Line type="monotone" dataKey="loss" name="Perdas (Drawdown)" stroke="#ffb4ab" strokeWidth={4} dot={{ r: 5, fill: '#ffb4ab', strokeWidth: 0 }} activeDot={{ r: 8, strokeWidth: 0 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -1557,7 +1607,7 @@ export default function Dashboard() {
                     <th className="font-normal pb-4">Date</th>
                     <th className="font-normal pb-4">Entry</th>
                     {tradeTypeFilter === 'ob' && <th className="font-normal pb-4">Timeframe</th>}
-                    <th className="font-normal pb-4">Login</th>
+                    <th className="font-normal pb-4">Conta</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1580,9 +1630,9 @@ export default function Dashboard() {
                     <td className="py-5 px-4 text-on-surface-variant whitespace-nowrap">{trade.entryTime || 'NA'}</td>
                     {tradeTypeFilter === 'ob' && <td className="py-5 px-4 text-on-surface-variant whitespace-nowrap">{trade.timeframe || 'NA'}</td>}
                     <td className="py-5 px-4 rounded-r-2xl text-on-surface-variant whitespace-nowrap">
-                      {(() => {
+                      {trade.account_login || (() => {
                         const acc = accounts.find(a => a.id === trade.accountId);
-                        return acc ? `${acc.accountNumber} - ${acc.accountType}` : trade.accountId;
+                        return acc ? `${acc.accountNumber}` : (trade.accountId || 'Manual');
                       })()}
                     </td>
                   </tr>
@@ -1605,115 +1655,104 @@ export default function Dashboard() {
 
       {activeDashboardTab === 'info' && (
         <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-10">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-12">
-            <div className="w-20 h-20 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden shrink-0">
-              {auth.currentUser?.photoURL ? (
-                <img src={auth.currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <span className="material-symbols-outlined text-5xl text-on-surface-variant">person</span>
-              )}
-            </div>
+          {selectedAccount === 'all' ? (
             <div>
-              <h2 className="text-on-surface font-bold text-2xl md:text-3xl font-headline">{auth.currentUser?.displayName || 'Usuário'}</h2>
-              <div className="flex items-center gap-3 mt-2">
-                <span className="text-on-surface-variant text-base">{selectedAccount === 'all' ? 'Todas as Contas' : accounts.find(a => a.id === selectedAccount)?.accountNumber}</span>
-                <button className="text-on-surface-variant hover:text-on-surface transition-colors">
-                  <span className="material-symbols-outlined text-base">content_copy</span>
-                </button>
+              <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline mb-8">Todas as Contas</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {accounts.map(acc => {
+                  const accTrades = trades.filter(t => t.accountId === acc.id);
+                  const accPnl = accTrades.reduce((sum, t) => sum + (Number(t.pnl) || 0), 0);
+                  const accBalance = Number(acc.initialBalance) + accPnl;
+                  return (
+                    <div key={acc.id} className="bg-surface-container border border-outline-variant/20 rounded-2xl p-6 hover:border-primary/30 transition-colors">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex flex-col">
+                          <h4 className="text-on-surface font-bold text-lg">Conta {acc.accountNumber}</h4>
+                          <p className="text-on-surface-variant text-sm">{acc.accountType} - {acc.phase || 'Fase 1'}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-on-surface-variant text-sm">Capital Inicial</span>
+                          <span className="text-on-surface font-bold">{formatCurrency(acc.initialBalance)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-on-surface-variant text-sm">P&L Atual</span>
+                          <span className={`font-bold ${accPnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                            {accPnl >= 0 ? '+' : ''}{formatCurrency(accPnl)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center pt-3 border-t border-outline-variant/10">
+                          <span className="text-on-surface-variant text-sm">Balanço Atual</span>
+                          <span className="text-on-surface font-bold text-lg">{formatCurrency(accBalance)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <p className="text-on-surface-variant text-sm mt-1 uppercase tracking-wider">
-                {selectedAccount === 'all' 
-                  ? '-' 
-                  : `${accounts.find(a => a.id === selectedAccount)?.accountType} - ${accounts.find(a => a.id === selectedAccount)?.phase || 'Fase 1'}`}
-              </p>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-20 gap-y-10">
-            {/* Left Column */}
-            <div className="space-y-8">
-              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
-                <span className="text-on-surface-variant text-base">Challenge</span>
-                <span className="text-on-surface font-bold text-base md:text-lg">{selectedAccount === 'all' ? '-' : accounts.find(a => a.id === selectedAccount)?.accountType}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
-                <span className="text-on-surface-variant text-base">Fase</span>
-                <span className="text-on-surface font-bold text-base md:text-lg">{selectedAccount === 'all' ? '-' : accounts.find(a => a.id === selectedAccount)?.phase || 'Fase 1'}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
-                <span className="text-on-surface-variant text-base">Broker</span>
-                <span className="text-on-surface font-bold text-base md:text-lg">{selectedAccount === 'all' ? '-' : accounts.find(a => a.id === selectedAccount)?.broker}</span>
-              </div>
-            </div>
-
-            {/* Right Column */}
-            <div className="space-y-8">
-              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
-                <span className="text-on-surface-variant text-base">Investor password</span>
-                <div className="flex items-center gap-4">
-                  <span className={`text-on-surface font-bold text-base md:text-lg ${!showInvestorPassword ? 'tracking-widest' : ''}`}>
-                    {selectedAccount === 'all' ? '-' : (showInvestorPassword ? (accounts.find(a => a.id === selectedAccount)?.investorPassword || 'N/A') : '********')}
-                  </span>
-                  <button 
-                    onClick={() => setShowInvestorPassword(!showInvestorPassword)}
-                    className="text-on-surface-variant hover:text-on-surface transition-colors"
-                    disabled={selectedAccount === 'all'}
-                  >
-                    <span className="material-symbols-outlined text-lg">{showInvestorPassword ? 'visibility' : 'visibility_off'}</span>
-                  </button>
-                  <button 
-                    onClick={() => {
-                      const pwd = accounts.find(a => a.id === selectedAccount)?.investorPassword;
-                      if (pwd) navigator.clipboard.writeText(pwd);
-                    }}
-                    className="text-on-surface-variant hover:text-on-surface transition-colors"
-                    disabled={selectedAccount === 'all'}
-                  >
-                    <span className="material-symbols-outlined text-lg">content_copy</span>
-                  </button>
+          ) : (
+            <>
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-12">
+                <div className="w-20 h-20 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden shrink-0">
+                  {auth.currentUser?.photoURL ? (
+                    <img src={auth.currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="material-symbols-outlined text-5xl text-on-surface-variant">person</span>
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-on-surface font-bold text-2xl md:text-3xl font-headline">{auth.currentUser?.displayName || 'Usuário'}</h2>
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="text-on-surface-variant text-base">{accounts.find(a => a.id === selectedAccount)?.accountNumber}</span>
+                    <button className="text-on-surface-variant hover:text-on-surface transition-colors">
+                      <span className="material-symbols-outlined text-base">content_copy</span>
+                    </button>
+                  </div>
+                  <p className="text-on-surface-variant text-sm mt-1 uppercase tracking-wider">
+                    {`${accounts.find(a => a.id === selectedAccount)?.accountType} - ${accounts.find(a => a.id === selectedAccount)?.phase || 'Fase 1'}`}
+                  </p>
                 </div>
               </div>
-              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
-                <span className="text-on-surface-variant text-base">Master password</span>
-                <div className="flex items-center gap-4">
-                  <span className={`text-on-surface font-bold text-base md:text-lg ${!showMasterPassword ? 'tracking-widest' : ''}`}>
-                    {selectedAccount === 'all' ? '-' : (showMasterPassword ? (accounts.find(a => a.id === selectedAccount)?.masterPassword || 'N/A') : '********')}
-                  </span>
-                  <button 
-                    onClick={() => setShowMasterPassword(!showMasterPassword)}
-                    className="text-on-surface-variant hover:text-on-surface transition-colors"
-                    disabled={selectedAccount === 'all'}
-                  >
-                    <span className="material-symbols-outlined text-lg">{showMasterPassword ? 'visibility' : 'visibility_off'}</span>
-                  </button>
-                  <button 
-                    onClick={() => {
-                      const pwd = accounts.find(a => a.id === selectedAccount)?.masterPassword;
-                      if (pwd) navigator.clipboard.writeText(pwd);
-                    }}
-                    className="text-on-surface-variant hover:text-on-surface transition-colors"
-                    disabled={selectedAccount === 'all'}
-                  >
-                    <span className="material-symbols-outlined text-lg">content_copy</span>
-                  </button>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-20 gap-y-10">
+                {/* Left Column */}
+                <div className="space-y-8">
+                  <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
+                    <span className="text-on-surface-variant text-base">Challenge</span>
+                    <span className="text-on-surface font-bold text-base md:text-lg">{accounts.find(a => a.id === selectedAccount)?.accountType}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
+                    <span className="text-on-surface-variant text-base">Fase</span>
+                    <span className="text-on-surface font-bold text-base md:text-lg">{accounts.find(a => a.id === selectedAccount)?.phase || 'Fase 1'}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
+                    <span className="text-on-surface-variant text-base">Broker</span>
+                    <span className="text-on-surface font-bold text-base md:text-lg">{accounts.find(a => a.id === selectedAccount)?.broker}</span>
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-8">
+                  <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
+                    <span className="text-on-surface-variant text-base">Starting balance</span>
+                    <span className="text-on-surface font-bold text-base md:text-lg">{formatCurrency(accounts.find(a => a.id === selectedAccount)?.initialBalance || 0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
+                    <span className="text-on-surface-variant text-base">Profit Target</span>
+                    <span className="text-on-surface font-bold text-base md:text-lg">{data.hasProfitTarget ? formatCurrency(data.totalProfitTarget) : '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
+                    <span className="text-on-surface-variant text-base">Account start date</span>
+                    <span className="text-on-surface font-bold text-base md:text-lg">
+                      {accounts.find(a => a.id === selectedAccount)?.createdAt?.toDate ? accounts.find(a => a.id === selectedAccount)?.createdAt.toDate().toLocaleDateString('pt-BR') : '-'}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
-                <span className="text-on-surface-variant text-base">Starting balance</span>
-                <span className="text-on-surface font-bold text-base md:text-lg">{selectedAccount === 'all' ? formatCurrency(data.totalSize) : formatCurrency(accounts.find(a => a.id === selectedAccount)?.initialBalance || 0)}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
-                <span className="text-on-surface-variant text-base">Profit Target</span>
-                <span className="text-on-surface font-bold text-base md:text-lg">{data.hasProfitTarget ? formatCurrency(data.totalProfitTarget) : '-'}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
-                <span className="text-on-surface-variant text-base">Account start date</span>
-                <span className="text-on-surface font-bold text-base md:text-lg">
-                  {selectedAccount === 'all' ? '-' : (accounts.find(a => a.id === selectedAccount)?.createdAt?.toDate ? accounts.find(a => a.id === selectedAccount)?.createdAt.toDate().toLocaleDateString('pt-BR') : '-')}
-                </span>
-              </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1778,14 +1817,7 @@ export default function Dashboard() {
                 <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo de Conta</label>
                 <select 
                   value={newAccount.accountType}
-                  onChange={(e) => {
-                    const type = e.target.value;
-                    setNewAccount({
-                      ...newAccount, 
-                      accountType: type,
-                      tradeType: type === 'Conta Real' ? newAccount.tradeType : 'forex'
-                    });
-                  }}
+                  onChange={(e) => setNewAccount({...newAccount, accountType: e.target.value})}
                   className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors appearance-none"
                 >
                   <option>5K Challenge</option>
@@ -1814,27 +1846,11 @@ export default function Dashboard() {
                 <select 
                   value={newAccount.tradeType}
                   onChange={(e) => setNewAccount({...newAccount, tradeType: e.target.value as 'forex' | 'ob'})}
-                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={newAccount.accountType !== 'Conta Real'}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors appearance-none"
                 >
                   <option value="forex">Forex / Índices</option>
                   <option value="ob">Opções Binárias (OB)</option>
                 </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Senha Master</label>
-                <div className="relative">
-                  <input 
-                    type={showMasterPassword ? "text" : "password"} 
-                    value={newAccount.masterPassword}
-                    onChange={(e) => setNewAccount({...newAccount, masterPassword: e.target.value})}
-                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 pr-12 text-on-surface outline-none focus:border-primary transition-colors" 
-                    placeholder="********" 
-                  />
-                  <button type="button" onClick={() => setShowMasterPassword(!showMasterPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors">
-                    <span className="material-symbols-outlined">{showMasterPassword ? 'visibility' : 'visibility_off'}</span>
-                  </button>
-                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Data de Início *</label>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { auth, db } from '../firebase';
+import { auth, db, storage } from '../firebase';
 import { updateProfile, verifyBeforeUpdateEmail, updatePassword } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Modal from './Modal';
 
 export default function Profile() {
@@ -12,6 +13,7 @@ export default function Profile() {
   const [password, setPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [photoURL, setPhotoURL] = useState(user?.photoURL || '');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -33,7 +35,14 @@ export default function Profile() {
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        // Tentar primeiro no novo caminho 'usuarios' (SaaS)
+        let userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+        
+        // Se não encontrar, tenta no antigo 'users'
+        if (!userDoc.exists()) {
+          userDoc = await getDoc(doc(db, 'users', user.uid));
+        }
+
         if (userDoc.exists()) {
           const data = userDoc.data();
           if (data.phoneNumber) setPhoneNumber(data.phoneNumber);
@@ -46,24 +55,45 @@ export default function Profile() {
 
   const closeModal = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 1024 * 1024) { // 1MB limit for base64
+    if (file && user) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
         setModalConfig({
           isOpen: true,
           title: "Erro",
-          message: "A imagem deve ter no máximo 1MB.",
+          message: "A imagem deve ter no máximo 5MB.",
           isError: true,
           onConfirm: closeModal
         });
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoURL(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      
+      setIsSaving(true);
+      try {
+        const fileRef = ref(storage, `profiles/${user.uid}/${Date.now()}_${file.name}`);
+        await uploadBytes(fileRef, file);
+        const url = await getDownloadURL(fileRef);
+        setPhotoURL(url);
+        
+        // Instant update to firestore profile for preview elsewhere
+        await setDoc(doc(db, 'usuarios', user.uid), {
+          photoURL: url,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+
+      } catch (err: any) {
+        console.error(err);
+        setModalConfig({
+          isOpen: true,
+          title: "Erro",
+          message: "Erro ao carregar imagem.",
+          isError: true,
+          onConfirm: closeModal
+        });
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -100,18 +130,31 @@ export default function Profile() {
     setIsSaving(true);
     try {
       const newDisplayName = `${firstName} ${lastName}`.trim();
-      if (newDisplayName !== user.displayName || photoURL !== user.photoURL) {
-        await updateProfile(user, { 
-          displayName: newDisplayName,
-          photoURL: photoURL || user.photoURL
-        });
+      const authUpdate: any = { displayName: newDisplayName };
+      
+      // photoURL might be a base64 string which is too long for Firebase Auth profile
+      // We only update Auth profile if it's a "normal" URL or small enough
+      if (photoURL) {
+        authUpdate.photoURL = photoURL;
       }
 
-      await setDoc(doc(db, 'users', user.uid), {
+      if (newDisplayName !== user.displayName || authUpdate.photoURL) {
+        await updateProfile(user, authUpdate);
+      }
+
+      const profileData = {
+        nome: newDisplayName, // "nome" used in Auth.tsx SaaS sync
         phoneNumber,
         photoURL,
-        updatedAt: new Date()
-      }, { merge: true });
+        userId: user.uid,
+        updatedAt: new Date().toISOString()
+      };
+
+      // Savar em ambos para compatibilidade, preferindo 'usuarios'
+      await setDoc(doc(db, 'usuarios', user.uid), profileData, { merge: true });
+      try {
+        await setDoc(doc(db, 'users', user.uid), profileData, { merge: true });
+      } catch (e) {}
 
       if (email !== user.email) {
         await verifyBeforeUpdateEmail(user, email);
@@ -238,13 +281,24 @@ export default function Profile() {
           </div>
           <div className="space-y-2 md:col-span-2">
             <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Nova Senha</label>
-            <input 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Deixe em branco para não alterar"
-              className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
-            />
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Deixe em branco para não alterar"
+                className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 pr-12 text-on-surface outline-none focus:border-primary transition-colors" 
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors focus:outline-none"
+              >
+                <span className="material-symbols-outlined">
+                  {showPassword ? 'visibility_off' : 'visibility'}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 

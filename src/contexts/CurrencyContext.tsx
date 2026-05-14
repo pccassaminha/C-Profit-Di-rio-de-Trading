@@ -24,6 +24,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const formatCurrency = (value: number) => {
+    if (isNaN(value) || value === null || value === undefined) return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: currency }).format(0).replace('US$', '$').replace('US$ ', '$');
     let formatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: currency }).format(value);
     return formatted.replace('US$', '$').replace('US$ ', '$');
   };

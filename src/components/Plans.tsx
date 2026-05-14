@@ -1,0 +1,420 @@
+import React, { useState, useEffect } from 'react';
+import { useTrades } from '../hooks/useTrades';
+import { db, auth } from '../firebase';
+import { collection, addDoc, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
+import { CreditCard, Check, ShieldCheck, Zap, Star, LayoutGrid, Smartphone, MessageSquare, History, Upload, Landmark, X, FileText } from 'lucide-react';
+import Modal from './Modal';
+
+export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { forcedExpired?: boolean, hideHeader?: boolean, onAuthRequired?: () => void }) {
+  const { userPlan, globalSettings } = useTrades();
+  const [payments, setPayments] = useState<any[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState<any>(null);
+  const [paymentSubmitted, setPaymentSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [payerName, setPayerName] = useState(auth.currentUser?.displayName || '');
+  const [payerPhone, setPayerPhone] = useState('');
+
+  // Função para gerar um ID numérico curto baseado no timestamp
+  const generateNumericId = () => {
+    return Math.floor(Math.random() * 9000000) + 1000000;
+  };
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+
+    // Load User Profile / Billing Info
+    const loadProfile = async () => {
+      try {
+        const profileSnapshot = await getDocs(query(collection(db, 'user_profiles'), where('userId', '==', auth.currentUser?.uid)));
+        if (!profileSnapshot.empty) {
+          const data = profileSnapshot.docs[0].data();
+          if (data.billingName) setPayerName(data.billingName);
+          if (data.billingPhone) setPayerPhone(data.billingPhone);
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error);
+      }
+    };
+    loadProfile();
+
+    const q = query(
+      collection(db, 'payments'), 
+      where('userId', '==', auth.currentUser.uid),
+      orderBy('createdAt', 'desc')
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      setPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  const plans = [
+    {
+      id: 'mensal_2',
+      name: 'Plano Mensal',
+      oldPrice: '7.500',
+      discount: '-33% OFF',
+      savingsText: 'Poupa Kz 2.500 / mês',
+      price: '5.000',
+      period: 'por mês',
+      days: 30,
+      limits: '2 Contas Forex + 2 Contas OB',
+      totalLimit: 4,
+      features: ['Suporte via WhatsApp', 'Importação MT5, HTML e CSV', 'Diário de Trades Ilimitado', 'Relatórios de Performance', 'Acesso à Comunidade'],
+      current: userPlan?.plan_type === 'mensal_2'
+    },
+    {
+      id: 'semestral_6',
+      name: 'Plano Semestral',
+      oldPrice: '45.000',
+      discount: '-44% OFF',
+      savingsText: 'Poupa Kz 20.000 no semestre',
+      price: '25.000',
+      period: 'a cada 6 meses',
+      days: 180,
+      savings: '17% OFF',
+      limits: '6 Contas Forex + 6 Contas OB',
+      totalLimit: 12,
+      features: ['Tudo do Mensal', 'Análise Psicológica Avançada', 'Exportação de Dados (PDF)', 'Suporte via WhatsApp', 'Acesso à Comunidade'],
+      featured: true,
+      current: userPlan?.plan_type === 'semestral_6'
+    },
+    {
+      id: 'anual_16',
+      name: 'Plano Anual',
+      oldPrice: '90.000',
+      discount: '-50% OFF',
+      savingsText: 'Poupa Kz 45.000 no ano',
+      price: '45.000',
+      period: 'por ano',
+      days: 365,
+      savings: '25% OFF',
+      limits: '16 Contas Forex + 16 Contas OB',
+      totalLimit: 32,
+      features: ['Tudo do Semestral', 'Mentorias Coletivas', 'Acesso Antecipado a Beta', 'Personalização de Interface', 'Suporte Prioritário via WhatsApp', 'Acesso à Comunidade VIP'],
+      current: userPlan?.plan_type === 'anual_16'
+    }
+  ];
+
+  const handleSupport = () => {
+    const phone = globalSettings?.whatsappNumber || '244921319200';
+    window.open(`https://wa.me/${phone}`, '_blank');
+  };
+
+  const handleRequestPayment = async () => {
+    if (!showPaymentModal || !payerName) {
+      alert('Por favor, preencha o seu nome completo.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const numericId = generateNumericId();
+      await addDoc(collection(db, 'payments'), {
+        userId: auth.currentUser?.uid,
+        userName: payerName,
+        userEmail: auth.currentUser?.email || '',
+        userPhone: payerPhone,
+        planId: showPaymentModal.id,
+        amount: Number(showPaymentModal.price.replace('.', '')),
+        status: 'pending',
+        transactionCode: numericId,
+        proofUrl: 'WhatsApp Support',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      setPaymentSubmitted(true);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao enviar solicitação.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowPaymentModal(null);
+    setPaymentSubmitted(false);
+  };
+
+  return (
+    <div className={`p-8 max-w-7xl mx-auto min-h-screen animate-in fade-in duration-500 space-y-12 ${hideHeader ? 'min-h-fit py-0' : ''}`}>
+      {forcedExpired && (
+        <div className="bg-error/10 border border-error/50 p-6 rounded-3xl flex items-center gap-6 animate-pulse">
+          <div className="w-12 h-12 bg-error/20 rounded-full flex items-center justify-center text-error">
+            <span className="material-symbols-outlined text-3xl">lock</span>
+          </div>
+          <div>
+            <h2 className="text-error font-black text-xl">Acesso Bloqueado: Assinatura Expirada</h2>
+            <p className="text-on-surface-variant text-sm">Para retomar o acesso, selecione um plano e realize o pagamento via transferência ou multicaixa.</p>
+          </div>
+        </div>
+      )}
+
+      {!hideHeader && (
+        <div className="flex flex-col items-center">
+          <h1 className="text-4xl font-black text-on-surface mb-4 font-headline text-center uppercase tracking-tighter">
+            Níveis de <span className="text-primary italic">Assinatura</span>
+          </h1>
+          <p className="text-on-surface-variant text-center max-w-2xl">Aumente sua capacidade analítica e tenha um terminal profissional de alta performance.</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {plans.map((plan) => (
+          <div 
+            key={plan.id}
+            className={`relative p-[40px_32px] rounded-[16px] border transition-all flex flex-col hover:-translate-y-[4px] ${
+              plan.featured 
+                ? 'bg-surface-container-high border-primary/30 shadow-[0_0_60px_rgba(0,245,160,0.07)]' 
+                : 'bg-surface-container border-outline hover:border-outline-variant'
+            }`}
+          >
+            {plan.featured && (
+              <div className="absolute -top-[13px] left-1/2 -translate-x-1/2 bg-primary text-background text-[10px] font-extrabold py-[5px] px-[16px] rounded-[100px] uppercase tracking-[0.12em]">
+                Best Choice
+              </div>
+            )}
+
+            <div className="mb-8">
+              <h3 className="text-[12px] font-bold tracking-[0.1em] uppercase text-on-surface-variant/70 mb-[12px]">{plan.name}</h3>
+              <div className="flex items-center gap-[8px] text-[14px] text-on-surface-variant/70 line-through mb-[2px]">
+                Kz {plan.oldPrice}
+                {plan.discount && (
+                  <span className="inline-block bg-[#ff4b6e]/15 border border-[#ff4b6e]/30 text-[#ff4b6e] text-[10px] font-extrabold tracking-[0.08em] uppercase px-[8px] py-[2px] rounded-[4px] no-underline">
+                    {plan.discount}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1 mb-[4px]">
+                <span className="text-[44px] font-extrabold font-headline leading-none text-on-surface">
+                  <sup className="text-[18px] font-semibold tracking-normal align-super">Kz</sup>
+                  {plan.price}
+                </span>
+              </div>
+              <div className="text-[12px] text-on-surface-variant/70 mb-[24px]">
+                {plan.period}
+              </div>
+              <div className="inline-flex items-center gap-[5px] bg-[#00f5a0]/10 border border-[#00f5a0]/20 text-[#00f5a0] text-[11px] font-bold px-[10px] py-[4px] rounded-[6px] mb-[16px]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                {plan.savingsText}
+              </div>
+              <div className="flex items-center gap-[8px] text-[13px] text-on-surface-variant bg-[#00f5a0]/10 border border-[#00f5a0]/15 rounded-[8px] px-[14px] py-[10px] mb-[24px]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#00f5a0] shrink-0"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span className="text-on-surface-variant">{plan.limits}</span>
+              </div>
+            </div>
+
+            <hr className="border-t border-outline/50 my-[24px]" />
+
+            <ul className="flex flex-col gap-[12px] mb-[36px] flex-1 list-none">
+              {plan.features.map((feature, idx) => {
+                 const isPrioritySupport = feature === 'Suporte Prioritário via WhatsApp';
+                 return (
+                <li key={idx} className="flex items-center gap-[10px] text-[14px] text-on-surface-variant">
+                  <div className={`w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0 border ${isPrioritySupport ? 'bg-[#00f5a0]/25 border-[#00f5a0]/50' : 'bg-[#00f5a0]/10 border-[#00f5a0]/30'}`}>
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke={isPrioritySupport ? "var(--color-primary)" : "currentColor"} strokeWidth={isPrioritySupport ? "2.5" : "2"} className={isPrioritySupport ? "" : "text-[#00f5a0]"}>
+                      <polyline points="2 6 5 9 10 3"/>
+                    </svg>
+                  </div>
+                  {isPrioritySupport ? <span className="text-[#00f5a0] font-semibold">{feature}</span> : feature}
+                </li>
+              )})}
+            </ul>
+
+            <button 
+              onClick={() => {
+                if (!auth.currentUser && onAuthRequired) {
+                  onAuthRequired();
+                } else if (!plan.current) {
+                  setShowPaymentModal(plan);
+                }
+              }}
+              disabled={plan.current}
+              className={`w-full py-[14px] rounded-[10px] font-headline text-[13px] font-bold tracking-[0.08em] uppercase transition-all flex items-center justify-center border ${
+                plan.current
+                  ? 'bg-[#00f5a0]/10 text-[#00f5a0] border-[#00f5a0]/20 cursor-default'
+                  : plan.featured
+                    ? 'bg-primary text-background border-transparent hover:bg-primary-fixed-dim shadow-[0_8px_30px_rgba(0,245,160,0.3)]'
+                    : 'bg-transparent text-on-surface border-outline-variant hover:bg-white/5'
+              }`}
+            >
+              {plan.current ? (
+                'Plano Ativo'
+              ) : (
+                'Adquirir Plano'
+              )}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Link para Faturamentos */}
+      <div className="bg-surface-container-low border border-outline-variant/10 rounded-[32px] p-8 md:p-10 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center">
+            <History size={24} />
+          </div>
+          <div>
+            <h3 className="text-2xl font-black text-on-surface uppercase tracking-tighter">Histórico de Pagamentos</h3>
+            <p className="text-sm text-on-surface-variant tracking-wide">Visualize e baixe suas faturas e recibos anteriores.</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2 text-on-surface-variant text-sm font-bold opacity-60">
+          <FileText size={20} />
+          Acesse no menu lateral
+        </div>
+      </div>
+
+      {/* Modal de Pagamento */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/95 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-surface-container border border-outline-variant/30 rounded-[40px] max-w-lg w-full p-8 md:p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] relative overflow-hidden">
+            <button 
+              onClick={handleCloseModal}
+              className="absolute top-8 right-8 text-on-surface-variant hover:text-on-surface transition-colors z-10"
+            >
+              <X size={28} />
+            </button>
+
+            {!paymentSubmitted ? (
+              <>
+                <div className="text-center mb-10">
+                  <div className="w-20 h-20 bg-primary text-on-primary rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/20">
+                    <CreditCard size={40} />
+                  </div>
+                  <h3 className="text-3xl font-black text-on-surface mb-2 font-headline uppercase italic tracking-tighter">Dados de <span className="text-primary italic">Pagamento</span></h3>
+                  <p className="text-on-surface-variant text-sm px-4">Utilize as informações oficiais abaixo para efetuar a transferência.</p>
+                </div>
+
+                <div className="space-y-6 mb-10">
+                  <div className="bg-surface-container-high rounded-[32px] p-8 border border-outline-variant/20 space-y-8 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Nome Completo do Pagador</label>
+                        <input 
+                          type="text" 
+                          value={payerName}
+                          onChange={(e) => setPayerName(e.target.value)}
+                          placeholder="Ex: João Manuel dos Santos"
+                          className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Telemóvel (WhatsApp)</label>
+                        <input 
+                          type="text" 
+                          value={payerPhone}
+                          onChange={(e) => setPayerPhone(e.target.value)}
+                          placeholder="+244 9..."
+                          className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pb-6 border-b border-outline-variant/20">
+                      <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.3em]">Total a Liquidar:</span>
+                      <span className="text-3xl font-black text-primary font-mono tracking-tighter">{showPaymentModal.price} Kz</span>
+                    </div>
+                    
+                    <div className="space-y-6">
+                      {globalSettings?.showIban && (
+                        <div className="space-y-2 group cursor-pointer" onClick={() => {
+                          navigator.clipboard.writeText(globalSettings.iban);
+                          alert('IBAN copiado para a área de transferência!');
+                        }}>
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+                              <Landmark size={12} className="text-primary" />
+                              IBAN para Transferência
+                            </label>
+                            <span className="text-[8px] font-black text-primary uppercase bg-primary/10 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Clicar para Copiar</span>
+                          </div>
+                          <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex items-center justify-between">
+                            <span className="text-lg font-black text-on-surface font-mono tracking-tight">{globalSettings?.iban || 'A carregar...'}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {globalSettings?.showMulticaixa && (
+                        <div className="space-y-4 pt-4 border-t border-outline-variant/10">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+                              <Smartphone size={12} className="text-secondary" />
+                              Pagamento de Serviços (Multicaixa)
+                            </label>
+                            {globalSettings?.multicaixaLogoUrl && (
+                              <img src={globalSettings?.multicaixaLogoUrl} alt="Multicaixa Logo" className="h-8 object-contain bg-white rounded-md p-1 opacity-80" />
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 flex flex-col gap-1">
+                              <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest opacity-60">Entidade</span>
+                              <span className="text-2xl font-black text-on-surface font-mono">{globalSettings?.multicaixaEntity}</span>
+                            </div>
+                            <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 flex flex-col gap-1">
+                              <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest opacity-60">Referência</span>
+                              <span className="text-2xl font-black text-on-surface font-mono">{globalSettings?.multicaixaReference}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {!globalSettings?.showIban && !globalSettings?.showMulticaixa && (
+                        <div className="text-center py-6 text-on-surface-variant italic text-sm">
+                          Informações indisponíveis. Contacte o administrador via WhatsApp.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                    <ShieldCheck size={20} className="text-amber-500 shrink-0" />
+                    <p className="text-[10px] text-amber-500/90 font-medium leading-relaxed italic">
+                      Após realizar o pagamento, clique no botão abaixo para confirmar. Você deverá enviar o comprovante via WhatsApp em seguida.
+                    </p>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleRequestPayment}
+                  disabled={isSubmitting}
+                  className="w-full bg-primary text-on-primary py-6 rounded-[24px] font-black hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-primary/30 uppercase tracking-[0.2em] disabled:opacity-50 flex items-center justify-center gap-3 text-sm"
+                >
+                  {isSubmitting ? 'A processar...' : 'Confirmar Pagamento'}
+                </button>
+              </>
+            ) : (
+              <div className="text-center py-10 animate-in zoom-in-95 duration-500">
+                <div className="w-24 h-24 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
+                  <Check size={48} className="animate-in slide-in-from-bottom-4" />
+                </div>
+                <h3 className="text-3xl font-black text-on-surface mb-4 font-headline uppercase italic tracking-tighter">Quase <span className="text-emerald-500 italic">Lá!</span></h3>
+                <p className="text-on-surface-variant text-sm mb-10 px-6 leading-relaxed">
+                  Recebemos a sua notificação. Agora, clique no botão abaixo para nos enviar o seu <span className="font-black text-on-surface group">comprovativo via WhatsApp</span> para ativação imediata do seu plano.
+                </p>
+                
+                <button 
+                  onClick={handleSupport}
+                  className="w-full bg-[#25D366] text-[#022c16] py-6 rounded-[24px] font-black hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-emerald-500/20 uppercase tracking-[0.2em] flex items-center justify-center gap-3 text-sm"
+                >
+                  <MessageSquare size={20} />
+                  Enviar Comprovante (WP)
+                </button>
+                
+                <button 
+                  onClick={handleCloseModal}
+                  className="mt-6 text-on-surface-variant text-[10px] font-black uppercase tracking-widest hover:text-on-surface transition-colors"
+                >
+                  Voltar para os Planos
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
