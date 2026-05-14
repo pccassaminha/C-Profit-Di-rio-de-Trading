@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTrades } from '../hooks/useTrades';
 import { db, auth } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, orderBy, getDocs, getDoc, doc } from 'firebase/firestore';
 import { CreditCard, Check, ShieldCheck, Zap, Star, LayoutGrid, Smartphone, MessageSquare, History, Upload, Landmark, X, FileText } from 'lucide-react';
 import Modal from './Modal';
 
@@ -13,6 +13,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [payerName, setPayerName] = useState(auth.currentUser?.displayName || '');
   const [payerPhone, setPayerPhone] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
   // Função para gerar um ID numérico curto baseado no timestamp
   const generateNumericId = () => {
@@ -25,6 +26,18 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     // Load User Profile / Billing Info
     const loadProfile = async () => {
       try {
+        const userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
+        if (userDoc.exists()) {
+           const userData = userDoc.data();
+           if (userData.usedCoupon) {
+              const qCoupons = query(collection(db, 'coupons'), where('code', '==', userData.usedCoupon), where('active', '==', true));
+              const couponSnap = await getDocs(qCoupons);
+              if (!couponSnap.empty) {
+                 setAppliedCoupon({ id: couponSnap.docs[0].id, ...couponSnap.docs[0].data() });
+              }
+           }
+        }
+
         const profileSnapshot = await getDocs(query(collection(db, 'user_profiles'), where('userId', '==', auth.currentUser?.uid)));
         if (!profileSnapshot.empty) {
           const data = profileSnapshot.docs[0].data();
@@ -110,6 +123,44 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     }
   ];
 
+  // Aplicar Desconto do Cupão
+  const getDiscountedPrice = (plan: any) => {
+     if (!appliedCoupon) return plan.price;
+     if (appliedCoupon.targetPlan !== 'all' && appliedCoupon.targetPlan !== plan.id) return plan.price;
+
+     const originalPriceNum = Number(plan.price.replace(/\./g, ''));
+     let finalPriceNum = originalPriceNum;
+
+     if (appliedCoupon.discountType === 'percentage') {
+       finalPriceNum = originalPriceNum - (originalPriceNum * (appliedCoupon.discountValue / 100));
+     } else if (appliedCoupon.discountType === 'fixed') {
+       finalPriceNum = originalPriceNum - appliedCoupon.discountValue;
+     }
+
+     if (finalPriceNum < 0) finalPriceNum = 0;
+     
+     // Formatar novamente com pontos
+     return finalPriceNum.toLocaleString('pt-PT').replace(/,/g, '.');
+  };
+
+  const getFinalDiscountLabel = (plan: any) => {
+     if (!appliedCoupon) return plan.discount;
+     if (appliedCoupon.targetPlan !== 'all' && appliedCoupon.targetPlan !== plan.id) return plan.discount;
+
+     if (appliedCoupon.discountType === 'percentage') {
+        return `-${appliedCoupon.discountValue}% PARCEIRO`;
+     } else {
+        return `-Kz ${appliedCoupon.discountValue} PARCEIRO`;
+     }
+  };
+
+  const finalPlans = plans.map(p => ({
+     ...p, 
+     originalPriceStr: p.price,
+     price: getDiscountedPrice(p),
+     discount: getFinalDiscountLabel(p)
+  }));
+
   const handleSupport = () => {
     const phone = globalSettings?.whatsappNumber || '244921319200';
     window.open(`https://wa.me/${phone}`, '_blank');
@@ -129,10 +180,11 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         userEmail: auth.currentUser?.email || '',
         userPhone: payerPhone,
         planId: showPaymentModal.id,
-        amount: Number(showPaymentModal.price.replace('.', '')),
+        amount: Number(showPaymentModal.price.replace(/\./g, '')),
         status: 'pending',
         transactionCode: numericId,
         proofUrl: 'WhatsApp Support',
+        usedCoupon: appliedCoupon ? appliedCoupon.code : null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
@@ -174,7 +226,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {plans.map((plan) => (
+        {finalPlans.map((plan) => (
           <div 
             key={plan.id}
             className={`relative p-[40px_32px] rounded-[16px] border transition-all flex flex-col hover:-translate-y-[4px] ${
@@ -204,6 +256,9 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                   <sup className="text-[18px] font-semibold tracking-normal align-super">Kz</sup>
                   {plan.price}
                 </span>
+                {appliedCoupon && appliedCoupon.targetPlan === 'all' || appliedCoupon?.targetPlan === plan.id ? (
+                   <span className="text-xs text-primary font-bold ml-2 line-through opacity-50">Kz {plan.originalPriceStr}</span>
+                ) : null}
               </div>
               <div className="text-[12px] text-on-surface-variant/70 mb-[24px]">
                 {plan.period}

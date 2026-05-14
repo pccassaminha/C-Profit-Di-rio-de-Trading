@@ -8,7 +8,7 @@ import {
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, 
@@ -40,6 +40,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [couponCode, setCouponCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -111,6 +112,19 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
     setLoading(true);
 
     try {
+      let validCoupon: any = null;
+
+      if (!isLogin && couponCode.trim() !== '') {
+        const qCoupons = query(collection(db, 'coupons'), where('code', '==', couponCode.trim().toUpperCase()), where('active', '==', true));
+        const couponSnap = await getDocs(qCoupons);
+        if (couponSnap.empty) {
+          setError('Cupom ou referência de parceiro inválido ou expirado.');
+          setLoading(false);
+          return;
+        }
+        validCoupon = { id: couponSnap.docs[0].id, ...couponSnap.docs[0].data() };
+      }
+
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
         const userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
@@ -120,7 +134,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         if (name) {
           await updateProfile(result.user, { displayName: name });
         }
-        await setDoc(doc(db, 'usuarios', result.user.uid), {
+        const newUserData: any = {
           nome: name,
           email: email,
           phoneNumber: phoneNumber,
@@ -128,7 +142,16 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
           plan_type: 'Iniciante',
           account_limit: 2,
           role: 'user'
-        });
+        };
+
+        if (validCoupon) {
+          newUserData.usedCoupon = validCoupon.code;
+          if (validCoupon.partnerRef) {
+            newUserData.partnerRef = validCoupon.partnerRef;
+          }
+        }
+
+        await setDoc(doc(db, 'usuarios', result.user.uid), newUserData);
         onSuccess(true);
       }
     } catch (err: any) {
@@ -278,6 +301,29 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
                         onChange={(e) => setPhoneNumber(e.target.value)}
                         placeholder="Ex: +244 900 000 000"
                         className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-4 text-on-surface outline-none focus:border-primary transition-all font-bold placeholder:text-on-surface-variant/30"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence mode="wait">
+                {!isLogin && !isForgotPassword && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-2 overflow-hidden"
+                  >
+                    <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50">Código de Desconto / Parceiro</label>
+                    <div className="relative">
+                      <Target className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40" size={20} />
+                      <input 
+                        type="text" 
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        placeholder="Opcional"
+                        className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-4 text-on-surface outline-none focus:border-primary transition-all font-bold placeholder:text-on-surface-variant/30 uppercase"
                       />
                     </div>
                   </motion.div>

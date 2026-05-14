@@ -9,7 +9,7 @@ import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Download } from 'lucide-react';
+import { Download, MoreVertical } from 'lucide-react';
 
 // --- COMPONENTES AUXILIARES ---
 function CalendarCell({ date, muted, trades, pnl, isWin, isLoss, active }: any) {
@@ -151,7 +151,21 @@ export default function Dashboard() {
   });
 
   const [isExporting, setIsExporting] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const dashboardRef = React.useRef<HTMLDivElement>(null);
+  const exportDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [exportDropdownRef]);
 
   const handleExportPDF = async () => {
     if (!dashboardRef.current) return;
@@ -923,14 +937,6 @@ export default function Dashboard() {
           </button>
         </div>
         <div className="flex flex-wrap gap-4 items-center w-full lg:w-auto justify-between lg:justify-end">
-          <button 
-            onClick={handleExportPDF}
-            disabled={isExporting}
-            className={`flex items-center justify-center gap-2 px-4 py-2 text-sm bg-surface-container border border-outline-variant/20 hover:bg-surface-container-high transition-colors rounded-xl font-bold flex-1 lg:flex-none whitespace-nowrap ${isExporting ? 'opacity-50 cursor-wait' : ''}`}
-          >
-            <Download size={16} />
-            {isExporting ? 'Gerando...' : 'Exportar PDF'}
-          </button>
           <div className="relative flex-1 lg:flex-none min-w-[180px]">
             <select 
               value={tradeTypeFilter}
@@ -965,6 +971,31 @@ export default function Dashboard() {
           >
             <span className="material-symbols-outlined">add</span>
           </button>
+
+          <div className="relative" ref={exportDropdownRef}>
+            <button 
+              onClick={() => setExportMenuOpen(!exportMenuOpen)}
+              className="w-10 h-10 md:w-12 md:h-12 bg-surface-container-low border border-outline-variant/20 hover:bg-surface-container-high transition-colors rounded-full flex items-center justify-center text-on-surface shrink-0"
+              title="Mais Opções"
+            >
+              <MoreVertical size={20} />
+            </button>
+            {exportMenuOpen && (
+              <div className="absolute top-full right-0 mt-2 w-56 bg-surface-container-high border border-outline-variant/20 shadow-xl rounded-2xl overflow-hidden z-[50] animate-in fade-in slide-in-from-top-2">
+                <button 
+                  onClick={() => {
+                    handleExportPDF();
+                    setExportMenuOpen(false);
+                  }}
+                  disabled={isExporting}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Download size={18} />
+                  {isExporting ? 'Exportando...' : 'Exportar Relatório PDF'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

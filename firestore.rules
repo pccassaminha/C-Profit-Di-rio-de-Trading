@@ -136,6 +136,12 @@ service cloud.firestore {
       allow update, delete: if isDataOwner();
     }
 
+    // Coupons
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Planning
     match /planning/{entryId} {
       allow get, list: if isDataOwner();

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, getDocs, doc, updateDoc, onSnapshot, query, orderBy, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, onSnapshot, query, orderBy, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
-import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark } from 'lucide-react';
+import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket } from 'lucide-react';
 
 export default function AdminPanel() {
   const { userPlan, globalSettings: initialSettings } = useTrades();
@@ -12,9 +12,10 @@ export default function AdminPanel() {
   // Super Admin check
   const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
 
-  const [activeTab, setActiveTab] = useState<'users' | 'payments' | 'settings'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'payments' | 'settings' | 'coupons'>('users');
   const [users, setUsers] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
   const [settings, setSettings] = useState(initialSettings || {
     whatsappNumber: '',
     iban: '',
@@ -49,10 +50,17 @@ export default function AdminPanel() {
       setPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    // Listen to coupons
+    const qCoupons = query(collection(db, 'coupons'));
+    const unsubCoupons = onSnapshot(qCoupons, (snapshot) => {
+      setCoupons(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     setLoading(false);
     return () => {
       unsubUsers();
       unsubPayments();
+      unsubCoupons();
     };
   }, [isSuperAdmin]);
 
@@ -138,6 +146,57 @@ export default function AdminPanel() {
     alert('Configurações salvas!');
   };
 
+  const [newCoupon, setNewCoupon] = useState({
+    code: '',
+    discountType: 'percentage', // 'percentage' | 'fixed'
+    discountValue: '',
+    targetPlan: 'all', // 'all', 'mensal_6', 'trimestral_6', 'semestral_8', 'anual_16'
+    partnerRef: ''
+  });
+
+  const handleCreateCoupon = async () => {
+    if (!newCoupon.code || !newCoupon.discountValue) return alert('Preencha os campos obrigatórios do cupão.');
+    try {
+      await addDoc(collection(db, 'coupons'), {
+        code: newCoupon.code.trim().toUpperCase(),
+        discountType: newCoupon.discountType,
+        discountValue: Number(newCoupon.discountValue),
+        targetPlan: newCoupon.targetPlan,
+        partnerRef: newCoupon.partnerRef,
+        active: true,
+        createdAt: new Date().toISOString()
+      });
+      setNewCoupon({
+        code: '',
+        discountType: 'percentage',
+        discountValue: '',
+        targetPlan: 'all',
+        partnerRef: ''
+      });
+      alert('Cupão criado com sucesso!');
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao criar cupão.');
+    }
+  };
+
+  const handleDeleteCoupon = async (id: string) => {
+    if (!window.confirm('Apagar este cupão permanentemente?')) return;
+    try {
+      await deleteDoc(doc(db, 'coupons', id));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleCoupon = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, 'coupons', id), { active: !currentStatus });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   if (!isSuperAdmin) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -173,6 +232,12 @@ export default function AdminPanel() {
             className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'settings' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
             <Settings size={18} /> Configs
+          </button>
+          <button 
+            onClick={() => setActiveTab('coupons')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'coupons' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
+          >
+            <Ticket size={18} /> Cupons
           </button>
         </div>
       </div>
@@ -421,6 +486,114 @@ export default function AdminPanel() {
               <Check size={20} />
               Salvar Alterações
             </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'coupons' && (
+        <div className="space-y-8">
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 shadow-xl">
+            <h3 className="text-xl font-bold text-on-surface mb-6 font-headline flex items-center gap-3">
+              <Ticket className="text-primary" />
+              Novo Cupão de Desconto / Parceria
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <input type="text" value={newCoupon.code} onChange={e => setNewCoupon({...newCoupon, code: e.target.value.toUpperCase()})} placeholder="Código (Ex: VIP20)" className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary uppercase font-mono" />
+              
+              <select value={newCoupon.discountType} onChange={e => setNewCoupon({...newCoupon, discountType: e.target.value})} className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                <option value="percentage">Percentagem %</option>
+                <option value="fixed">Valor Fixo (Kz)</option>
+              </select>
+              
+              <input type="number" value={newCoupon.discountValue} onChange={e => setNewCoupon({...newCoupon, discountValue: e.target.value})} placeholder={newCoupon.discountType === 'percentage' ? "Ex: 20" : "Ex: 5000"} className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary" />
+              
+              <select value={newCoupon.targetPlan} onChange={e => setNewCoupon({...newCoupon, targetPlan: e.target.value})} className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                <option value="all">Todos os Planos</option>
+                <option value="mensal_6">Mensal</option>
+                <option value="trimestral_6">Trimestral</option>
+                <option value="semestral_8">Semestral</option>
+                <option value="anual_16">Anual</option>
+              </select>
+              
+              <input type="text" value={newCoupon.partnerRef} onChange={e => setNewCoupon({...newCoupon, partnerRef: e.target.value})} placeholder="Referência (Parceiro)" className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary" />
+            </div>
+            
+            <button onClick={handleCreateCoupon} className="mt-6 bg-primary text-background px-6 py-3 rounded-xl font-black text-sm uppercase tracking-widest hover:scale-[1.02] transition-all">
+              Criar Cupão
+            </button>
+          </div>
+
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-surface-container text-on-surface-variant text-xs uppercase tracking-widest border-b border-outline-variant/20">
+                <tr>
+                  <th className="p-6 font-black">Código</th>
+                  <th className="p-6 font-black">Desconto</th>
+                  <th className="p-6 font-black">Plano Alvo</th>
+                  <th className="p-6 font-black">Referência</th>
+                  <th className="p-6 font-black">Status</th>
+                  <th className="p-6 font-black">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {coupons.map(c => (
+                  <tr key={c.id} className="hover:bg-surface-container/30 transition-colors">
+                    <td className="p-6 font-mono font-bold text-primary">{c.code}</td>
+                    <td className="p-6 text-on-surface font-black">
+                      {c.discountType === 'percentage' ? `${c.discountValue}%` : `Kz ${c.discountValue}`}
+                    </td>
+                    <td className="p-6 text-sm text-on-surface-variant">{c.targetPlan === 'all' ? 'Todos' : c.targetPlan}</td>
+                    <td className="p-6 text-sm text-on-surface-variant">{c.partnerRef || '-'}</td>
+                    <td className="p-6">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${c.active ? 'bg-emerald-500/20 text-emerald-500' : 'bg-error/20 text-error'}`}>
+                        {c.active ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </td>
+                    <td className="p-6 flex items-center gap-3">
+                      <button onClick={() => handleToggleCoupon(c.id, c.active)} className="text-sm font-bold hover:underline">
+                        {c.active ? 'Desativar' : 'Ativar'}
+                      </button>
+                      <button onClick={() => handleDeleteCoupon(c.id)} className="text-sm text-error font-bold hover:underline">Apagar</button>
+                    </td>
+                  </tr>
+                ))}
+                {coupons.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-12 text-center text-on-surface-variant">Nenhum cupão criado.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 shadow-xl">
+            <h3 className="text-xl font-bold text-on-surface mb-6 font-headline">Relatório de Indicações</h3>
+            <div className="overflow-hidden border border-outline-variant/10 rounded-2xl">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-surface-container text-on-surface-variant text-[10px] uppercase tracking-widest">
+                  <tr>
+                    <th className="p-4 font-black">Usuário</th>
+                    <th className="p-4 font-black">Cupão Utilizado</th>
+                    <th className="p-4 font-black">Parceiro</th>
+                    <th className="p-4 font-black">Data Registo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {users.filter(u => u.usedCoupon).map(u => (
+                    <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
+                      <td className="p-4 font-bold text-sm text-on-surface">{u.name || u.email}</td>
+                      <td className="p-4 text-xs font-mono text-primary font-black">{u.usedCoupon}</td>
+                      <td className="p-4 text-xs text-on-surface-variant">{u.partnerRef || '-'}</td>
+                      <td className="p-4 text-xs text-on-surface-variant">{new Date(u.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                  {users.filter(u => u.usedCoupon).length === 0 && (
+                    <tr><td colSpan={4} className="p-6 text-center text-xs text-on-surface-variant">Nenhum registro encontrado.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

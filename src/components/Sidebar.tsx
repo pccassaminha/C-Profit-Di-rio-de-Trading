@@ -9,6 +9,21 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
   // Super Admin check - only this email can see the admin panel
   const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
 
+  const getPlanDisplay = (type: string | undefined) => {
+    if (!type) return 'Iniciante';
+    const maps: Record<string, string> = {
+      'mensal_6': 'Mensal',
+      'mensal_2': 'Mensal',
+      'trimestral_6': 'Trimestral',
+      'semestral_8': 'Semestral',
+      'semestral_6': 'Semestral',
+      'anual_16': 'Anual',
+      'Unlimited Elite': 'Unlimited Elite',
+      'Iniciante': 'Terminal Free'
+    };
+    return maps[type] || type;
+  };
+
   const navItems = [
     { id: 'dashboard', icon: 'dashboard', label: 'Performance' },
     { id: 'journal', icon: 'receipt_long', label: 'Diário de Trades' },
@@ -27,7 +42,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
               <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[36px] drop-shadow-md rounded-[8px]" />
               <span className="font-headline text-[20px] font-extrabold text-on-surface tracking-tight uppercase">Profit</span>
             </button>
-            <p className="text-[10px] uppercase tracking-[0.1em] text-on-surface-variant/80 font-label mt-2 whitespace-nowrap ml-2">Sessão Ativa</p>
+            <p className="text-[10px] uppercase tracking-[0.1em] text-primary font-bold mt-2 whitespace-nowrap ml-2">Plano: {getPlanDisplay(userPlan?.plan_type)}</p>
           </div>
         ) : (
           <button onClick={() => setActiveTab('dashboard')} className="cursor-pointer hover:scale-110 transition-transform bg-transparent border-none p-0 outline-none flex items-center justify-center mt-2 mb-4">

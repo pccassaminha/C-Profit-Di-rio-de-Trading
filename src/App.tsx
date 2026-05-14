@@ -149,6 +149,7 @@ export default function App() {
           toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
           onProfileClick={() => setActiveTab('profile')}
           onPlansClick={() => setActiveTab('plans')}
+          onNavigate={(tab) => setActiveTab(tab)}
         />
         <main className="flex-1 overflow-y-auto">
           {renderContent()}
