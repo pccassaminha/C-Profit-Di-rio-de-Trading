@@ -6,17 +6,19 @@ import Plans from './Plans';
 interface LandingProps {
   onLoginClick: () => void;
   onRegisterClick: () => void;
+  onNavigate?: (page: string) => void;
 }
 
-export default function Landing({ onLoginClick, onRegisterClick }: LandingProps) {
+export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: LandingProps) {
   return (
     <div className="min-h-screen bg-background text-on-surface font-body overflow-x-hidden">
       <div className="noise-overlay"></div>
       
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-[5%] h-[100px] bg-background/85 backdrop-blur-[20px] border-b border-outline">
-        <a href="#" onClick={(e) => {e.preventDefault(); window.scrollTo(0,0)}} className="flex items-center gap-[10px] text-none">
-          <img src="https://i.postimg.cc/4xXGKLmV/Chat-GPT-Image-9-de-mai-de-2026-01-01-09.png" alt="C Profit Logo" className="h-[140px] drop-shadow-md -ml-6" />
+        <a href="#" onClick={(e) => {e.preventDefault(); window.scrollTo(0,0)}} className="flex items-center gap-[16px] text-none hover:opacity-90 transition-opacity">
+          <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[44px] drop-shadow-md rounded-[8px]" />
+          <span className="font-headline text-[22px] font-extrabold text-on-surface tracking-tight uppercase">Profit</span>
         </a>
         <ul className="hidden md:flex items-center gap-[36px] list-none">
           <li><a href="#recursos" className="text-[13px] font-medium tracking-[0.08em] uppercase text-on-surface-variant hover:text-primary transition-colors">Recursos</a></li>
@@ -291,15 +293,19 @@ export default function Landing({ onLoginClick, onRegisterClick }: LandingProps)
         <p className="text-[12px] font-medium tracking-[0.1em] uppercase text-on-surface-variant/70 mb-[36px]">Desenvolvido pelo Grupo Cassaminha</p>
         <div className="flex items-center justify-center gap-[48px] flex-wrap">
           <a href="#" onClick={(e) => {e.preventDefault(); window.scrollTo(0,0)}} className="flex items-center gap-[10px] opacity-50 hover:opacity-100 transition-opacity cursor-pointer no-underline">
-            <img src="https://i.postimg.cc/4xXGKLmV/Chat-GPT-Image-9-de-mai-de-2026-01-01-09.png" alt="C Profit Logo" className="h-[32px] w-[32px] object-contain" />
-            <span className="font-headline text-[15px] font-bold text-on-surface">C Profit</span>
+            <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Profit Logo" className="h-[32px] w-[32px] object-contain rounded-[8px]" />
+            <span className="font-headline text-[15px] font-bold text-on-surface">Profit</span>
+          </a>
+          <a href="https://validac.shop/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[10px] opacity-50 hover:opacity-100 transition-opacity cursor-pointer no-underline">
+            <img src="https://i.postimg.cc/Prh7BMBw/Chat-GPT-Image-14-de-mai-de-2026-11-53-41.png" alt="Valida C Logo" className="h-[32px] w-[32px] object-contain rounded-[8px]" />
+            <span className="font-headline text-[15px] font-bold text-on-surface">Valida C</span>
           </a>
           <a href="https://www.cstoreao.shop/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[10px] opacity-50 hover:opacity-100 transition-opacity cursor-pointer no-underline">
-            <img src="https://i.postimg.cc/8cmZ9GhN/Chat-GPT-Image-7-de-mai-de-2026-21-55-40.png" alt="C Store Angola Logo" className="h-[40px] w-auto object-contain rounded-[8px]" />
+            <img src="https://i.postimg.cc/3wsKF20v/Chat-GPT-Image-13-de-mai-de-2026-12-40-58.png" alt="C Store Angola Logo" className="h-[40px] w-auto object-contain rounded-[8px]" />
             <span className="font-headline text-[15px] font-bold text-on-surface">C Store Angola</span>
           </a>
           <a href="https://www.cstoreao.shop/page" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[10px] opacity-50 hover:opacity-100 transition-opacity cursor-pointer no-underline">
-            <img src="https://i.postimg.cc/CxDDdCn8/Chat-GPT-Image-7-de-mai-de-2026-22-06-24.png" alt="C Gestão Empresarial Logo" className="h-[32px] w-[32px] object-contain rounded-[8px]" />
+            <img src="https://i.postimg.cc/Prh7BMBw/Chat-GPT-Image-14-de-mai-de-2026-11-53-41.png" alt="C Gestão Empresarial Logo" className="h-[32px] w-[32px] object-contain rounded-[8px]" />
             <span className="font-headline text-[15px] font-bold text-on-surface">C Gestão Empresarial</span>
           </a>
         </div>
@@ -312,8 +318,9 @@ export default function Landing({ onLoginClick, onRegisterClick }: LandingProps)
       <footer className="px-[5%] pt-[64px] pb-[32px] border-t border-outline">
         <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-[64px] mb-[64px]">
           <div>
-            <a href="#" className="flex items-center gap-[10px] mb-[16px]">
-               <img src="https://i.postimg.cc/4xXGKLmV/Chat-GPT-Image-9-de-mai-de-2026-01-01-09.png" alt="C Profit Logo" className="h-[140px] drop-shadow-md -ml-6" />
+            <a href="#" className="flex items-center gap-[16px] mb-[16px] hover:opacity-90 transition-opacity">
+               <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[44px] drop-shadow-md rounded-[8px]" />
+               <span className="font-headline text-[22px] font-extrabold text-on-surface tracking-tight uppercase">Profit</span>
             </a>
             <p className="text-[14px] text-on-surface-variant/70 leading-[1.7] max-w-[320px] mt-[16px]">O terminal definitivo para traders que levam a performance a sério. Journaling, analytics e planejamento num só lugar.</p>
           </div>
@@ -328,9 +335,9 @@ export default function Landing({ onLoginClick, onRegisterClick }: LandingProps)
           <div>
             <h4 className="text-[12px] font-bold tracking-[0.1em] uppercase text-on-surface-variant mb-[20px]">Suporte</h4>
             <ul className="list-none space-y-[12px]">
-               <li><a href="#" className="text-[14px] text-on-surface-variant/70 hover:text-on-surface transition-colors">Central de Ajuda</a></li>
-               <li><a href="#" className="text-[14px] text-on-surface-variant/70 hover:text-on-surface transition-colors">Termos</a></li>
-               <li><a href="#" className="text-[14px] text-on-surface-variant/70 hover:text-on-surface transition-colors">Privacidade</a></li>
+               <li><button onClick={() => onNavigate && onNavigate('ajuda')} className="text-[14px] text-on-surface-variant/70 hover:text-on-surface transition-colors cursor-pointer bg-transparent border-none">Central de Ajuda</button></li>
+               <li><button onClick={() => onNavigate && onNavigate('termos')} className="text-[14px] text-on-surface-variant/70 hover:text-on-surface transition-colors cursor-pointer bg-transparent border-none">Termos</button></li>
+               <li><button onClick={() => onNavigate && onNavigate('privacidade')} className="text-[14px] text-on-surface-variant/70 hover:text-on-surface transition-colors cursor-pointer bg-transparent border-none">Privacidade</button></li>
             </ul>
           </div>
         </div>

@@ -174,7 +174,10 @@ export default function Payments() {
               <div className="bg-white text-slate-900 rounded-3xl p-8 md:p-12 shadow-inner border border-slate-200">
                 <div className="flex flex-col md:flex-row justify-between mb-12 gap-8 border-b border-slate-100 pb-12">
                   <div>
-                    <img src="https://i.postimg.cc/4xXGKLmV/Chat-GPT-Image-9-de-mai-de-2026-01-01-09.png" alt="C Profit Logo" className="h-[120px] -ml-4 object-contain mb-2 drop-shadow-md" />
+                    <div className="flex items-center gap-[12px] mb-4">
+                      <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[32px] object-contain drop-shadow-md rounded-[8px]" />
+                      <span className="font-headline text-[20px] font-extrabold text-slate-800 tracking-tight uppercase">Profit</span>
+                    </div>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Terminal de Alta Performance</p>
                     <p className="text-xs text-slate-400 mt-4 leading-relaxed">
                       Luanda, Angola<br/>

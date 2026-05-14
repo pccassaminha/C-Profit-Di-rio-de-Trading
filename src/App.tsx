@@ -18,6 +18,9 @@ import { useTrades } from './hooks/useTrades';
 
 import Auth from './components/Auth';
 import Landing from './components/Landing';
+import Termos from './components/Termos';
+import Privacidade from './components/Privacidade';
+import Ajuda from './components/Ajuda';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -28,6 +31,7 @@ export default function App() {
   const [needsPlanSelection, setNeedsPlanSelection] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
+  const [publicPage, setPublicPage] = useState<string>('landing');
   
   const { isExpired, userPlan } = useTrades();
 
@@ -84,6 +88,15 @@ export default function App() {
     if (showAuth) {
       return <Auth onSuccess={handleAuthSuccess} initialMode={authInitialMode} />;
     }
+    if (publicPage === 'termos') {
+      return <Termos onBack={() => setPublicPage('landing')} />;
+    }
+    if (publicPage === 'privacidade') {
+      return <Privacidade onBack={() => setPublicPage('landing')} />;
+    }
+    if (publicPage === 'ajuda') {
+      return <Ajuda onBack={() => setPublicPage('landing')} />;
+    }
     return (
       <Landing 
         onLoginClick={() => {
@@ -93,7 +106,8 @@ export default function App() {
         onRegisterClick={() => {
           setAuthInitialMode('register');
           setShowAuth(true);
-        }} 
+        }}
+        onNavigate={setPublicPage}
       />
     );
   }

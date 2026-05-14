@@ -22,15 +22,16 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
     <aside className={`h-screen sticky top-0 bg-surface-container-low flex flex-col border-r border-outline-variant/20 z-50 transition-all duration-300 ${isOpen ? 'w-64' : 'w-20'} hidden md:flex shrink-0`}>
       <div className={`p-6 flex items-center ${isOpen ? 'justify-start' : 'justify-center'}`}>
         {isOpen ? (
-          <div className="flex flex-col items-start -mt-4">
-            <button onClick={() => setActiveTab('dashboard')} className="cursor-pointer hover:scale-105 transition-transform bg-transparent border-none p-0 outline-none text-left">
-              <img src="https://i.postimg.cc/4xXGKLmV/Chat-GPT-Image-9-de-mai-de-2026-01-01-09.png" alt="C Profit Logo" className="h-[180px] -ml-6 object-contain drop-shadow-md" />
+          <div className="flex flex-col items-start mt-2 mb-4">
+            <button onClick={() => setActiveTab('dashboard')} className="cursor-pointer hover:scale-105 transition-transform bg-transparent border-none p-0 outline-none text-left flex items-center gap-[12px]">
+              <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[36px] drop-shadow-md rounded-[8px]" />
+              <span className="font-headline text-[20px] font-extrabold text-on-surface tracking-tight uppercase">Profit</span>
             </button>
-            <p className="text-[10px] uppercase tracking-[0.1em] text-on-surface-variant/80 font-label -mt-6 whitespace-nowrap ml-6">Sessão Ativa</p>
+            <p className="text-[10px] uppercase tracking-[0.1em] text-on-surface-variant/80 font-label mt-2 whitespace-nowrap ml-2">Sessão Ativa</p>
           </div>
         ) : (
-          <button onClick={() => setActiveTab('dashboard')} className="cursor-pointer hover:scale-110 transition-transform bg-transparent border-none p-0 outline-none flex items-center justify-center">
-            <img src="https://i.postimg.cc/4xXGKLmV/Chat-GPT-Image-9-de-mai-de-2026-01-01-09.png" alt="C Logo" className="w-[80px] h-[80px] object-contain drop-shadow-md" />
+          <button onClick={() => setActiveTab('dashboard')} className="cursor-pointer hover:scale-110 transition-transform bg-transparent border-none p-0 outline-none flex items-center justify-center mt-2 mb-4">
+            <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="w-[32px] h-[32px] object-contain drop-shadow-md rounded-[8px]" />
           </button>
         )}
       </div>
