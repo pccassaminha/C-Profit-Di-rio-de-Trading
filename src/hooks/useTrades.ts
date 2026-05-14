@@ -30,9 +30,10 @@ export const useTrades = (manualTrades: any[] = []) => {
         if (userDoc.exists()) {
           const data = userDoc.data();
           let limit = data.account_limit || 2;
-          if (data.plan_type === 'mensal_2') limit = 4;
-          if (data.plan_type === 'semestral_6') limit = 12;
-          if (data.plan_type === 'anual_16') limit = 32;
+          if (data.plan_type === 'mensal_6' || data.plan_type === 'mensal_2') limit = 12; // 6 OB + 6 Forex
+          if (data.plan_type === 'trimestral_6') limit = 12; // 6 OB + 6 Forex
+          if (data.plan_type === 'semestral_8' || data.plan_type === 'semestral_6') limit = 16; // 8 OB + 8 Forex
+          if (data.plan_type === 'anual_16') limit = 32; // 16 OB + 16 Forex
 
           setUserPlan({
             plan_type: data.plan_type || 'Iniciante',

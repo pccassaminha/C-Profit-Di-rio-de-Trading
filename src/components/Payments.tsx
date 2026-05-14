@@ -3,6 +3,8 @@ import { db, auth } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { useTrades } from '../hooks/useTrades';
 import { CreditCard, History, Download, FileText, CheckCircle2, XCircle, Clock, Printer, Landmark, Smartphone, Zap, ShieldCheck } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function Payments() {
   const { userPlan, globalSettings } = useTrades();
@@ -23,38 +25,53 @@ export default function Payments() {
     return () => unsub();
   }, []);
 
-  const handlePrint = () => {
-    const printContent = printRef.current;
-    const windowUrl = 'about:blank';
-    const uniqueName = new Date().getTime();
-    const windowName = 'Print' + uniqueName;
-    const printWindow = window.open(windowUrl, windowName, 'left=100,top=100,width=900,height=900');
+  const [isExporting, setIsExporting] = useState(false);
 
-    if (printWindow && printContent) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Fatura - C Profit</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <style>
-              @media print {
-                body { padding: 0; margin: 0; }
-                .no-print { display: none; }
-              }
-            </style>
-          </head>
-          <body class="bg-white text-black p-10">
-            ${printContent.innerHTML}
-            <script>
-              setTimeout(() => {
-                window.print();
-                window.close();
-              }, 500);
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
+  const handlePrint = async () => {
+    if (!printRef.current) return;
+    setIsExporting(true);
+    try {
+      // Create a clone of the printable content and append it to body but hide it,
+      // to resolve any rendering issues with fixed positioning or scrolling elements.
+      const printContainer = document.createElement('div');
+      printContainer.style.position = 'absolute';
+      printContainer.style.top = '-9999px';
+      printContainer.style.left = '-9999px';
+      printContainer.style.width = '800px';
+      printContainer.style.backgroundColor = '#ffffff';
+      
+      const contentClone = printRef.current.cloneNode(true) as HTMLElement;
+      // Ajuste para não ter rolagem interna no clone
+      contentClone.style.height = 'auto';
+      contentClone.style.overflow = 'visible';
+      printContainer.appendChild(contentClone);
+      document.body.appendChild(printContainer);
+
+      const canvas = await html2canvas(printContainer, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      document.body.removeChild(printContainer);
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`CProfit_Fatura_${selectedInvoice?.transactionCode || selectedInvoice?.id?.slice(0, 8)}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Erro ao gerar PDF. Tente imprimir normalmente pela página.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -305,10 +322,11 @@ export default function Payments() {
               )}
               <button 
                 onClick={handlePrint}
-                className="flex items-center justify-center gap-3 bg-primary text-on-primary px-8 py-4 rounded-2xl font-black shadow-xl shadow-primary/20 hover:scale-105 transition-all uppercase tracking-widest text-sm"
+                disabled={isExporting}
+                className={`flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-black shadow-xl uppercase tracking-widest text-sm transition-all ${isExporting ? 'bg-primary/50 text-white cursor-wait shadow-none' : 'bg-primary text-on-primary shadow-primary/20 hover:scale-105'}`}
               >
                 <Printer size={20} />
-                Imprimir / PDF
+                {isExporting ? 'GERANDO PDF...' : 'Imprimir / PDF'}
               </button>
             </div>
           </div>

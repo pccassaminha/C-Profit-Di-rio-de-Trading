@@ -50,7 +50,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
   const plans = [
     {
-      id: 'mensal_2',
+      id: 'mensal_6',
       name: 'Plano Mensal',
       oldPrice: '7.500',
       discount: '-33% OFF',
@@ -58,13 +58,27 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       price: '5.000',
       period: 'por mês',
       days: 30,
-      limits: '2 Contas Forex + 2 Contas OB',
-      totalLimit: 4,
+      limits: '6 Contas Forex + 6 Contas OB',
+      totalLimit: 12,
       features: ['Suporte via WhatsApp', 'Importação MT5, HTML e CSV', 'Diário de Trades Ilimitado', 'Relatórios de Performance', 'Acesso à Comunidade'],
-      current: userPlan?.plan_type === 'mensal_2'
+      current: userPlan?.plan_type === 'mensal_6' || userPlan?.plan_type === 'mensal_2'
     },
     {
-      id: 'semestral_6',
+      id: 'trimestral_6',
+      name: 'Plano Trimestral',
+      oldPrice: '22.500',
+      discount: '-33% OFF',
+      savingsText: 'Poupa Kz 7.500 no trimestre',
+      price: '15.000',
+      period: 'a cada 3 meses',
+      days: 90,
+      limits: '6 Contas Forex + 6 Contas OB',
+      totalLimit: 12,
+      features: ['Tudo do Mensal', 'Análise Psicológica Essencial', 'Suporte Prioritário via WhatsApp', 'Acesso à Comunidade VIP'],
+      current: userPlan?.plan_type === 'trimestral_6'
+    },
+    {
+      id: 'semestral_8',
       name: 'Plano Semestral',
       oldPrice: '45.000',
       discount: '-44% OFF',
@@ -73,11 +87,11 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       period: 'a cada 6 meses',
       days: 180,
       savings: '17% OFF',
-      limits: '6 Contas Forex + 6 Contas OB',
-      totalLimit: 12,
-      features: ['Tudo do Mensal', 'Análise Psicológica Avançada', 'Exportação de Dados (PDF)', 'Suporte via WhatsApp', 'Acesso à Comunidade'],
+      limits: '8 Contas Forex + 8 Contas OB',
+      totalLimit: 16,
+      features: ['Tudo do Trimestral', 'Análise Psicológica Avançada', 'Exportação de Dados (PDF)', 'Suporte via WhatsApp', 'Acesso à Comunidade'],
       featured: true,
-      current: userPlan?.plan_type === 'semestral_6'
+      current: userPlan?.plan_type === 'semestral_8' || userPlan?.plan_type === 'semestral_6'
     },
     {
       id: 'anual_16',

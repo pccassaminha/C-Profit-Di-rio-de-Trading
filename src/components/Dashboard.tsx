@@ -7,6 +7,9 @@ import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import { Download } from 'lucide-react';
 
 // --- COMPONENTES AUXILIARES ---
 function CalendarCell({ date, muted, trades, pnl, isWin, isLoss, active }: any) {
@@ -146,6 +149,57 @@ export default function Dashboard() {
     message: '',
     onConfirm: () => {}
   });
+
+  const [isExporting, setIsExporting] = useState(false);
+  const dashboardRef = React.useRef<HTMLDivElement>(null);
+
+  const handleExportPDF = async () => {
+    if (!dashboardRef.current) return;
+    setIsExporting(true);
+    try {
+      const scaleStr = window.innerWidth < 768 ? '2' : '1.5';
+      const canvas = await html2canvas(dashboardRef.current, {
+        scale: parseFloat(scaleStr),
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#1E1E2D', // background color for the dark theme
+        windowWidth: dashboardRef.current.scrollWidth,
+        windowHeight: dashboardRef.current.scrollHeight
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      let heightLeft = pdfHeight;
+      let position = 0;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // Setup for multiple pages if content exceeds A4 height
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`CProfit_Performance_${selectedAccount === 'all' ? 'Geral' : selectedAccount}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Erro ao gerar PDF da performance.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const closeModal = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
 
@@ -868,8 +922,16 @@ export default function Dashboard() {
             {selectedAccount === 'all' ? 'Contas' : 'Info da Conta'}
           </button>
         </div>
-        <div className="flex gap-4 items-center w-full lg:w-auto justify-between lg:justify-end">
-          <div className="relative flex-1 lg:flex-none">
+        <div className="flex flex-wrap gap-4 items-center w-full lg:w-auto justify-between lg:justify-end">
+          <button 
+            onClick={handleExportPDF}
+            disabled={isExporting}
+            className={`flex items-center justify-center gap-2 px-4 py-2 text-sm bg-surface-container border border-outline-variant/20 hover:bg-surface-container-high transition-colors rounded-xl font-bold flex-1 lg:flex-none whitespace-nowrap ${isExporting ? 'opacity-50 cursor-wait' : ''}`}
+          >
+            <Download size={16} />
+            {isExporting ? 'Gerando...' : 'Exportar PDF'}
+          </button>
+          <div className="relative flex-1 lg:flex-none min-w-[180px]">
             <select 
               value={tradeTypeFilter}
               onChange={(e) => setTradeTypeFilter(e.target.value as any)}
@@ -881,7 +943,7 @@ export default function Dashboard() {
             </select>
             <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface text-lg pointer-events-none">expand_more</span>
           </div>
-          <div className="relative flex-1 lg:flex-none">
+          <div className="relative flex-1 lg:flex-none min-w-[200px]">
             <select 
               value={selectedAccount}
               onChange={(e) => setSelectedAccount(e.target.value)}
@@ -907,9 +969,10 @@ export default function Dashboard() {
       </div>
 
       {/* Conditional Content */}
-      {activeDashboardTab === 'objectives' && (
-        <>
-          {/* Statistics */}
+      <div ref={dashboardRef} className="space-y-8 bg-background pt-4 pb-8 max-w-full overflow-hidden">
+        {activeDashboardTab === 'objectives' && (
+          <>
+            {/* Statistics */}
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
         <h3 className="text-on-surface font-bold mb-6 md:mb-8 text-base md:text-xl font-headline">Estatísticas Globais</h3>
         <div className={`grid gap-6 md:gap-8 text-center lg:divide-x divide-outline-variant/20 ${tradeTypeFilter === 'all' ? 'grid-cols-2' : (tradeTypeFilter === 'ob' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5')}`}>
@@ -1755,6 +1818,7 @@ export default function Dashboard() {
           )}
         </div>
       )}
+      </div>
 
       {/* Add Account Modal */}
       {isAddAccountModalOpen && (

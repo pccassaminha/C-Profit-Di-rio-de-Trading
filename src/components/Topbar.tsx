@@ -20,9 +20,12 @@ export default function Topbar({
   const getPlanDisplay = (type: string | undefined) => {
     if (!type) return 'Iniciante';
     const maps: Record<string, string> = {
-      'mensal_2': 'Mensal Basic',
-      'semestral_6': 'Semestral Pro',
-      'anual_16': 'Anual Elite',
+      'mensal_6': 'Mensal',
+      'mensal_2': 'Mensal',
+      'trimestral_6': 'Trimestral',
+      'semestral_8': 'Semestral',
+      'semestral_6': 'Semestral',
+      'anual_16': 'Anual',
       'Unlimited Elite': 'Unlimited Elite',
       'Iniciante': 'Terminal Free'
     };
@@ -38,7 +41,7 @@ export default function Topbar({
         >
           <span className="material-symbols-outlined text-sm">menu</span>
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex md:hidden items-center gap-2">
           <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
             <span className="material-symbols-outlined text-on-primary text-sm">show_chart</span>
           </div>
