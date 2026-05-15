@@ -225,7 +225,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {finalPlans.map((plan) => (
           <div 
             key={plan.id}
@@ -397,12 +397,17 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                           <div className="flex items-center justify-between">
                             <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
                               <Landmark size={12} className="text-primary" />
-                              IBAN para Transferência
+                              Transferência Bancária (IBAN)
                             </label>
                             <span className="text-[8px] font-black text-primary uppercase bg-primary/10 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Clicar para Copiar</span>
                           </div>
-                          <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex items-center justify-between">
-                            <span className="text-lg font-black text-on-surface font-mono tracking-tight">{globalSettings?.iban || 'A carregar...'}</span>
+                          <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col">
+                            {globalSettings?.ibanName && (
+                              <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                                Favorecido: <span className="text-on-surface">{globalSettings.ibanName}</span>
+                              </span>
+                            )}
+                            <span className="text-xl md:text-2xl font-black text-on-surface font-mono tracking-tight break-all">{globalSettings?.iban || 'A carregar...'}</span>
                           </div>
                         </div>
                       )}
@@ -412,12 +417,18 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                           <div className="flex items-center justify-between">
                             <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
                               <Smartphone size={12} className="text-secondary" />
-                              Pagamento de Serviços (Multicaixa)
+                              Pagamento por Referência (MCX)
                             </label>
                             {globalSettings?.multicaixaLogoUrl && (
                               <img src={globalSettings?.multicaixaLogoUrl} alt="Multicaixa Logo" className="h-8 object-contain bg-white rounded-md p-1 opacity-80" />
                             )}
                           </div>
+                          {globalSettings?.multicaixaName && (
+                            <div className="px-5 py-3 bg-secondary/10 border border-secondary/20 rounded-xl mb-4">
+                               <span className="text-[10px] font-black text-secondary uppercase tracking-widest block mb-1">Beneficiário</span>
+                               <span className="font-bold text-on-surface">{globalSettings.multicaixaName}</span>
+                            </div>
+                          )}
                           <div className="grid grid-cols-2 gap-4">
                             <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 flex flex-col gap-1">
                               <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest opacity-60">Entidade</span>
@@ -425,7 +436,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                             </div>
                             <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 flex flex-col gap-1">
                               <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest opacity-60">Referência</span>
-                              <span className="text-2xl font-black text-on-surface font-mono">{globalSettings?.multicaixaReference}</span>
+                              <span className="text-xl md:text-2xl font-black text-on-surface font-mono">{globalSettings?.multicaixaReference}</span>
                             </div>
                           </div>
                         </div>

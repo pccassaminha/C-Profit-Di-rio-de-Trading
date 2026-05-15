@@ -69,16 +69,6 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
       </nav>
       <div className={`p-6 mt-auto border-t border-outline-variant/20 ${isOpen ? '' : 'flex flex-col items-center px-2'}`}>
         <div className={`flex flex-col ${isOpen ? 'gap-2' : 'gap-4 items-center'}`}>
-          {isSuperAdmin && (
-            <button 
-              onClick={() => setActiveTab('admin')}
-              title={!isOpen ? "Painel Admin" : undefined}
-              className={`flex items-center transition-colors text-left ${isOpen ? 'gap-3 text-sm w-full' : 'justify-center'} ${activeTab === 'admin' ? 'text-primary font-bold' : 'text-on-surface-variant hover:text-primary'}`}
-            >
-              <span className="material-symbols-outlined text-[20px] text-primary">admin_panel_settings</span> 
-              {isOpen && <span className="whitespace-nowrap uppercase italic tracking-widest text-[10px] font-black">Painel Admin</span>}
-            </button>
-          )}
           <button 
             onClick={() => setActiveTab('plans')}
             title={!isOpen ? "Planos" : undefined}

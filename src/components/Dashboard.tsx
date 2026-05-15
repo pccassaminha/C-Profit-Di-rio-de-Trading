@@ -78,7 +78,7 @@ export default function Dashboard() {
   const [analysisDateRange, setAnalysisDateRange] = useState<DateRange | undefined>();
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [objectives, setObjectives] = useState<any[]>([]);
-  const [forceShowObFilter, setForceShowObFilter] = useState(false);
+  const [visibleMarkets, setVisibleMarkets] = useState<'all' | 'forex' | 'ob'>('all');
   const [defaultTradeType, setDefaultTradeType] = useState<'ask' | 'forex' | 'ob'>('ask');
 
   // Load settings
@@ -87,9 +87,14 @@ export default function Dashboard() {
     if (savedObjectives) {
       setObjectives(JSON.parse(savedObjectives));
     }
-    const savedForceShowObFilter = localStorage.getItem('app_force_show_ob_filter');
-    if (savedForceShowObFilter) {
-      setForceShowObFilter(savedForceShowObFilter === 'true');
+    const savedVisibleMarkets = localStorage.getItem('app_visible_markets') as 'all' | 'forex' | 'ob';
+    if (savedVisibleMarkets) {
+      setVisibleMarkets(savedVisibleMarkets);
+      if (savedVisibleMarkets === 'forex' && (tradeTypeFilter as any) === 'ob') {
+         setTradeTypeFilter('forex');
+      } else if (savedVisibleMarkets === 'ob' && (tradeTypeFilter as any) === 'forex') {
+         setTradeTypeFilter('ob');
+      }
     }
     const savedDefaultTradeType = localStorage.getItem('app_default_trade_type') as 'ask' | 'forex' | 'ob';
     if (savedDefaultTradeType) {
@@ -114,6 +119,7 @@ export default function Dashboard() {
 
   // Firebase Data State
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const { 
     allTrades: trades, 
     loading: loadingTrades, 
@@ -238,6 +244,13 @@ export default function Dashboard() {
     });
     unsubscribes.push(unsubNew);
 
+    // Withdrawals
+    const qWithdrawals = query(collection(db, 'withdrawals'), where('userId', '==', auth.currentUser.uid));
+    const unsubWithdrawals = onSnapshot(qWithdrawals, (snapshot) => {
+      setWithdrawals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    unsubscribes.push(unsubWithdrawals);
+
     const accountsByPath: Record<string, any[]> = { old: [], new: [] };
     const updateAccounts = (data: any[], path: 'old' | 'new') => {
       accountsByPath[path] = data;
@@ -252,13 +265,19 @@ export default function Dashboard() {
   }, []);
 
   const hasObAccount = accounts.some(a => a.tradeType === 'ob');
-  const showObFilter = hasObAccount || forceShowObFilter;
+  const hasForexAccount = accounts.some(a => a.tradeType !== 'ob');
+  const showObFilter = visibleMarkets === 'all' || visibleMarkets === 'ob';
+  const showForexFilter = visibleMarkets === 'all' || visibleMarkets === 'forex';
 
+  // Ensure tradeTypeFilter matches visibleMarkets
   useEffect(() => {
     if (!showObFilter && tradeTypeFilter === 'ob') {
-      setTradeTypeFilter('all');
+      setTradeTypeFilter(showForexFilter ? 'forex' : 'all');
     }
-  }, [showObFilter, tradeTypeFilter]);
+    if (!showForexFilter && tradeTypeFilter === 'forex') {
+      setTradeTypeFilter(showObFilter ? 'ob' : 'all');
+    }
+  }, [showObFilter, showForexFilter, tradeTypeFilter]);
 
   useEffect(() => {
     if ((activeDashboardTab === 'history' || activeDashboardTab === 'analysis') && tradeTypeFilter === 'all') {
@@ -342,15 +361,22 @@ export default function Dashboard() {
 
   // --- LÓGICA DE AGREGAÇÃO ---
   const data = useMemo(() => {
-    // Filter out inactive accounts if not explicitly selected
-    const activeAccounts = accounts.filter(a => a.status !== 'inactive');
+    // Filter according to visibleMarkets
+    const visibleAccounts = accounts.filter(a => {
+      const accTradeType = a.tradeType || 'forex';
+      if (visibleMarkets === 'forex' && accTradeType === 'ob') return false;
+      if (visibleMarkets === 'ob' && accTradeType !== 'ob') return false;
+      return true;
+    });
+
+    const activeAccounts = visibleAccounts.filter(a => a.status !== 'inactive');
     
     let accountsToProcess = selectedAccount === 'all' 
       ? activeAccounts 
-      : accounts.filter(a => a.id === selectedAccount);
+      : visibleAccounts.filter(a => a.id === selectedAccount);
 
     // If an inactive account was selected (from old state), fallback to all
-    const currentAccObj = accounts.find(a => a.id === selectedAccount);
+    const currentAccObj = visibleAccounts.find(a => a.id === selectedAccount);
     if (selectedAccount !== 'all' && currentAccObj?.status === 'inactive') {
       accountsToProcess = activeAccounts;
     }
@@ -358,8 +384,18 @@ export default function Dashboard() {
     const baseTradesToProcess = selectedAccount === 'all' 
       ? trades.filter(t => activeAccounts.some(a => a.id === t.accountId) || !t.accountId)
       : trades.filter(t => t.accountId === selectedAccount);
+      
+    // Remove trades belonging to hidden markets
+    const finalTradesToProcess = baseTradesToProcess.filter(t => {
+      // Find the account for this trade to check its type
+      const tradeAcc = visibleAccounts.find(a => a.id === t.accountId);
+      const tt = tradeAcc?.tradeType || 'forex';
+      if (visibleMarkets === 'forex' && tt === 'ob') return false;
+      if (visibleMarkets === 'ob' && tt !== 'ob') return false;
+      return true;
+    });
 
-    let tradesToProcess = baseTradesToProcess.map(t => ({
+    let tradesToProcess = finalTradesToProcess.map(t => ({
       ...t,
       pnl: Number(t.pnl) || 0,
       type: t.type || 'forex'
@@ -679,7 +715,14 @@ export default function Dashboard() {
 
     const currentMonthLosses = currentMonthPnl < 0 ? Math.abs(currentMonthPnl) : 0;
 
-    const totalBalance = totalSize + totalPnl;
+    let totalWithdrawnFromActive = 0;
+    withdrawals.forEach(w => {
+      // Assuming withdrawals apply to all active capital globally
+      // (or you could filter by date if needed, but totalBalance is usually all-time)
+      totalWithdrawnFromActive += (w.amount || 0);
+    });
+
+    const totalBalance = totalSize + totalPnl - totalWithdrawnFromActive;
     const winRate = totalTrades > 0 ? ((totalWins / totalTrades) * 100).toFixed(1) : '0.0';
     const averageRr = tradesWithRr > 0 ? (totalRr / tradesWithRr).toFixed(2) : '0.00';
 
@@ -790,7 +833,7 @@ export default function Dashboard() {
       analysisBestDaysOfWeek,
       analysisTotalTrades
     };
-  }, [selectedAccount, calendarDate, accounts, trades, analysisDateRange, tradeTypeFilter, objectives]);
+  }, [selectedAccount, calendarDate, accounts, trades, analysisDateRange, tradeTypeFilter, objectives, withdrawals]);
 
   // --- LÓGICA DO CALENDÁRIO ---
   const calendarCells = useMemo(() => {
@@ -943,8 +986,8 @@ export default function Dashboard() {
               onChange={(e) => setTradeTypeFilter(e.target.value as any)}
               className="w-full bg-surface-container-low border border-outline-variant/20 text-on-surface pl-6 pr-12 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold outline-none appearance-none cursor-pointer"
             >
-              <option value="all">Soma (FX + OB)</option>
-              <option value="forex">Forex & Índices</option>
+              {showForexFilter && showObFilter && <option value="all">Soma (Todas)</option>}
+              {showForexFilter && <option value="forex">Forex & Índices</option>}
               {showObFilter && <option value="ob">Opções Binárias</option>}
             </select>
             <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface text-lg pointer-events-none">expand_more</span>
@@ -956,7 +999,14 @@ export default function Dashboard() {
               className="w-full bg-surface-container-low border border-outline-variant/20 text-on-surface pl-6 pr-12 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold outline-none appearance-none cursor-pointer"
             >
               <option value="all">Todas as Contas (Soma)</option>
-              {accounts.filter(acc => acc.status !== 'inactive' && (tradeTypeFilter === 'all' || acc.tradeType === tradeTypeFilter || (!acc.tradeType && tradeTypeFilter === 'forex'))).map(acc => (
+              {accounts.filter(acc => {
+                if (acc.status === 'inactive') return false;
+                const tt = acc.tradeType || 'forex';
+                if (visibleMarkets === 'forex' && tt === 'ob') return false;
+                if (visibleMarkets === 'ob' && tt !== 'ob') return false;
+                if (tradeTypeFilter !== 'all' && tt !== tradeTypeFilter) return false;
+                return true;
+              }).map(acc => (
                 <option key={acc.id} value={acc.id}>
                   Conta {acc.accountNumber} - {acc.accountType}
                 </option>
@@ -1009,7 +1059,7 @@ export default function Dashboard() {
         <div className={`grid gap-6 md:gap-8 text-center lg:divide-x divide-outline-variant/20 ${tradeTypeFilter === 'all' ? 'grid-cols-2' : (tradeTypeFilter === 'ob' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5')}`}>
           <div className="pb-6 lg:pb-0 border-b lg:border-b-0 border-outline-variant/20">
             <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Lucro/Prejuízo do Dia</p>
-            <p className={`font-bold text-2xl md:text-4xl font-headline ${data.todayPnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+            <p className={`font-bold text-2xl md:text-4xl ${data.todayPnl >= 0 ? 'text-secondary' : 'text-error'}`}>
               {data.todayPnl >= 0 ? '+' : ''}{formatCurrency(data.todayPnl)}
             </p>
           </div>
@@ -1017,23 +1067,23 @@ export default function Dashboard() {
             <>
               <div className="pb-6 lg:pb-0 border-b lg:border-b-0 border-outline-variant/20">
                 <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Nº de trades</p>
-                <p className="text-on-surface font-bold text-2xl md:text-4xl font-headline">{data.totalTrades}</p>
+                <p className="text-on-surface font-bold text-2xl md:text-4xl">{data.totalTrades}</p>
               </div>
               <div className="pb-6 lg:pb-0 border-b lg:border-b-0 border-outline-variant/20">
                 <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Taxa de Acerto</p>
-                <p className="text-on-surface font-bold text-2xl md:text-4xl font-headline">{data.winRate}%</p>
+                <p className="text-on-surface font-bold text-2xl md:text-4xl">{data.winRate}%</p>
               </div>
               {tradeTypeFilter !== 'ob' && (
                 <div className="pb-6 lg:pb-0 border-b lg:border-b-0 border-outline-variant/20">
                   <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Risco/Retorno Médio</p>
-                  <p className="text-on-surface font-bold text-2xl md:text-4xl font-headline">1:{data.averageRr}</p>
+                  <p className="text-on-surface font-bold text-2xl md:text-4xl">1:{data.averageRr}</p>
                 </div>
               )}
             </>
           )}
           <div>
             <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Capital Geral</p>
-            <p className="text-on-surface font-bold text-2xl md:text-4xl font-headline">{formatCurrency(data.totalBalance)}</p>
+            <p className="text-on-surface font-bold text-2xl md:text-4xl">{formatCurrency(data.totalBalance)}</p>
             {data.hasProfitTarget && (
               <p className="text-on-surface-variant text-xs md:text-sm mt-2">
                 Meta: {formatCurrency(data.totalProfitTarget)}
@@ -1357,7 +1407,7 @@ export default function Dashboard() {
       <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl overflow-hidden">
         <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
           <button onClick={handlePrevMonth} className="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors text-2xl">chevron_left</button>
-          <span className="text-on-surface font-bold text-lg md:text-xl font-headline capitalize">{monthName}</span>
+          <span className="text-on-surface font-bold text-lg md:text-xl capitalize">{monthName}</span>
           <button onClick={handleNextMonth} className="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors text-2xl">chevron_right</button>
         </div>
         <div className="w-full overflow-x-auto">

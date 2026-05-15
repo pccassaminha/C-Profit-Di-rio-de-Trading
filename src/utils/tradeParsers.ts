@@ -1,0 +1,513 @@
+// ============================================================
+// C PROFIT — SISTEMA DE IMPORTAÇÃO DE TRADES
+// Versão: 3.1 Final
+// Suporta: CSV MatchTrades | HTML MatchTrades | HTML MT5
+// Grupo Cassaminha
+// ============================================================
+//
+// LÓGICA DA LINHA "Total" — LEIA ISTO PRIMEIRO:
+// ──────────────────────────────────────────────
+// A linha "Total" no fim dos ficheiros CSV e HTML do MatchTrades
+// NÃO é um trade — por isso NÃO entra na tabela de trades individuais.
+//
+// MAS ela é CRUCIAL e é guardada separadamente para 2 fins:
+//
+//   1. MOSTRAR o total de comissões cobrado pelo broker no período
+//      (valor visível no painel de resumo pós-importação)
+//
+//   2. VERIFICAR integridade: o sistema soma o profit de cada trade
+//      individualmente e compara com o Total do ficheiro.
+//      Se bater certo → ✓ importação íntegra
+//      Se houver diferença → ⚠ aviso de inconsistência
+//
+// Cada parser retorna sempre:
+//   trades[]      → cada trade individual, nunca somados entre si
+//   summary{}     → calculado pelo sistema (soma dos trades reais)
+//   fileSummary{} → valores do Total do ficheiro (broker) para comparação
+//
+// ============================================================
+
+
+// ============================================================
+// SECÇÃO 1 — UTILITÁRIOS
+// ============================================================
+
+function parseMatchTradesDate(str: string) {
+  if (!str || str.trim() === '') return null;
+  const [datePart, timePart] = str.trim().split(' ');
+  const [day, month, year]   = datePart.split('/');
+  const [hour, min, sec]     = (timePart || '00:00:00').split(':');
+  return new Date(+year, +month - 1, +day, +hour, +min, +sec);
+}
+
+function parseMT5Date(str: string) {
+  if (!str || str.trim() === '') return null;
+  const match = str.trim().match(/(\d{4})\.(\d{2})\.(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+  if (!match) return null;
+  const [, year, month, day, hour, min, sec] = match;
+  return new Date(+year, +month - 1, +day, +hour, +min, +sec);
+}
+
+function toFloat(val: any) {
+  if (val === null || val === undefined) return 0;
+  const cleaned = String(val).replace(',', '.').trim();
+  const parsed  = parseFloat(cleaned);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function readFileAsText(file: File, encoding = 'UTF-8'): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader   = new FileReader();
+    reader.onload  = (e) => resolve(e.target?.result as string);
+    reader.onerror = ()  => reject(new Error(`Erro ao ler ficheiro: ${file.name}`));
+    reader.readAsText(file, encoding);
+  });
+}
+
+/**
+ * Calcula o resumo FINANCEIRO a partir dos trades INDIVIDUAIS.
+ * É este valor que o sistema usa — nunca o Total do ficheiro directamente.
+ * O Total do ficheiro serve apenas para validação/comparação.
+ */
+function calcSummary(trades: any[]) {
+  const wins   = trades.filter(t => t.profit > 0);
+  const losses = trades.filter(t => t.profit < 0);
+  const be     = trades.filter(t => t.profit === 0);
+
+  const grossProfit = wins.reduce((s, t) => s + t.profit, 0);
+  const grossLoss   = losses.reduce((s, t) => s + t.profit, 0);
+  const totalComm   = trades.reduce((s, t) => s + t.commission, 0);
+  const totalSwap   = trades.reduce((s, t) => s + t.swap, 0);
+  const netProfit   = grossProfit + grossLoss + totalComm + totalSwap;
+
+  return {
+    totalTrades:     trades.length,
+    wins:            wins.length,
+    losses:          losses.length,
+    breakeven:       be.length,
+    winRate:         trades.length > 0 ? +((wins.length / trades.length) * 100).toFixed(2) : 0,
+    grossProfit:     +grossProfit.toFixed(2),
+    grossLoss:       +grossLoss.toFixed(2),
+    totalCommission: +totalComm.toFixed(2),
+    totalSwap:       +totalSwap.toFixed(2),
+    netProfit:       +netProfit.toFixed(2),
+  };
+}
+
+/**
+ * Compara o resumo calculado pelo sistema com o Total do ficheiro (broker).
+ * Retorna um objecto de verificação com status e mensagem.
+ *
+ * Este painel de verificação deve ser MOSTRADO ao utilizador após cada importação
+ * para confirmar que os dados foram lidos correctamente.
+ */
+function verificarIntegridade(summary: any, fileSummary: any) {
+  if (!fileSummary) {
+    return {
+      status:  'SEM_TOTAL',
+      ok:      null,
+      message: 'Ficheiro não contém linha de Total para comparação (normal em MT5).',
+      detalhe: null,
+    };
+  }
+
+  const diffProfit = +(summary.netProfit - fileSummary.profit).toFixed(2);
+  const diffComm   = +(summary.totalCommission - fileSummary.commission).toFixed(2);
+  const diffSwap   = +(summary.totalSwap - fileSummary.swap).toFixed(2);
+  const ok         = Math.abs(diffProfit) <= 0.02;
+
+  return {
+    status:  ok ? 'OK' : 'DIVERGENCIA',
+    ok,
+
+    // Valores calculados pelo sistema (soma dos trades individuais)
+    calculado: {
+      profit:     summary.netProfit,
+      commission: summary.totalCommission,
+      swap:       summary.totalSwap,
+    },
+
+    // Valores do Total do ficheiro (broker)
+    broker: {
+      profit:     fileSummary.profit,
+      commission: fileSummary.commission,
+      swap:       fileSummary.swap,
+    },
+
+    // Diferenças
+    diferenca: {
+      profit: diffProfit,
+      commission: diffComm,
+      swap:   diffSwap,
+    },
+
+    message: ok
+      ? `✓ Dados verificados — o profit calculado (${summary.netProfit}) bate certo com o broker (${fileSummary.profit}).`
+      : `⚠ Divergência detectada — sistema calculou ${summary.netProfit} mas broker diz ${fileSummary.profit}. Diferença: ${diffProfit}.`,
+  };
+}
+
+
+// ============================================================
+// SECÇÃO 2 — PARSER CSV (MatchTrades)
+// ============================================================
+//
+// SOBRE A LINHA "Total" no CSV:
+//   Última linha do ficheiro:  Total,,,,,,,,,,0.00,-45.34,-185.16,
+//   ─ NÃO entra no array trades[]
+//   ─ É guardada em fileSummary{} para:
+//       a) Mostrar total de comissões cobradas pelo broker
+//       b) Comparar com o profit calculado trade a trade
+//
+// ============================================================
+
+const calcularRR = (entry: number, sl: number, tp: number) => {
+  if (!entry || !sl || !tp || sl === 0 || tp === 0) return 0;
+  const risk = Math.abs(entry - sl);
+  const reward = Math.abs(tp - entry);
+  if (risk === 0) return 0;
+  return Number((reward / risk).toFixed(2));
+};
+
+function parseMatchTradesCSV(csvText: string, accountId: string) {
+
+  const lines = csvText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length < 2) throw new Error('Ficheiro CSV vazio ou sem trades.');
+
+  const dataLines  = lines.slice(1); // ignorar cabeçalho
+  const trades     = [];
+  let   fileSummary: any = null;
+
+  for (const line of dataLines) {
+    const cols = line.split(',');
+
+    // ── LINHA "Total" ──────────────────────────────────────────────────────
+    // Detectada quando a primeira coluna é exactamente "Total"
+    // Guardada em fileSummary — NÃO adicionada ao array trades
+    if (cols[0]?.trim().toLowerCase() === 'total') {
+      fileSummary = {
+        swap:       toFloat(cols[10]),  // total de swap do período
+        commission: toFloat(cols[11]),  // total de comissões do período
+        profit:     toFloat(cols[12]),  // profit total segundo o broker
+      };
+      continue; // passa para a linha seguinte — não processa como trade
+    }
+
+    if (cols.length < 14) continue;
+
+    // 0=ID 1=Symbol 2=OpenTime 3=Volume 4=Side 5=CloseTime
+    // 6=OpenPrice 7=ClosePrice 8=SL 9=TP 10=Swap 11=Commission 12=Profit 13=Reason
+    const profit     = toFloat(cols[12]);
+    const commission = toFloat(cols[11]);
+    const swap       = toFloat(cols[10]);
+
+    trades.push({
+      ticket:     cols[0].trim(),
+      symbol:     cols[1].trim().toUpperCase(),
+      openTime:   parseMatchTradesDate(cols[2]),
+      closeTime:  parseMatchTradesDate(cols[5]),
+      size:       toFloat(cols[3]),
+      action:     cols[4].trim().toUpperCase() === 'BUY' ? 'Buy' : 'Sell',
+      openPrice:  toFloat(cols[6]),
+      closePrice: toFloat(cols[7]),
+      sl:         toFloat(cols[8]),
+      tp:         toFloat(cols[9]),
+      date:       cols[2]?.trim()?.split(' ')[0] || '',
+      entryTime:  cols[2]?.trim()?.split(' ')[1] || '',
+      swap,
+      commission,
+      pnl:        profit, // We will use pnl as grossProfit, or net depending. Let's keep profit
+      profit:     profit,
+      rr:         calcularRR(toFloat(cols[6]), toFloat(cols[8]), toFloat(cols[9])),
+      netResult:  +(profit + commission + swap).toFixed(2),
+      reason:     (cols[13] || '').trim(),
+      isWin:      profit > 0,
+      isLoss:     profit < 0,
+      source:     'MATCHTRADES_CSV',
+      accountId,
+      type: 'forex',
+      session: 'Importado',
+      notes: '',
+      psychology: ''
+    });
+  }
+
+  const summary      = calcSummary(trades);
+  const verificacao  = verificarIntegridade(summary, fileSummary);
+
+  console.log(`[CSV Parser] ${verificacao.message}`);
+
+  return { trades, summary, fileSummary, verificacao };
+}
+
+
+// ============================================================
+// SECÇÃO 3 — PARSER HTML (MatchTrades)
+// ============================================================
+//
+// SOBRE A LINHA "Total" no HTML:
+//   <tr style="background:#25c4ee99">
+//     <th>Total</th><th></th>...<th>0.00</th><th>-45.34</th><th>-185.16</th>
+//   </tr>
+//   ─ Identificada porque a primeira célula é <th> com texto "Total"
+//   ─ NÃO entra no array trades[]
+//   ─ Guardada em fileSummary{} para verificação e exibição de comissões
+//
+// ============================================================
+
+function parseMatchTradesHTML(htmlText: string, accountId: string) {
+
+  const parser = new DOMParser();
+  const doc    = parser.parseFromString(htmlText, 'text/html');
+
+  const allRows    = doc.querySelectorAll('table tr');
+  const trades     = [];
+  let   fileSummary: any = null;
+
+  for (const row of Array.from(allRows)) {
+    const cells     = Array.from(row.querySelectorAll('th, td'));
+    if (cells.length < 14) continue;
+
+    const firstText = cells[0]?.textContent?.trim();
+    const firstTag  = cells[0]?.tagName?.toUpperCase();
+
+    // ── LINHA "Total" ──────────────────────────────────────────────────────
+    // Primeira célula é <th> com texto "Total"
+    // Guardada para verificação — NÃO é trade
+    if (firstText === 'Total') {
+      fileSummary = {
+        swap:       toFloat(cells[10]?.textContent),  // total swap do período
+        commission: toFloat(cells[11]?.textContent),  // total comissões do período
+        profit:     toFloat(cells[12]?.textContent),  // profit total segundo o broker
+      };
+      continue; // não processar como trade
+    }
+
+    // ── Ignorar cabeçalho (linha com <th>ID</th>) ─────────────────────────
+    if (firstText === 'ID' || firstTag === 'TH') continue;
+    if (!firstText || firstText === '') continue;
+
+    // 0=ID 1=Symbol 2=OpenTime 3=Volume 4=Side 5=CloseTime
+    // 6=OpenPrice 7=ClosePrice 8=SL 9=TP 10=Swap 11=Commission 12=Profit 13=Reason
+    const getText    = (i: number) => cells[i]?.textContent?.trim() ?? '';
+    const profit     = toFloat(getText(12));
+    const commission = toFloat(getText(11));
+    const swap       = toFloat(getText(10));
+
+    trades.push({
+      ticket:     getText(0),
+      symbol:     getText(1).toUpperCase(),
+      openTime:   parseMatchTradesDate(getText(2)),
+      closeTime:  parseMatchTradesDate(getText(5)),
+      size:       toFloat(getText(3)),
+      action:     getText(4).toUpperCase() === 'BUY' ? 'Buy' : 'Sell',
+      openPrice:  toFloat(getText(6)),
+      closePrice: toFloat(getText(7)),
+      sl:         toFloat(getText(8)),
+      tp:         toFloat(getText(9)),
+      date:       getText(2)?.split(' ')[0] || '',
+      entryTime:  getText(2)?.split(' ')[1] || '',
+      swap,
+      commission,
+      profit,
+      pnl:        profit, // Map to Trade info
+      rr:         calcularRR(toFloat(getText(6)), toFloat(getText(8)), toFloat(getText(9))),
+      netResult:  +(profit + commission + swap).toFixed(2),
+      reason:     getText(13),
+      isWin:      profit > 0,
+      isLoss:     profit < 0,
+      source:     'MATCHTRADES_HTML',
+      accountId,
+      type: 'forex',
+      session: 'Importado',
+      notes: '',
+      psychology: ''
+    });
+  }
+
+  const summary     = calcSummary(trades);
+  const verificacao = verificarIntegridade(summary, fileSummary);
+
+  console.log(`[HTML MatchTrades Parser] ${verificacao.message}`);
+
+  return { trades, summary, fileSummary, verificacao };
+}
+
+
+// ============================================================
+// SECÇÃO 4 — PARSER HTML (MetaTrader 5)
+// ============================================================
+//
+// O MT5 NÃO tem linha "Total" separada — tem um bloco de estatísticas
+// no fim do ficheiro com "Total Net Profit", "Gross Profit", etc.
+// Esses valores são extraídos para fileSummary e usados para verificação.
+//
+// Regra crítica: profit POSITIVO = ganhou | NEGATIVO = perdeu
+// NÃO inverter o sinal com base no side (buy/sell).
+//
+// ============================================================
+
+async function parseMT5HTML(file: File, accountId: string) {
+
+  // Ler como UTF-16LE (encoding nativo dos ficheiros MT5)
+  let rawText;
+  try {
+    rawText = await readFileAsText(file, 'UTF-16LE');
+  } catch (e) {
+    rawText = await readFileAsText(file, 'UTF-8');
+  }
+
+  const cleanText = rawText.replace(/\x00/g, '');
+
+  const parser  = new DOMParser();
+  const doc     = parser.parseFromString(cleanText, 'text/html');
+  const trades  = [];
+  let   parsing = false;
+
+  const STOP_KEYWORDS = [
+    'total net profit', 'gross profit', 'profit factor',
+    'balance drawdown', 'recovery factor', 'total trades',
+  ];
+
+  const rows = doc.querySelectorAll('table tr');
+
+  for (const row of Array.from(rows)) {
+    const allCells  = Array.from(row.querySelectorAll('td, th'));
+    if (allCells.length === 0) continue;
+
+    const rowText   = row.textContent?.toLowerCase().trim() || '';
+    const firstText = allCells[0]?.textContent?.trim().toLowerCase() || '';
+
+    if (!parsing) {
+      if (rowText.includes('positions') && !rowText.includes('closed positions')) {
+        parsing = true;
+      }
+      continue;
+    }
+
+    if (STOP_KEYWORDS.some(kw => rowText.startsWith(kw))) break;
+
+    if (firstText === 'time' || allCells[0]?.tagName === 'TH') continue;
+    if (allCells.length < 5) continue;
+    if (allCells[3]?.textContent?.trim().toLowerCase() === 'balance') continue;
+
+    // Filtrar célula hidden (colspan="8") — crítico para índices correctos
+    const visibleCells = allCells.filter(td => !td.classList.contains('hidden'));
+    if (visibleCells.length < 13) continue;
+
+    const firstCellText = visibleCells[0]?.textContent?.trim();
+    if (!firstCellText?.match(/^\d{4}\.\d{2}\.\d{2}/)) continue;
+
+    const getText  = (i: number) => visibleCells[i]?.textContent?.trim() ?? '';
+    const getFloat = (i: number) => toFloat(getText(i));
+
+    // visível[0]=OpenTime  [1]=PositionID  [2]=Symbol   [3]=Type
+    // visível[4]=Volume    [5]=OpenPrice   [6]=SL        [7]=TP
+    // visível[8]=CloseTime [9]=ClosePrice  [10]=Comm    [11]=Swap  [12]=Profit
+
+    const profit     = getFloat(12);
+    const commission = getFloat(10);
+    const swap       = getFloat(11);
+
+    trades.push({
+      ticket:     getText(1),
+      symbol:     getText(2).toUpperCase(),
+      openTime:   parseMT5Date(getText(0)),
+      closeTime:  parseMT5Date(getText(8)),
+      size:       getFloat(4),
+      action:     getText(3).toUpperCase() === 'BUY' ? 'Buy' : 'Sell',
+      openPrice:  getFloat(5),
+      closePrice: getFloat(9),
+      sl:         getFloat(6),
+      tp:         getFloat(7),
+      date:       getText(0)?.split(' ')[0] || '',
+      entryTime:  getText(0)?.split(' ')[1] || '',
+      swap,
+      commission,
+      profit,
+      pnl:        profit, // Map to Trade info
+      rr:         calcularRR(getFloat(5), getFloat(6), getFloat(7)),
+      netResult:  +(profit + commission + swap).toFixed(2),
+      reason:     profit > 0 ? 'TP' : 'SL',
+      isWin:      profit > 0,
+      isLoss:     profit < 0,
+      source:     'MT5_HTML',
+      accountId,
+      type: 'forex',
+      session: 'Importado',
+      notes: '',
+      psychology: ''
+    });
+  }
+
+  const summary = calcSummary(trades);
+
+  // Extrair "Total Net Profit" do bloco de estatísticas do MT5
+  // para usar como fileSummary na verificação
+  let fileSummary: any = null;
+  const totalMatch = cleanText.match(/Total Net Profit[^<]*<[^>]+>\s*<b>([-\d.]+)<\/b>/i);
+  if (totalMatch) {
+    fileSummary = {
+      profit:     parseFloat(totalMatch[1]),
+      commission: summary.totalCommission, // MT5 não separa comissões no bloco final
+      swap:       summary.totalSwap,
+    };
+  }
+
+  const verificacao = verificarIntegridade(summary, fileSummary);
+  console.log(`[MT5 Parser] ${verificacao.message}`);
+
+  return { trades, summary, fileSummary, verificacao };
+}
+
+
+// ============================================================
+// SECÇÃO 5 — DETECÇÃO AUTOMÁTICA DO TIPO DE FICHEIRO
+// ============================================================
+
+export async function importTradeFile(file: File, accountId: string) {
+  if (!file) throw new Error('Nenhum ficheiro seleccionado.');
+
+  const fileName = file.name.toLowerCase();
+  const ext      = fileName.split('.').pop();
+
+  if (ext === 'csv') {
+    const text   = await readFileAsText(file, 'UTF-8');
+    return { ...parseMatchTradesCSV(text, accountId), source: 'MATCHTRADES_CSV' };
+  }
+
+  if (ext === 'html' || ext === 'htm') {
+    let previewText = '';
+    try { previewText = await readFileAsText(file, 'UTF-8'); } catch (_) {}
+
+    const isMT5 =
+      previewText.includes('Trade History Report') ||
+      previewText.includes('mso-number-format')    ||
+      previewText.includes('client terminal')      ||
+      previewText.includes('Balance Drawdown');
+
+    const isMatchTrades =
+      previewText.includes('Closed Positions') ||
+      previewText.includes('25c4ee')           ||
+      previewText.includes('EquityEdge')       ||
+      (previewText.includes('<th>ID</th>') && previewText.includes('<th>Reason</th>'));
+
+    if (isMT5) {
+      const result = await parseMT5HTML(file, accountId);
+      return { ...result, source: 'MT5_HTML' };
+    }
+
+    if (isMatchTrades) {
+      const result = parseMatchTradesHTML(previewText, accountId);
+      return { ...result, source: 'MATCHTRADES_HTML' };
+    }
+
+    // Fallback
+    const result = parseMatchTradesHTML(previewText, accountId);
+    return { ...result, source: 'MATCHTRADES_HTML' };
+  }
+
+  throw new Error(`Formato "${ext}" não suportado. Aceites: .csv, .html`);
+}
+
+export { parseMatchTradesCSV, parseMatchTradesHTML, parseMT5HTML, calcSummary, verificarIntegridade };

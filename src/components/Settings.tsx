@@ -23,7 +23,7 @@ export default function Settings() {
   const [defaultTradeType, setDefaultTradeType] = useState<'ask' | 'forex' | 'ob'>('ask');
   const [defaultCommunityFeed, setDefaultCommunityFeed] = useState<'forex' | 'ob'>('forex');
   const [showCommunityFilter, setShowCommunityFilter] = useState(true);
-  const [forceShowObFilter, setForceShowObFilter] = useState(false);
+  const [visibleMarkets, setVisibleMarkets] = useState<'all' | 'forex' | 'ob'>('all');
   const [tokenCopiedId, setTokenCopiedId] = useState<string | null>(null);
 
   const handleCopyAccountToken = (token: string, id: string) => {
@@ -107,8 +107,8 @@ export default function Settings() {
     const savedShowCommFilter = localStorage.getItem('app_show_community_filter');
     if (savedShowCommFilter) setShowCommunityFilter(savedShowCommFilter === 'true');
 
-    const savedForceShowObFilter = localStorage.getItem('app_force_show_ob_filter');
-    if (savedForceShowObFilter) setForceShowObFilter(savedForceShowObFilter === 'true');
+    const savedVisibleMarkets = localStorage.getItem('app_visible_markets') as 'all' | 'forex' | 'ob';
+    if (savedVisibleMarkets) setVisibleMarkets(savedVisibleMarkets);
 
     const savedObjectives = localStorage.getItem('app_objectives');
     if (savedObjectives) setObjectives(JSON.parse(savedObjectives));
@@ -179,7 +179,7 @@ export default function Settings() {
     localStorage.setItem('app_default_trade_type', defaultTradeType);
     localStorage.setItem('app_default_community_feed', defaultCommunityFeed);
     localStorage.setItem('app_show_community_filter', showCommunityFilter.toString());
-    localStorage.setItem('app_force_show_ob_filter', forceShowObFilter.toString());
+    localStorage.setItem('app_visible_markets', visibleMarkets);
     localStorage.setItem('app_objectives', JSON.stringify(objectives));
     localStorage.setItem('app_sessions', JSON.stringify(sessions));
 
@@ -621,22 +621,19 @@ export default function Settings() {
                       </div>
                       
                       <div className="space-y-2 flex flex-col justify-center">
-                        <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider mb-2">Filtro de Opções Binárias</label>
-                        <label className="flex items-center cursor-pointer">
-                          <div className="relative">
-                            <input 
-                              type="checkbox" 
-                              className="sr-only" 
-                              checked={forceShowObFilter}
-                              onChange={(e) => setForceShowObFilter(e.target.checked)}
-                            />
-                            <div className={`block w-14 h-8 rounded-full transition-colors ${forceShowObFilter ? 'bg-primary' : 'bg-surface-container-highest'}`}></div>
-                            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${forceShowObFilter ? 'transform translate-x-6' : ''}`}></div>
-                          </div>
-                          <div className="ml-3 text-on-surface text-sm">
-                            {forceShowObFilter ? 'Sempre visível' : 'Oculto (se não houver contas OB)'}
-                          </div>
-                        </label>
+                        <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider mb-2">Visibilidade de Mercados</label>
+                        <div className="relative">
+                          <select 
+                            value={visibleMarkets}
+                            onChange={(e) => setVisibleMarkets(e.target.value as 'all' | 'forex' | 'ob')}
+                            className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none appearance-none cursor-pointer focus:border-primary transition-colors"
+                          >
+                            <option value="all">Mostrar Tudo (Forex + OB)</option>
+                            <option value="forex">Apenas Forex / Índices</option>
+                            <option value="ob">Apenas Opções Binárias</option>
+                          </select>
+                          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+                        </div>
                       </div>
                     </div>
                 </div>

@@ -12,6 +12,7 @@ interface Post {
   userPhoto: string;
   legend: string;
   imageUrl?: string;
+  imageUrls?: string[];
   type: 'forex' | 'ob';
   likesCount: number;
   commentsCount: number;
@@ -23,6 +24,7 @@ export default function Community() {
   const { userPlan } = useTrades();
   const [activeFeed, setActiveFeed] = useState<'forex' | 'ob'>('forex');
   const [showFilter, setShowFilter] = useState(true);
+  const [viewingPost, setViewingPost] = useState<Post | null>(null);
 
   useEffect(() => {
     const savedDefaultFeed = localStorage.getItem('app_default_community_feed') as 'forex' | 'ob';
@@ -32,8 +34,9 @@ export default function Community() {
     if (savedShowFilter) setShowFilter(savedShowFilter === 'true');
   }, []);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [broadcasts, setBroadcasts] = useState<any[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newPost, setNewPost] = useState({ legend: '', imageUrl: '', type: 'forex' as 'forex' | 'ob' });
+  const [newPost, setNewPost] = useState({ legend: '', imageUrl: '', imageUrls: [] as string[], type: 'forex' as 'forex' | 'ob' });
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -42,6 +45,7 @@ export default function Community() {
   const [activeComments, setActiveComments] = useState<string | null>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   const isAdmin = userPlan?.role === 'admin';
 
@@ -61,7 +65,15 @@ export default function Community() {
       setPosts(postsData);
     });
 
-    return () => unsubscribe();
+    const bQ = query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'));
+    const unsubB = onSnapshot(bQ, (snapshot) => {
+      setBroadcasts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubscribe();
+      unsubB();
+    };
   }, [activeFeed]);
 
   // Effect to check likes per post
@@ -81,17 +93,24 @@ export default function Community() {
     setIsSubmitting(true);
     try {
       let finalImageUrl = newPost.imageUrl;
+      let finalImageUrls = newPost.imageUrls || [];
+
+      if (!finalImageUrl && finalImageUrls.length > 0) {
+        finalImageUrl = finalImageUrls[0];
+      }
 
       if (selectedFile) {
         const fileRef = ref(storage, `community/${auth.currentUser.uid}/${Date.now()}_${selectedFile.name}`);
         await uploadBytes(fileRef, selectedFile);
         finalImageUrl = await getDownloadURL(fileRef);
+        // Ensure the uploaded image is also in the array if needed, but it's okay to just keep in finalImageUrl.
       }
 
       if (editingPostId) {
         await updateDoc(doc(db, 'community_posts', editingPostId), {
           legend: newPost.legend,
           imageUrl: finalImageUrl,
+          imageUrls: finalImageUrls,
           type: newPost.type,
           updatedAt: serverTimestamp()
         });
@@ -102,6 +121,7 @@ export default function Community() {
           userPhoto: auth.currentUser.photoURL || '',
           legend: newPost.legend,
           imageUrl: finalImageUrl,
+          imageUrls: finalImageUrls,
           type: newPost.type,
           likesCount: 0,
           commentsCount: 0,
@@ -110,7 +130,7 @@ export default function Community() {
       }
       setIsCreateModalOpen(false);
       setEditingPostId(null);
-      setNewPost({ legend: '', imageUrl: '', type: activeFeed });
+      setNewPost({ legend: '', imageUrl: '', imageUrls: [], type: activeFeed });
       setSelectedFile(null);
       setPreviewUrl(null);
     } catch (err) {
@@ -124,6 +144,7 @@ export default function Community() {
     setNewPost({
       legend: post.legend,
       imageUrl: post.imageUrl || '',
+      imageUrls: post.imageUrls || [],
       type: post.type
     });
     setEditingPostId(post.id);
@@ -180,6 +201,7 @@ export default function Community() {
     if (!window.confirm('Deseja excluir esta análise?')) return;
     try {
       await deleteDoc(doc(db, 'community_posts', postId));
+      setActiveDropdown(null);
     } catch (err) {
       console.error(err);
     }
@@ -197,6 +219,33 @@ export default function Community() {
       navigator.clipboard.writeText(shareText);
       alert('Link e legenda copiados para a área de transferência!');
     }
+  };
+
+  const renderTextWithMentions = (text: string) => {
+    if (!text) return text;
+    const mentionRegex = /@([a-zA-Z0-9_\s]+?)(?=\s|$|[,.?!])/g;
+    const parts = text.split(/(?=@)/);
+    
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        const spaceIndex = part.indexOf(' ');
+        let name = part.substring(1);
+        let rest = '';
+        if (spaceIndex !== -1) {
+           name = part.substring(1, spaceIndex);
+           rest = part.substring(spaceIndex);
+        }
+        return (
+          <span key={index}>
+            <span className="font-extrabold text-primary bg-primary/10 px-1 rounded inline-flex items-center">
+              {name}
+            </span>
+            {rest}
+          </span>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
   };
 
   return (
@@ -276,6 +325,25 @@ export default function Community() {
         </div>
       )}
 
+      {/* Broadcasts (Avisos da Administração) */}
+      {broadcasts.length > 0 && (
+        <div className="space-y-4">
+          {broadcasts.slice(0, 3).map(b => (
+            <div key={b.id} className="bg-primary/10 border border-primary/30 rounded-3xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-2 h-full bg-primary" />
+              <div className="flex items-center gap-3 mb-2">
+                <span className="material-symbols-outlined text-primary">campaign</span>
+                <span className="text-[10px] uppercase tracking-widest font-black text-primary">Comunicado Oficial - {b.author || 'Admin'}</span>
+                <span className="text-[10px] text-on-surface-variant ml-auto opacity-70">
+                  {new Date(b.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+              <p className="text-on-surface text-sm font-medium leading-relaxed whitespace-pre-wrap">{b.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Posts Feed */}
       <div className="space-y-8">
         {posts.map(post => (
@@ -298,32 +366,50 @@ export default function Community() {
               </div>
               
               {(isAdmin || post.userId === auth.currentUser?.uid) && (
-                <div className="flex items-center gap-1">
-                  {post.userId === auth.currentUser?.uid && (
-                    <button 
-                      onClick={() => handleOpenEditModal(post)}
-                      className="p-2 rounded-xl hover:bg-primary/10 text-on-surface-variant hover:text-primary transition-all"
-                    >
-                      <Plus className="rotate-45" size={18} />
-                    </button>
-                  )}
+                <div className="relative">
                   <button 
-                    onClick={() => handleDeletePost(post.id)}
-                    className="p-2 rounded-xl hover:bg-error/10 text-on-surface-variant hover:text-error transition-all"
+                    onClick={() => setActiveDropdown(activeDropdown === post.id ? null : post.id)}
+                    className="p-2 rounded-xl hover:bg-surface-container text-on-surface-variant transition-all"
                   >
-                    <Trash2 size={18} />
+                    <MoreVertical size={20} />
                   </button>
+                  {activeDropdown === post.id && (
+                    <div className="absolute top-10 right-0 w-48 bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-xl overflow-hidden py-2 z-10 animate-in fade-in slide-in-from-top-2">
+                       {post.userId === auth.currentUser?.uid && (
+                        <button 
+                          onClick={() => {
+                            handleOpenEditModal(post);
+                            setActiveDropdown(null);
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm text-on-surface hover:bg-surface-container transition-colors flex items-center gap-3"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">edit</span>
+                          Editar
+                        </button>
+                       )}
+                       <button 
+                        onClick={() => handleDeletePost(post.id)}
+                        className="w-full text-left px-4 py-3 text-sm text-error hover:bg-error/10 transition-colors flex items-center gap-3 border-t border-outline-variant/10"
+                       >
+                         <Trash2 size={18} />
+                         Eliminar
+                       </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Post Content */}
-            <div className="px-6 pb-4">
-              <p className="text-on-surface text-base leading-relaxed whitespace-pre-wrap">{post.legend}</p>
+            <div className="px-6 pb-4 cursor-pointer" onClick={() => setViewingPost(post)}>
+              <p className="text-on-surface text-base leading-relaxed whitespace-pre-wrap line-clamp-4">{renderTextWithMentions(post.legend)}</p>
+              {post.legend.length > 200 && (
+                 <span className="text-secondary text-sm font-bold mt-2 inline-block">Ver mais</span>
+              )}
             </div>
 
             {post.imageUrl && (
-              <div className="px-2 pb-2">
+              <div className="px-2 pb-2 cursor-pointer" onClick={() => setViewingPost(post)}>
                 {(() => {
                   const link = post.imageUrl.toLowerCase();
                   const isVideo = link.match(/\.(mp4|webm|ogg|mov)$/) || 
@@ -371,7 +457,7 @@ export default function Community() {
                     <img 
                       src={post.imageUrl} 
                       alt="Análise" 
-                      className="w-full h-auto max-h-[600px] object-contain rounded-[32px] border border-outline-variant/5 bg-black/20" 
+                      className="w-full h-auto max-h-[300px] object-cover rounded-[32px] border border-outline-variant/5 bg-black/20" 
                       referrerPolicy="no-referrer"
                       loading="lazy"
                     />
@@ -418,12 +504,15 @@ export default function Community() {
                       </div>
                       <div className="flex-1 bg-surface-container p-4 rounded-3xl rounded-tl-none">
                         <div className="flex justify-between items-center mb-1">
-                          <p className="text-[10px] font-black text-primary uppercase">{c.userName}</p>
+                          <div className="flex gap-1 items-center">
+                            <p className="text-[10px] font-black text-primary uppercase">{c.userName}</p>
+                            <span className="material-symbols-outlined text-[10px] text-primary/70">notifications_active</span>
+                          </div>
                           <p className="text-[9px] text-on-surface-variant opacity-40 uppercase">
                             {c.createdAt ? new Date(c.createdAt.toDate ? c.createdAt.toDate() : c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                           </p>
                         </div>
-                        <p className="text-sm text-on-surface leading-tight">{c.text}</p>
+                        <p className="text-sm text-on-surface leading-tight">{renderTextWithMentions(c.text)}</p>
                       </div>
                     </div>
                   ))}
@@ -469,7 +558,7 @@ export default function Community() {
               onClick={() => {
                 setIsCreateModalOpen(false);
                 setEditingPostId(null);
-                setNewPost({ legend: '', imageUrl: '', type: activeFeed });
+                setNewPost({ legend: '', imageUrl: '', imageUrls: [], type: activeFeed });
               }}
               className="absolute top-6 right-6 p-2 rounded-full hover:bg-surface-container-high transition-colors"
             >
@@ -520,43 +609,75 @@ export default function Community() {
                   <span className="text-[9px] text-on-surface-variant italic opacity-60">Suporta Prints e Vídeos</span>
                 </div>
 
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    value={newPost.imageUrl}
-                    onChange={(e) => {
-                      setNewPost({ ...newPost, imageUrl: e.target.value });
-                      if (e.target.value) {
-                        setSelectedFile(null);
-                        setPreviewUrl(null);
-                      }
-                    }}
-                    placeholder="Link do TradingView, YouTube ou Imagem..."
-                    className="flex-1 bg-surface-container-low border border-outline-variant/20 rounded-2xl px-6 py-4 text-on-surface focus:outline-none focus:border-primary transition-all text-sm"
-                  />
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={newPost.imageUrl}
+                      onChange={(e) => {
+                        setNewPost({ ...newPost, imageUrl: e.target.value });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newPost.imageUrl) {
+                            setNewPost({ ...newPost, imageUrls: [...(newPost.imageUrls || []), newPost.imageUrl], imageUrl: '' });
+                          }
+                        }
+                      }}
+                      placeholder="Colar link de imagem/vídeo e pressionar Enter ou '+'..."
+                      className="flex-1 bg-surface-container-low border border-outline-variant/20 rounded-2xl px-6 py-4 text-on-surface focus:outline-none focus:border-primary transition-all text-sm"
+                    />
+                    <button 
+                      onClick={() => {
+                        if (newPost.imageUrl) {
+                            setNewPost({ ...newPost, imageUrls: [...(newPost.imageUrls || []), newPost.imageUrl], imageUrl: '' });
+                        }
+                      }}
+                      type="button"
+                      className="w-14 rounded-2xl border border-outline-variant/20 flex items-center justify-center transition-all bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+                    >
+                      <Plus size={24} />
+                    </button>
+                    
+                    <input 
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          setPreviewUrl(URL.createObjectURL(file));
+                          setNewPost({ ...newPost, imageUrl: '' });
+                        }
+                      }}
+                    />
+                    
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Upload Imagem do Dispositivo"
+                      type="button"
+                      className={`w-14 rounded-2xl border border-outline-variant/20 flex items-center justify-center transition-all ${previewUrl ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'}`}
+                    >
+                      <ImageIcon size={24} />
+                    </button>
+                  </div>
                   
-                  <input 
-                    type="file"
-                    ref={fileInputRef}
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setSelectedFile(file);
-                        setPreviewUrl(URL.createObjectURL(file));
-                        setNewPost({ ...newPost, imageUrl: '' });
-                      }
-                    }}
-                  />
-                  
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    type="button"
-                    className={`w-14 rounded-2xl border border-outline-variant/20 flex items-center justify-center transition-all ${previewUrl ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'}`}
-                  >
-                    <Plus size={24} />
-                  </button>
+                  {/* Links Added Preview */}
+                  {newPost.imageUrls && newPost.imageUrls.length > 0 && (
+                     <div className="flex flex-col gap-2 mt-2">
+                        {newPost.imageUrls.map((link, idx) => (
+                           <div key={idx} className="flex items-center justify-between bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2">
+                             <span className="text-xs text-on-surface-variant truncate max-w-[80%]">{link}</span>
+                             <button className="text-error" onClick={() => {
+                               setNewPost(p => ({ ...p, imageUrls: p.imageUrls?.filter((_, i) => i !== idx) }))
+                             }}><X size={16} /></button>
+                           </div>
+                        ))}
+                     </div>
+                  )}
                 </div>
                 
                 {/* Media Preview */}
@@ -616,6 +737,83 @@ export default function Community() {
               >
                 {isSubmitting ? 'Publicando...' : (editingPostId ? 'Guardar Alterações' : 'Publicar Agora')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Post Modal */}
+      {viewingPost && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/95 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-surface border border-outline-variant/20 rounded-[40px] max-w-2xl w-full max-h-[90vh] flex flex-col shadow-3xl overflow-hidden relative">
+            <button 
+              onClick={() => setViewingPost(null)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-surface-container-high transition-colors z-10"
+            >
+              <X size={24} className="text-on-surface-variant" />
+            </button>
+
+            <div className="p-6 md:p-8 flex items-center gap-4 border-b border-outline-variant/10">
+              <img 
+                src={viewingPost.userPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(viewingPost.userName)}&background=random`} 
+                alt={viewingPost.userName}
+                className="w-12 h-12 rounded-full object-cover border border-outline-variant/10"
+                referrerPolicy="no-referrer"
+              />
+              <div>
+                <h3 className="font-bold text-on-surface">{viewingPost.userName}</h3>
+                <p className="text-sm text-on-surface-variant flex items-center gap-2">
+                  <span>{new Date(viewingPost.createdAt?.toDate ? viewingPost.createdAt.toDate() : viewingPost.createdAt).toLocaleString()}</span>
+                  <span>•</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black tracking-widest ${viewingPost.type === 'forex' ? 'bg-primary/20 text-primary' : 'bg-secondary/20 text-secondary'}`}>
+                    {viewingPost.type === 'forex' ? 'Forex' : 'OB'}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 scrollbar-hide">
+              <p className="text-on-surface text-base md:text-lg leading-relaxed whitespace-pre-wrap">{renderTextWithMentions(viewingPost.legend)}</p>
+              
+              <div className="flex flex-col gap-4 w-full">
+                {viewingPost.imageUrl && (() => {
+                  const link = viewingPost.imageUrl.toLowerCase();
+                  const isVideo = link.match(/\.(mp4|webm|ogg|mov)$/) || link.includes('youtube.com') || link.includes('youtu.be') || link.includes('vimeo.com');
+                  
+                  if (isVideo) {
+                    if (link.includes('youtube.com') || link.includes('youtu.be')) {
+                      const videoId = link.includes('v=') ? link.split('v=')[1]?.split('&')[0] : link.split('/').pop();
+                      return (
+                        <div className="aspect-video w-full rounded-2xl overflow-hidden shadow-lg">
+                          <iframe src={`https://www.youtube.com/embed/${videoId}`} className="w-full h-full" allowFullScreen></iframe>
+                        </div>
+                      );
+                    }
+                    return <video src={viewingPost.imageUrl} controls className="w-full h-auto rounded-3xl shadow-lg bg-black/20" />;
+                  }
+
+                  return <img src={viewingPost.imageUrl} alt="Análise" className="w-full h-auto rounded-3xl shadow-lg border border-outline-variant/10 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(viewingPost.imageUrl, '_blank')} referrerPolicy="no-referrer" />;
+                })()}
+                
+                {viewingPost.imageUrls?.filter(url => url !== viewingPost.imageUrl).map((mediaUrl, idx) => {
+                  const link = mediaUrl.toLowerCase();
+                  const isVideo = link.match(/\.(mp4|webm|ogg|mov)$/) || link.includes('youtube.com') || link.includes('youtu.be') || link.includes('vimeo.com');
+                  
+                  if (isVideo) {
+                    if (link.includes('youtube.com') || link.includes('youtu.be')) {
+                      const videoId = link.includes('v=') ? link.split('v=')[1]?.split('&')[0] : link.split('/').pop();
+                      return (
+                        <div key={idx} className="aspect-video w-full rounded-2xl overflow-hidden shadow-lg">
+                          <iframe src={`https://www.youtube.com/embed/${videoId}`} className="w-full h-full" allowFullScreen></iframe>
+                        </div>
+                      );
+                    }
+                    return <video key={idx} src={mediaUrl} controls className="w-full h-auto rounded-3xl shadow-lg bg-black/20" />;
+                  }
+
+                  return <img key={idx} src={mediaUrl} alt={`Mídia ${idx + 1}`} className="w-full h-auto rounded-3xl shadow-lg border border-outline-variant/10 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(mediaUrl, '_blank')} referrerPolicy="no-referrer" />;
+                })}
+              </div>
             </div>
           </div>
         </div>

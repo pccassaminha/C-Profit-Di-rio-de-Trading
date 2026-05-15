@@ -55,7 +55,16 @@ export default function App() {
   };
 
   if (!isAuthReady) {
-    return <div className="min-h-screen bg-[#0b1326] flex items-center justify-center text-primary font-black uppercase tracking-[0.2em] animate-pulse">Iniciando Terminal...</div>;
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center space-y-8">
+        <div className="flex items-end justify-center gap-3 h-20">
+          <div className="w-5 bg-emerald-500 rounded-sm h-8 relative animate-[bounce_1s_infinite_0s] after:content-[''] after:absolute after:w-0.5 after:h-16 after:bg-emerald-500/50 after:-top-4 after:left-1/2 after:-translate-x-1/2 shadow-[0_0_15px_rgba(16,185,129,0.3)]"></div>
+          <div className="w-5 bg-rose-500 rounded-sm h-12 relative animate-[bounce_1s_infinite_0.2s] after:content-[''] after:absolute after:w-0.5 after:h-20 after:bg-rose-500/50 after:-top-4 after:left-1/2 after:-translate-x-1/2 shadow-[0_0_15px_rgba(244,63,94,0.3)]"></div>
+          <div className="w-5 bg-emerald-500 rounded-sm h-16 relative animate-[bounce_1s_infinite_0.4s] after:content-[''] after:absolute after:w-0.5 after:h-24 after:bg-emerald-500/50 after:-top-4 after:left-1/2 after:-translate-x-1/2 shadow-[0_0_15px_rgba(16,185,129,0.3)]"></div>
+          <div className="w-5 bg-rose-500 rounded-sm h-10 relative animate-[bounce_1s_infinite_0.6s] after:content-[''] after:absolute after:w-0.5 after:h-14 after:bg-rose-500/50 after:-top-2 after:left-1/2 after:-translate-x-1/2 shadow-[0_0_15px_rgba(244,63,94,0.3)]"></div>
+        </div>
+      </div>
+    );
   }
 
   // Se o usuário acabou de se cadastrar e precisa escolher um plano

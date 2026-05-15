@@ -125,10 +125,15 @@ export default function Withdrawals() {
     });
   }, [withdrawals, dateRange]);
 
+  const activeAccounts = accounts.filter(a => a.status !== 'inactive');
+  const activeAccountIds = new Set(activeAccounts.map(a => a.id));
+  const activeTrades = trades.filter(t => t.accountId ? activeAccountIds.has(t.accountId) : true);
+
   const totalWithdrawn = filteredWithdrawals.reduce((sum, w) => sum + (w.amount || 0), 0);
   
-  const totalInitialBalance = accounts.reduce((sum, a) => sum + (a.initialBalance || 0), 0);
-  const totalPnL = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+  const totalInitialBalance = activeAccounts.reduce((sum, a) => sum + (a.initialBalance || 0), 0);
+  const totalPnL = activeTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+  // Optional: only subtract withdrawals from active accounts if withdrawals are linked to accounts? Currently withdrawals are global.
   const totalWithdrawnAllTime = withdrawals.reduce((sum, w) => sum + (w.amount || 0), 0);
   const remainingBalance = totalInitialBalance + totalPnL - totalWithdrawnAllTime;
 
@@ -157,11 +162,11 @@ export default function Withdrawals() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
           <h3 className="text-on-surface-variant font-bold text-sm uppercase tracking-wider mb-2">Total Sacado (Período)</h3>
-          <p className="text-4xl font-bold text-secondary font-headline">{formatCurrency(totalWithdrawn)}</p>
+          <p className="text-4xl font-bold text-secondary">{formatCurrency(totalWithdrawn)}</p>
         </div>
         <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
           <h3 className="text-on-surface-variant font-bold text-sm uppercase tracking-wider mb-2">Saldo Restante Geral</h3>
-          <p className="text-4xl font-bold text-primary font-headline">{formatCurrency(remainingBalance)}</p>
+          <p className="text-4xl font-bold text-primary">{formatCurrency(remainingBalance)}</p>
         </div>
       </div>
 

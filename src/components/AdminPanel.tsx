@@ -12,15 +12,18 @@ export default function AdminPanel() {
   // Super Admin check
   const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
 
-  const [activeTab, setActiveTab] = useState<'users' | 'payments' | 'settings' | 'coupons'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast'>('users');
   const [users, setUsers] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
+  const [broadcastMessage, setBroadcastMessage] = useState('');
   const [settings, setSettings] = useState(initialSettings || {
     whatsappNumber: '',
     iban: '',
+    ibanName: '',
     multicaixaEntity: '',
     multicaixaReference: '',
+    multicaixaName: '',
     showIban: true,
     showMulticaixa: true,
     multicaixaLogoUrl: ''
@@ -35,6 +38,29 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true);
 
   const isAdmin = userPlan?.role === 'admin';
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'US';
+    const parts = name.trim().split(' ');
+    const first = parts[0]?.[0] || 'U';
+    const second = parts.length > 1 ? parts[1]?.[0] : (parts[0]?.[1] || 'S');
+    return (first + second).toUpperCase();
+  };
+
+  const getUserDisplayId = (uid: string) => {
+    const sortedUsers = [...users].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+    const index = sortedUsers.findIndex(u => u.id === uid);
+    const numericStr = String(1000 + (index >= 0 ? index : users.length));
+    const user = users.find(u => u.id === uid);
+    return `${getInitials(user?.name)}${numericStr}`;
+  };
+
+  const getPaymentDisplayId = (paymentId: string) => {
+    const sortedPayments = [...payments].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+    const index = sortedPayments.findIndex(p => p.id === paymentId);
+    const numericStr = String(1000 + (index >= 0 ? index : payments.length));
+    return `PG${numericStr}`;
+  };
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -146,6 +172,22 @@ export default function AdminPanel() {
     alert('Configurações salvas!');
   };
 
+  const handleSendBroadcast = async () => {
+    if (!broadcastMessage.trim()) return alert('Digite uma mensagem.');
+    try {
+      await addDoc(collection(db, 'broadcasts'), {
+        message: broadcastMessage,
+        createdAt: new Date().toISOString(),
+        author: currentUser?.displayName || 'Admin'
+      });
+      setBroadcastMessage('');
+      alert('Comunicado enviado à comunidade com sucesso!');
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao enviar comunicado.');
+    }
+  };
+
   const [newCoupon, setNewCoupon] = useState({
     code: '',
     discountType: 'percentage', // 'percentage' | 'fixed'
@@ -234,6 +276,12 @@ export default function AdminPanel() {
             <Settings size={18} /> Configs
           </button>
           <button 
+            onClick={() => setActiveTab('broadcast')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'broadcast' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
+          >
+            <Phone size={18} /> Avisos
+          </button>
+          <button 
             onClick={() => setActiveTab('coupons')}
             className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'coupons' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
@@ -258,7 +306,12 @@ export default function AdminPanel() {
               {users.filter(u => u.status !== 'deleted').map(u => (
                 <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
                   <td className="p-6">
-                    <p className="font-bold text-on-surface">{u.name || 'Sem Nome'}</p>
+                    <p className="font-bold text-on-surface flex items-center gap-2">
+                       {u.name || 'Sem Nome'}
+                       <span className="text-xs bg-surface-container font-mono px-2 py-0.5 rounded text-on-surface-variant font-black">
+                         {getUserDisplayId(u.id)}
+                       </span>
+                    </p>
                     <p className="text-xs text-on-surface-variant italic">{u.email}</p>
                   </td>
                   <td className="p-6">
@@ -319,14 +372,14 @@ export default function AdminPanel() {
                   }`}>
                     {p.status || 'Pendente'}
                   </span>
-                  <span className="text-xs text-on-surface-variant font-medium">#{p.id.slice(0,8)}</span>
+                  <span className="text-xs text-on-surface-variant font-medium">#{getPaymentDisplayId(p.id)}</span>
                 </div>
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div>
                     <h4 className="text-lg font-bold text-on-surface">Upgrade solicitado por {users.find(u => u.id === p.userId)?.name || p.userId}</h4>
                     <p className="text-sm text-on-surface-variant">Plano: <span className="text-on-surface font-bold uppercase tracking-widest">{p.planId?.replace('_', ' ')}</span></p>
                     <p className="text-sm font-black text-primary mt-1">{p.amount?.toLocaleString()} Kz</p>
-                    <p className="text-[10px] text-on-surface-variant mt-2 font-mono opacity-50">ID Usuário: {p.userId}</p>
+                    <p className="text-[10px] text-on-surface-variant mt-2 font-mono opacity-50">ID Usuário: {getUserDisplayId(p.userId)}</p>
                   </div>
                   <p className="text-[10px] text-on-surface-variant mt-1 text-right">{new Date(p.createdAt).toLocaleString()}</p>
                 </div>
@@ -448,19 +501,30 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">IBAN de Depósito</label>
-              <input 
-                type="text" 
-                value={settings.iban}
-                onChange={(e) => setSettings({ ...settings, iban: e.target.value })}
-                className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">IBAN de Depósito</label>
+                <input 
+                  type="text" 
+                  value={settings.iban}
+                  onChange={(e) => setSettings({ ...settings, iban: e.target.value })}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Titular da Conta (IBAN)</label>
+                <input 
+                  type="text" 
+                  value={settings.ibanName || ''}
+                  onChange={(e) => setSettings({ ...settings, ibanName: e.target.value })}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Entidade MCX</label>
+                <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Entidade MCX (Código)</label>
                 <input 
                   type="text" 
                   value={settings.multicaixaEntity}
@@ -478,6 +542,17 @@ export default function AdminPanel() {
                 />
               </div>
             </div>
+            
+            <div className="space-y-2">
+              <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Nome do Beneficiário (Cobrador MCX)</label>
+              <input 
+                type="text" 
+                value={settings.multicaixaName || ''}
+                onChange={(e) => setSettings({ ...settings, multicaixaName: e.target.value })}
+                className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
+                placeholder="Nome da Empresa / Negócio"
+              />
+            </div>
 
             <button 
               onClick={handleSaveSettings}
@@ -485,6 +560,31 @@ export default function AdminPanel() {
             >
               <Check size={20} />
               Salvar Alterações
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'broadcast' && (
+        <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 max-w-2xl mx-auto shadow-xl">
+          <h3 className="text-xl font-bold text-on-surface mb-6 font-headline flex items-center gap-3">
+            <Phone className="text-primary" />
+            Comunicados à Comunidade
+          </h3>
+          <p className="text-sm text-on-surface-variant mb-6">Envie atualizações ou comunicados para todos os membros da comunidade.</p>
+          
+          <div className="space-y-4">
+            <textarea
+              value={broadcastMessage}
+              onChange={(e) => setBroadcastMessage(e.target.value)}
+              placeholder="Escreva a atualização ou comunicado..."
+              className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-6 py-4 text-on-surface focus:outline-none focus:border-primary transition-all min-h-[150px] resize-none"
+            />
+            <button
+              onClick={handleSendBroadcast}
+              className="w-full bg-primary text-on-primary py-4 rounded-2xl font-black hover:scale-[1.02] transition-all shadow-xl shadow-primary/30 uppercase tracking-widest"
+            >
+              Publicar Comunicado
             </button>
           </div>
         </div>

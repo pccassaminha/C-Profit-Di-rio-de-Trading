@@ -16,7 +16,9 @@ export default function Topbar({
 }) {
   const { currency, setCurrency } = useCurrency();
   const { userPlan } = useTrades();
-  const userName = auth.currentUser?.displayName || 'Usuário';
+  const currentUser = auth.currentUser;
+  const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
+  const userName = currentUser?.displayName || 'Usuário';
   const initial = userName.charAt(0).toUpperCase();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -99,6 +101,15 @@ export default function Topbar({
                 <span className="material-symbols-outlined text-[18px]">help</span>
                 Suporte
               </button>
+              {isSuperAdmin && (
+                <button 
+                  onClick={() => handleNavigate('admin')}
+                  className="w-full text-left px-4 py-3 text-sm text-primary hover:bg-surface-container transition-colors flex items-center gap-3 border-t border-outline-variant/10"
+                >
+                  <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+                  Administração
+                </button>
+              )}
               <button 
                 onClick={() => auth.signOut()}
                 className="w-full text-left px-4 py-3 text-sm text-error hover:bg-error/10 transition-colors flex items-center gap-3 border-t border-outline-variant/10 font-bold"

@@ -7,6 +7,7 @@ import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import { DatePicker } from './DatePicker';
+import { importTradeFile } from '../utils/tradeParsers';
 
 export default function TradeJournal({ currentView = 'list', onViewChange }: { currentView?: 'list' | 'form' | 'detail', onViewChange?: (view: 'list' | 'form' | 'detail') => void }) {
   const { formatCurrency } = useCurrency();
@@ -427,259 +428,45 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setIsImporting(true);
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const content = e.target?.result as string;
-      let parsedTrades: any[] = [];
-
-      const calcularRR = (entryStr: string, slStr: string, tpStr: string, action: string) => {
-        const entry = parseFloat(entryStr);
-        const sl = parseFloat(slStr);
-        const tp = parseFloat(tpStr);
     
-        if (!entry || !sl || !tp || isNaN(sl) || isNaN(tp) || sl === 0 || tp === 0) return 0;
-    
-        const risk = Math.abs(entry - sl);
-        const reward = Math.abs(tp - entry);
-        
-        if (risk === 0) return 0;
-        
-        return Number((reward / risk).toFixed(2));
-      };
-
-      if (file.name.toLowerCase().endsWith('.csv')) {
-        const lines = content.trim().split('\n');
-        if (lines.length > 0) {
-          let separator = ',';
-          let tIdx = -1, tkIdx = -1, symIdx = -1, typeIdx = -1, volIdx = -1, priceIdx = -1;
-          let slIdx = -1, tpIdx = -1, commIdx = -1, swapIdx = -1, pnlIdx = -1;
-          
-          for (let i = 0; i < lines.length; i++) {
-            let rawLine = lines[i].trim();
-            if (!rawLine) continue;
-            
-            const lowerLine = rawLine.toLowerCase();
-            // Detect header line
-            if (lowerLine.includes('time') || lowerLine.includes('date') || lowerLine.includes('data') || lowerLine.includes('ticket') || lowerLine.includes('order') || lowerLine.includes('profit')) {
-                  separator = lowerLine.includes(';') ? ';' : (lowerLine.includes('\t') ? '\t' : ',');
-                  const header = lowerLine.split(separator).map(s => s.replace(/"/g, '').trim());
-                  
-                  // Ignore lines that are just single words like "Orders", "Positions", "Deals"
-                  if (header.length > 3) {
-                      const getIdx = (keywords: string[]) => header.findIndex(col => keywords.some(kw => col.includes(kw)));
-                      
-                      tIdx = getIdx(['time', 'date', 'data', 'hora']);
-                      tkIdx = getIdx(['ticket', 'position', 'deal', 'order', 'ordem']);
-                      symIdx = getIdx(['symbol', 'item', 'asset', 'ativo', 'símbolo']);
-                      typeIdx = getIdx(['type', 'action', 'side', 'tipo', 'ação']);
-                      volIdx = getIdx(['size', 'volume', 'tamanho']);
-                      // sometimes deal has direction! if so, use 'type' for action 
-                      priceIdx = getIdx(['price', 'open', 'preço', 'abertura']);
-                      slIdx = getIdx(['s/l', 'stop', 's / l']);
-                      tpIdx = getIdx(['t/p', 'target', 't / p', 'alvo']);
-                      commIdx = getIdx(['commission', 'fee', 'comissão', 'taxa']);
-                      swapIdx = getIdx(['swap']);
-                      pnlIdx = getIdx(['profit', 'pnl', 'p/l', 'lucro']);
-                      continue; // skip the header
-                  }
-            }
-
-            const data = rawLine.split(separator).map(s => s.replace(/"/g, '').trim());
-            if (data.length < 5) continue; // Skip empty/invalid lines
-
-            // If we couldn't detect columns perfectly, fallback to MT5-ish / generic indices
-            const rawTime = tIdx >= 0 ? data[tIdx] : (data[0] || "");
-            
-            // Validate that we actually have a date-like string (e.g. 2026.05.01 or 2026-05-01 or DD/MM/YYYY)
-            if (!rawTime.match(/\d{2,4}[./\-]\d{2}[./\-]\d{2,4}/)) continue;
-
-            const fullDateTime = rawTime.trim();
-            const dateTimeParts = fullDateTime.split(' ');
-            const datePart = dateTimeParts[0] || "";
-            const timePart = dateTimeParts[1] || "";
-            
-            let rawType = (typeIdx >= 0 ? data[typeIdx] : data[3]) || "";
-            
-            const parseNumber = (val: string) => {
-               if (!val) return 0;
-               val = val.replace(/ /g, '');
-               if (val.includes(',') && val.includes('.')) {
-                  if (val.lastIndexOf(',') > val.lastIndexOf('.')) {
-                      val = val.replace(/\./g, '').replace(',', '.');
-                  } else {
-                      val = val.replace(/,/g, '');
-                  }
-               } else if (val.includes(',')) {
-                  val = val.replace(',', '.');
-               }
-               return Number(val) || 0;
-            };
-
-            const size = parseNumber(volIdx >= 0 ? data[volIdx] : data[4]);
-            if (rawType.toLowerCase().includes('balance') || size === 0) continue;
-
-            const isSell = rawType.toLowerCase().includes('sell') || rawType.toLowerCase().includes('venda');
-
-            const commission = parseNumber((commIdx >= 0 ? data[commIdx] : data[10]) || '0');
-            const swap = parseNumber((swapIdx >= 0 ? data[swapIdx] : data[11]) || '0');
-            const grossPnl = parseNumber((pnlIdx >= 0 ? data[pnlIdx] : data[12]) || '0');
-
-            parsedTrades.push({
-                ticket: (tkIdx >= 0 ? data[tkIdx] : data[1]) || `T${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                symbol: (symIdx >= 0 ? data[symIdx] : data[2]) || 'Unknown',
-                action: isSell ? 'Sell' : 'Buy',
-                date: datePart,
-                entryTime: timePart,
-                size: size,
-                openPrice: parseNumber(priceIdx >= 0 ? data[priceIdx] : data[5]),
-                closePrice: parseNumber(priceIdx >= 0 ? data[priceIdx] : data[5]),
-                commission: commission,
-                swap: swap,
-                pnl: grossPnl + commission + swap,
-                rr: calcularRR(
-                  (priceIdx >= 0 ? data[priceIdx] : data[5]) || '0', 
-                  (slIdx >= 0 ? data[slIdx] : data[6]) || '0', 
-                  (tpIdx >= 0 ? data[tpIdx] : data[7]) || '0', 
-                  rawType
-                ),
-                sl: parseNumber(slIdx >= 0 ? data[slIdx] : data[6]),
-                tp: parseNumber(tpIdx >= 0 ? data[tpIdx] : data[7]),
-                session: 'Importado',
-                notes: '',
-                psychology: '',
-                type: 'forex',
-                openTime: parseDateStr(fullDateTime),
-                closeTime: parseDateStr(fullDateTime)
-            });
-          }
-        }
-        if (parsedTrades.length > 0) {
-          setImportedTradesToReview(parsedTrades);
-          setTradeData(prev => {
-             const latestTrade = parsedTrades[parsedTrades.length - 1];
-             if (prev.accountId) return prev;
-             const bestAccount = accounts.find(a => latestTrade.type === 'ob' ? a.tradeType === 'ob' : (a.tradeType === 'forex' || !a.tradeType));
-             return bestAccount ? { ...prev, accountId: bestAccount.id, type: latestTrade.type } : prev;
-          });
-        } else {
-          setModalConfig({
-            isOpen: true,
-            title: "Aviso",
-            message: "Nenhum trade válido foi encontrado. Verifique se o arquivo possui colunas/linhas com as informações da operação.",
-            isError: true,
-            onConfirm: closeModal
-          });
-        }
-        setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      } else if (file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm')) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(content, 'text/html');
-        
-        const rows = doc.querySelectorAll('tr');
-        
-        const parseHTMLNumber = (str: string) => {
-           if (!str) return 0;
-           str = str.replace(/&nbsp;/g, '').replace(/\s/g, ''); // remove spaces
-           if (str.includes(',') && str.includes('.')) {
-              if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
-                 str = str.replace(/\./g, '').replace(',', '.');
-              } else {
-                 str = str.replace(/,/g, '');
-              }
-           } else if (str.includes(',')) {
-              str = str.replace(',', '.');
-           }
-           return Number(str) || 0;
-        };
-
-        rows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            
-            if (cells.length > 10 && cells[0].innerText.match(/\d{2,4}[./\-]\d{2}[./\-]\d{2,4}/)) {
-                const validCells = Array.from(cells).filter(c => !c.classList.contains('hidden'));
-                
-                if (validCells.length >= 12) {
-                    const fullDateTime = validCells[0].innerText.trim();
-                    const dateTimeParts = fullDateTime.split(' ');
-                    const datePart = dateTimeParts[0] || "";
-                    const timePart = dateTimeParts[1] || "";
-    
-                    const action = validCells[3].innerText.trim();
-                    const size = parseHTMLNumber(validCells[4].innerText);
-                    
-                    if (action.toLowerCase().includes('balance') || size === 0) return;
-
-                    const openPrice = validCells[5].innerText.trim();
-                    const sl = validCells[6].innerText.trim();
-                    const tp = validCells[7].innerText.trim();
-                    const commission = parseHTMLNumber(validCells[10].innerText);
-                    const swap = parseHTMLNumber(validCells[11].innerText);
-                    const grossPnl = parseHTMLNumber(validCells[12].innerText);
-    
-                    parsedTrades.push({
-                        ticket: validCells[1].innerText.trim() || `T${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                        symbol: validCells[2].innerText.trim(),
-                        action: action?.toUpperCase() === 'SELL' ? 'Sell' : 'Buy',
-                        date: datePart,
-                        entryTime: timePart,
-                        size: size,
-                        openPrice: parseHTMLNumber(openPrice),
-                        closePrice: parseHTMLNumber(openPrice), // mock
-                        commission: commission,
-                        swap: swap,
-                        pnl: grossPnl + commission + swap,
-                        rr: calcularRR(openPrice, sl, tp, action),
-                        sl: parseHTMLNumber(sl),
-                        tp: parseHTMLNumber(tp),
-                        session: 'Importado',
-                        notes: '',
-                        psychology: '',
-                        type: 'forex',
-                        openTime: parseDateStr(fullDateTime),
-                        closeTime: parseDateStr(fullDateTime)
-                    });
-                }
-            }
+    try {
+      const result = await importTradeFile(file, tradeData.accountId || accounts[0]?.id || '');
+      
+      if (result.trades && result.trades.length > 0) {
+        setImportedTradesToReview(result.trades);
+        setTradeData(prev => {
+           const latestTrade = result.trades[result.trades.length - 1];
+           if (prev.accountId) return prev;
+           const bestAccount = accounts.find(a => latestTrade.type === 'ob' ? a.tradeType === 'ob' : (a.tradeType === 'forex' || !a.tradeType));
+           return bestAccount ? { ...prev, accountId: bestAccount.id, type: latestTrade.type } : prev;
         });
-
-        if (parsedTrades.length > 0) {
-          setImportedTradesToReview(parsedTrades);
-          setTradeData(prev => {
-             const latestTrade = parsedTrades[parsedTrades.length - 1];
-             if (prev.accountId) return prev;
-             const bestAccount = accounts.find(a => latestTrade.type === 'ob' ? a.tradeType === 'ob' : (a.tradeType === 'forex' || !a.tradeType));
-             return bestAccount ? { ...prev, accountId: bestAccount.id, type: latestTrade.type } : prev;
-          });
-        } else {
-          setModalConfig({
-            isOpen: true,
-            title: "Aviso",
-            message: "Nenhum trade válido foi encontrado. Verifique se o arquivo possui colunas/linhas com as informações da operação.",
-            isError: true,
-            onConfirm: closeModal
-          });
-        }
-        setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
       } else {
-        setIsImporting(false);
         setModalConfig({
           isOpen: true,
-          title: "Erro",
-          message: "Formato de arquivo não suportado. Por favor, use CSV ou HTML.",
+          title: "Aviso",
+          message: "Nenhum trade válido foi encontrado. Verifique se o arquivo possui as informações da operação.",
           isError: true,
           onConfirm: closeModal
         });
-        if (fileInputRef.current) fileInputRef.current.value = '';
       }
-    };
-    reader.readAsText(file);
+    } catch (error: any) {
+      console.error('Erro na importação:', error);
+      setModalConfig({
+        isOpen: true,
+        title: "Erro na Importação",
+        message: error.message || "Falha ao ler o arquivo.",
+        isError: true,
+        onConfirm: closeModal
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const [customSetup, setCustomSetup] = useState('');
@@ -926,7 +713,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
               >
                 chevron_left
               </button>
-              <span className="text-on-surface font-bold text-lg md:text-xl font-headline capitalize">
+              <span className="text-on-surface font-bold text-lg md:text-xl capitalize">
                 {selectedCalendarDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
               </span>
               <button 
