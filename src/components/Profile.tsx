@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, storage } from '../firebase';
 import { updateProfile, verifyBeforeUpdateEmail, updatePassword } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Modal from './Modal';
 
@@ -74,25 +74,32 @@ export default function Profile() {
         const fileRef = ref(storage, `profiles/${user.uid}/${Date.now()}_${file.name}`);
         await uploadBytes(fileRef, file);
         const url = await getDownloadURL(fileRef);
-        setPhotoURL(url);
         
-        // Instant update to firestore profile for preview elsewhere
-        await setDoc(doc(db, 'usuarios', user.uid), {
-          photoURL: url,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
+        // Update both state, Auth profile, and Firestore
+        setPhotoURL(url);
+        await updateProfile(user, { photoURL: url });
+        
+        const userDocRef = doc(db, 'usuarios', user.uid);
+        await setDoc(userDocRef, { photoURL: url }, { merge: true });
 
-      } catch (err: any) {
-        console.error(err);
         setModalConfig({
           isOpen: true,
-          title: "Erro",
-          message: "Erro ao carregar imagem.",
+          title: "Foto Atualizada",
+          message: "Sua foto de perfil foi alterada com sucesso."
+        });
+      } catch (error: any) {
+        console.error("Error uploading photo:", error);
+        setModalConfig({
+          isOpen: true,
+          title: "Erro de Upload",
+          message: `Falha ao enviar foto: ${error.message}. Entre em contato com o suporte ou tente novamente mais tarde.`,
           isError: true,
-          onConfirm: closeModal
         });
       } finally {
         setIsSaving(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     }
   };

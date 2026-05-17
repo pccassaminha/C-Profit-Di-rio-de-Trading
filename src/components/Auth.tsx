@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 interface AuthProps {
-  onSuccess: (isNewUser: boolean) => void;
+  onSuccess: () => void;
   initialMode?: 'login' | 'register';
 }
 
@@ -72,7 +72,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         });
       }
       
-      onSuccess(isNewUser);
+      onSuccess();
     } catch (err: any) {
       setError(err.message);
       console.error(err);
@@ -128,7 +128,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
         const userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
-        onSuccess(!userDoc.exists());
+        onSuccess();
       } else {
         const result = await createUserWithEmailAndPassword(auth, email, password);
         if (name) {
@@ -152,7 +152,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         await setDoc(doc(db, 'usuarios', result.user.uid), newUserData);
-        onSuccess(true);
+        onSuccess();
       }
     } catch (err: any) {
       setError(err.message);

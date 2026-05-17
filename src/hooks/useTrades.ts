@@ -34,6 +34,7 @@ export const useTrades = (manualTrades: any[] = []) => {
           if (data.plan_type === 'trimestral_6') limit = 12; // 6 OB + 6 Forex
           if (data.plan_type === 'semestral_8' || data.plan_type === 'semestral_6') limit = 16; // 8 OB + 8 Forex
           if (data.plan_type === 'anual_16') limit = 32; // 16 OB + 16 Forex
+          if (data.plan_type === 'ilimitado' || data.role === 'admin') limit = 999; 
 
           setUserPlan({
             plan_type: data.plan_type || 'Iniciante',
@@ -74,8 +75,9 @@ export const useTrades = (manualTrades: any[] = []) => {
   }, []);
 
   const isSuperAdmin = useMemo(() => {
-    return userPlan?.role === 'admin' || auth.currentUser?.email === 'exportacoes.extras@gmail.com';
-  }, [userPlan]);
+    const email = auth.currentUser?.email;
+    return userPlan?.role === 'admin' || email === 'exportacoes.extras@gmail.com';
+  }, [userPlan, auth.currentUser?.email]);
 
   const finalUserPlan = useMemo(() => {
     if (isSuperAdmin) {
@@ -171,10 +173,14 @@ export const useTrades = (manualTrades: any[] = []) => {
     
     // Verificação de Expiração
     let isExpired = false;
-    if (!isSuperAdmin && finalUserPlan?.expiry_date) {
-      const now = new Date();
-      const expiry = finalUserPlan.expiry_date.toDate ? finalUserPlan.expiry_date.toDate() : new Date(finalUserPlan.expiry_date);
-      isExpired = now > expiry;
+    if (!isSuperAdmin) {
+      if (!finalUserPlan || finalUserPlan.plan_type === 'Iniciante') {
+        isExpired = true;
+      } else if (finalUserPlan.expiry_date) {
+        const now = new Date();
+        const expiry = finalUserPlan.expiry_date.toDate ? finalUserPlan.expiry_date.toDate() : new Date(finalUserPlan.expiry_date);
+        isExpired = now > expiry;
+      }
     }
 
     return { 

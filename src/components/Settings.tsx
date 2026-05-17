@@ -277,7 +277,6 @@ export default function Settings() {
           setDateFormat('DD/MM/YYYY');
           setSessionType('subdivided');
           setDefaultTradeType('ask');
-          setForceShowObFilter(false);
           setObjectives([]);
           setSessions([
             { id: 'asian', name: 'Sessão Asiática', start: '20:00', end: '04:00' },

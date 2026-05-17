@@ -28,12 +28,22 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [needsPlanSelection, setNeedsPlanSelection] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   const [publicPage, setPublicPage] = useState<string>('landing');
   
   const { isExpired, userPlan } = useTrades();
+
+  useEffect(() => {
+    const handleNavigation = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setActiveTab(customEvent.detail);
+      }
+    };
+    window.addEventListener('navigateToTab', handleNavigation);
+    return () => window.removeEventListener('navigateToTab', handleNavigation);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -47,11 +57,8 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleAuthSuccess = (isNewUser: boolean) => {
+  const handleAuthSuccess = () => {
     setShowAuth(false);
-    if (isNewUser) {
-      setNeedsPlanSelection(true);
-    }
   };
 
   if (!isAuthReady) {
@@ -62,32 +69,6 @@ export default function App() {
           <div className="w-5 bg-rose-500 rounded-sm h-12 relative animate-[bounce_1s_infinite_0.2s] after:content-[''] after:absolute after:w-0.5 after:h-20 after:bg-rose-500/50 after:-top-4 after:left-1/2 after:-translate-x-1/2 shadow-[0_0_15px_rgba(244,63,94,0.3)]"></div>
           <div className="w-5 bg-emerald-500 rounded-sm h-16 relative animate-[bounce_1s_infinite_0.4s] after:content-[''] after:absolute after:w-0.5 after:h-24 after:bg-emerald-500/50 after:-top-4 after:left-1/2 after:-translate-x-1/2 shadow-[0_0_15px_rgba(16,185,129,0.3)]"></div>
           <div className="w-5 bg-rose-500 rounded-sm h-10 relative animate-[bounce_1s_infinite_0.6s] after:content-[''] after:absolute after:w-0.5 after:h-14 after:bg-rose-500/50 after:-top-2 after:left-1/2 after:-translate-x-1/2 shadow-[0_0_15px_rgba(244,63,94,0.3)]"></div>
-        </div>
-      </div>
-    );
-  }
-
-  // Se o usuário acabou de se cadastrar e precisa escolher um plano
-  if (user && needsPlanSelection) {
-    return (
-      <div className="min-h-screen bg-background overflow-y-auto">
-        <div className="p-8 max-w-7xl mx-auto text-center space-y-8">
-           <div className="space-y-4">
-             <h1 className="text-5xl font-black text-on-surface font-headline uppercase italic tracking-tighter">Bem-vindo ao <span className="text-primary italic">Terminal</span></h1>
-             <p className="text-on-surface-variant max-w-2xl mx-auto">Para começar sua jornada rumo à consistência, selecione o nível de acesso que melhor se adapta às suas operações de mercado.</p>
-           </div>
-           
-           <Plans hideHeader />
-           
-           <div className="flex flex-col items-center gap-4 mt-8 pb-12">
-             <button 
-               onClick={() => setNeedsPlanSelection(false)}
-               className="bg-surface-container-high text-on-surface-variant hover:text-on-surface px-10 py-4 rounded-full text-xs font-black uppercase tracking-widest transition-all border border-outline-variant/10 shadow-lg"
-             >
-               Pular por enquanto (Plano Iniciante)
-             </button>
-             <p className="text-[10px] text-on-surface-variant opacity-50 uppercase tracking-[0.2em]">Você pode alterar seu plano a qualquer momento nas configurações.</p>
-           </div>
         </div>
       </div>
     );
@@ -123,8 +104,10 @@ export default function App() {
 
   const renderContent = () => {
     // Se o plano estiver expirado, forçar exibição da página de planos
-    const allowedExpiredTabs = ['plans', 'payments', 'profile', 'support', 'settings'];
-    if (isExpired && !allowedExpiredTabs.includes(activeTab)) {
+    const allowedExpiredTabs = ['plans', 'payments', 'profile', 'support', 'settings', 'admin'];
+    const isAdmin = user?.email === 'exportacoes.extras@gmail.com' || userPlan?.role === 'admin';
+    
+    if (isExpired && !isAdmin && !allowedExpiredTabs.includes(activeTab)) {
       return <Plans forcedExpired />;
     }
 

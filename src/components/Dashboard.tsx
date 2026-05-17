@@ -893,7 +893,7 @@ export default function Dashboard() {
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   const handleMulticaixa = () => {
-    window.open('https://wa.me/244921319200', '_blank');
+    window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'plans' }));
   };
 
   return (

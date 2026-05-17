@@ -12,7 +12,8 @@ export default function AdminPanel() {
   // Super Admin check
   const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
 
-  const [activeTab, setActiveTab] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast' | 'maestros'>('users');
+  const [editingUser, setEditingUser] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -287,6 +288,12 @@ export default function AdminPanel() {
           >
             <Ticket size={18} /> Cupons
           </button>
+          <button 
+            onClick={() => setActiveTab('maestros')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'maestros' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
+          >
+            <ShieldAlert size={18} /> Maestros
+          </button>
         </div>
       </div>
 
@@ -333,10 +340,10 @@ export default function AdminPanel() {
                   <td className="p-6">
                     <div className="flex flex-col gap-2">
                       <button 
-                        onClick={() => handleUpdateUser(u.id, { role: u.role === 'admin' ? 'user' : 'admin' })}
-                        className="text-primary hover:underline text-xs font-black text-left"
+                        onClick={() => setEditingUser(u)}
+                        className="text-primary hover:underline text-[12px] font-black uppercase text-left tracking-widest"
                       >
-                        {u.role === 'admin' ? 'Remover Admin' : 'Tornar Admin'}
+                        Editar Plano & Expiração
                       </button>
                       <button 
                         onClick={() => handleUpdateUser(u.id, { expiry_date: new Date(Date.now() - 86400000).toISOString() })}
@@ -695,6 +702,152 @@ export default function AdminPanel() {
               </table>
             </div>
           </div>
+        </div>
+      )}
+      {activeTab === 'maestros' && (
+        <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
+          <div className="p-6 border-b border-outline-variant/20">
+             <h3 className="text-xl font-bold text-on-surface font-headline">Administradores e Maestros</h3>
+             <p className="text-sm text-on-surface-variant mt-2">Os usuários listados abaixo têm controle total sobre as configurações da plataforma e listagem de usuários.</p>
+          </div>
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-surface-container text-on-surface-variant text-xs uppercase tracking-widest border-b border-outline-variant/20">
+              <tr>
+                <th className="p-6 font-black">Usuário</th>
+                <th className="p-6 font-black">Email</th>
+                <th className="p-6 font-black w-24 text-right">Ação</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/10 text-sm">
+              {users.filter(u => u.role === 'admin').map((u) => (
+                <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
+                  <td className="p-6">
+                    <div className="flex items-center gap-4">
+                      {u.photoURL ? (
+                        <img src={u.photoURL} alt="avatar" className="w-10 h-10 rounded-xl object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center font-bold font-headline uppercase">
+                          {u.email.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-bold text-on-surface text-base">{u.name}</p>
+                        <p className="text-xs text-primary font-bold uppercase tracking-widest mt-1">Maestro</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-6 text-on-surface-variant text-xs">{u.email}</td>
+                  <td className="p-6 text-right">
+                    <button 
+                      onClick={() => handleUpdateUser(u.id, { role: 'user' })}
+                      className="px-4 py-2 bg-error/10 text-error rounded-xl text-[10px] font-black hover:bg-error/20 transition-all uppercase tracking-widest"
+                      disabled={u.email === 'exportacoes.extras@gmail.com'}
+                    >
+                      Remover Maestro
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {users.filter(u => u.role === 'admin').length === 0 && (
+                <tr>
+                  <td colSpan={3} className="p-8 text-center text-on-surface-variant">Nenhum administrador encontrado.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          
+          <div className="p-6 border-t border-outline-variant/20 bg-surface-container">
+            <h4 className="font-bold text-sm mb-4">Adicionar Novo Maestro</h4>
+            <div className="flex gap-4">
+              <select id="newAdminSelect" className="flex-1 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2 focus:outline-none focus:border-primary text-sm">
+                 <option value="">Selecione um usuário...</option>
+                 {users.filter(u => u.role !== 'admin' && u.status !== 'deleted').map(u => (
+                   <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                 ))}
+              </select>
+              <button 
+                onClick={() => {
+                  const select = document.getElementById('newAdminSelect') as HTMLSelectElement;
+                  if (select.value) {
+                    handleUpdateUser(select.value, { role: 'admin' });
+                    select.value = '';
+                  }
+                }}
+                className="px-6 py-2 bg-primary text-on-primary font-bold rounded-xl hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20"
+              >
+                Promover a Maestro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+           <div className="bg-surface-container border border-outline-variant/20 rounded-3xl p-8 max-w-lg w-full shadow-2xl">
+              <h3 className="text-xl font-bold mb-6">Editar Plano de <span className="text-primary">{editingUser.name || editingUser.email}</span></h3>
+              
+              <div className="space-y-4">
+                 <div>
+                   <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-2">Plano Definido</label>
+                   <select 
+                     id="editPlan" 
+                     className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm"
+                     defaultValue={editingUser.plan_type || 'Iniciante'}
+                   >
+                     <option value="Iniciante">Iniciante (Sem Acesso)</option>
+                     <option value="mensal_6">Mensal (6 Contas)</option>
+                     <option value="trimestral_6">Trimestral (6 Contas)</option>
+                     <option value="semestral_8">Semestral (8 Contas)</option>
+                     <option value="anual_16">Anual (16 Contas)</option>
+                     <option value="ilimitado">Maestro (Ilimitado & Sem Expiração)</option>
+                   </select>
+                 </div>
+                 
+                 <div>
+                   <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-2">Data de Expiração (Ano-Mês-Dia)</label>
+                   <input 
+                     id="editExpiry" 
+                     type="date"
+                     defaultValue={
+                       editingUser.plan_type === 'ilimitado' ? '' : 
+                       editingUser.expiry_date ? (editingUser.expiry_date.toDate ? editingUser.expiry_date.toDate().toISOString().split('T')[0] : new Date(editingUser.expiry_date).toISOString().split('T')[0]) : ''
+                     }
+                     className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm"
+                   />
+                 </div>
+              </div>
+
+              <div className="flex gap-4 mt-8">
+                 <button 
+                   onClick={() => setEditingUser(null)}
+                   className="flex-1 py-3 bg-surface-container-low hover:bg-surface-container-high transition-colors rounded-xl font-bold uppercase tracking-widest text-xs"
+                 >
+                   Cancelar
+                 </button>
+                 <button 
+                   onClick={() => {
+                      const plan = (document.getElementById('editPlan') as HTMLSelectElement).value;
+                      const dateVal = (document.getElementById('editExpiry') as HTMLInputElement).value;
+                      
+                      const updateData: any = { plan_type: plan };
+                      if (plan === 'ilimitado') {
+                         updateData.expiry_date = null;
+                      } else if (dateVal) {
+                         const time = new Date(dateVal);
+                         time.setHours(23, 59, 59);
+                         updateData.expiry_date = time.toISOString();
+                      }
+                      
+                      handleUpdateUser(editingUser.id, updateData);
+                      setEditingUser(null);
+                   }}
+                   className="flex-1 py-3 bg-primary text-on-primary hover:bg-primary-fixed-dim transition-colors rounded-xl font-bold uppercase tracking-widest text-xs"
+                 >
+                   Salvar Alterações
+                 </button>
+              </div>
+           </div>
         </div>
       )}
     </div>

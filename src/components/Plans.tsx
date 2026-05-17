@@ -203,15 +203,22 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   };
 
   return (
-    <div className={`p-8 max-w-7xl mx-auto min-h-screen animate-in fade-in duration-500 space-y-12 ${hideHeader ? 'min-h-fit py-0' : ''}`}>
+    <div className={`p-8 max-w-[1440px] mx-auto min-h-screen animate-in fade-in duration-500 space-y-12 ${hideHeader ? 'min-h-fit py-0' : ''}`}>
       {forcedExpired && (
-        <div className="bg-error/10 border border-error/50 p-6 rounded-3xl flex items-center gap-6 animate-pulse">
-          <div className="w-12 h-12 bg-error/20 rounded-full flex items-center justify-center text-error">
+        <div className="bg-error/10 border border-error/50 p-6 rounded-3xl flex items-center gap-6 animate-in slide-in-from-top duration-500">
+          <div className="w-14 h-14 bg-error/20 rounded-2xl flex items-center justify-center text-error shadow-lg shadow-error/10">
             <span className="material-symbols-outlined text-3xl">lock</span>
           </div>
           <div>
-            <h2 className="text-error font-black text-xl">Acesso Bloqueado: Assinatura Expirada</h2>
-            <p className="text-on-surface-variant text-sm">Para retomar o acesso, selecione um plano e realize o pagamento via transferência ou multicaixa.</p>
+            <h2 className="text-error font-black text-xl uppercase tracking-tighter">
+              {userPlan?.plan_type === 'Iniciante' ? 'Acesso Restrito: Plano Inativo' : 'Acesso Bloqueado: Assinatura Expirada'}
+            </h2>
+            <p className="text-on-surface-variant text-sm font-medium opacity-80">
+              {userPlan?.plan_type === 'Iniciante' 
+                ? 'Sua conta ainda não possui uma assinatura ativa. Escolha um plano abaixo para começar.' 
+                : 'Seu período de assinatura terminou. Renove agora para continuar gerenciando seus trades.'
+              }
+            </p>
           </div>
         </div>
       )}
@@ -225,63 +232,63 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6 overflow-visible">
         {finalPlans.map((plan) => (
           <div 
             key={plan.id}
-            className={`relative p-[40px_32px] rounded-[16px] border transition-all flex flex-col hover:-translate-y-[4px] ${
+            className={`relative p-[32px_20px] rounded-[24px] border transition-all flex flex-col hover:-translate-y-[6px] hover:z-20 hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] ${
               plan.featured 
-                ? 'bg-surface-container-high border-primary/30 shadow-[0_0_60px_rgba(0,245,160,0.07)]' 
-                : 'bg-surface-container border-outline hover:border-outline-variant'
+                ? 'bg-surface-container-high border-primary/40 shadow-[0_0_40px_rgba(0,245,160,0.08)] z-10' 
+                : 'bg-surface-container border-outline hover:border-outline-variant shadow-lg z-0'
             }`}
           >
             {plan.featured && (
-              <div className="absolute -top-[13px] left-1/2 -translate-x-1/2 bg-primary text-background text-[10px] font-extrabold py-[5px] px-[16px] rounded-[100px] uppercase tracking-[0.12em]">
+              <div className="absolute -top-[14px] left-1/2 -translate-x-1/2 bg-primary text-background text-[10px] font-black py-[5px] px-[18px] rounded-[100px] uppercase tracking-[0.15em] border border-primary/20 shadow-lg shadow-primary/20">
                 Best Choice
               </div>
             )}
 
-            <div className="mb-8">
-              <h3 className="text-[12px] font-bold tracking-[0.1em] uppercase text-on-surface-variant/70 mb-[12px]">{plan.name}</h3>
-              <div className="flex items-center gap-[8px] text-[14px] text-on-surface-variant/70 line-through mb-[2px]">
-                Kz {plan.oldPrice}
+            <div className="mb-6">
+              <h3 className="text-[10px] font-black tracking-[0.15em] uppercase text-on-surface-variant/70 mb-[16px]">{plan.name}</h3>
+              <div className="flex items-center gap-[6px] text-[12px] text-on-surface-variant/60 line-through mb-[4px]">
+                {plan.oldPrice} Kz
                 {plan.discount && (
-                  <span className="inline-block bg-[#ff4b6e]/15 border border-[#ff4b6e]/30 text-[#ff4b6e] text-[10px] font-extrabold tracking-[0.08em] uppercase px-[8px] py-[2px] rounded-[4px] no-underline">
+                  <span className="inline-block bg-[#ff4b6e]/15 border border-[#ff4b6e]/30 text-[#ff4b6e] text-[8px] font-black tracking-[0.08em] uppercase px-[6px] py-[1px] rounded-[4px] no-underline">
                     {plan.discount}
                   </span>
                 )}
               </div>
-              <div className="flex items-baseline gap-1 mb-[4px]">
-                <span className="text-[44px] font-extrabold font-headline leading-none text-on-surface">
-                  <sup className="text-[18px] font-semibold tracking-normal align-super">Kz</sup>
+              <div className="flex items-baseline gap-1.5 mb-[8px] overflow-visible">
+                <span className="text-[28px] xl:text-[32px] font-black font-headline tracking-tighter leading-none text-primary flex items-baseline drop-shadow-[0_4px_12px_rgba(0,245,160,0.15)]">
                   {plan.price}
+                  <span className="text-[12px] font-black tracking-widest ml-1.5 opacity-40 text-on-surface uppercase align-baseline">Kz</span>
                 </span>
                 {appliedCoupon && appliedCoupon.targetPlan === 'all' || appliedCoupon?.targetPlan === plan.id ? (
-                   <span className="text-xs text-primary font-bold ml-2 line-through opacity-50">Kz {plan.originalPriceStr}</span>
+                   <span className="text-[9px] text-on-surface-variant font-bold ml-1 line-through opacity-25 whitespace-nowrap">{plan.originalPriceStr} Kz</span>
                 ) : null}
               </div>
-              <div className="text-[12px] text-on-surface-variant/70 mb-[24px]">
+              <div className="text-[11px] font-medium text-on-surface-variant/60 mb-[18px] uppercase tracking-widest">
                 {plan.period}
               </div>
-              <div className="inline-flex items-center gap-[5px] bg-[#00f5a0]/10 border border-[#00f5a0]/20 text-[#00f5a0] text-[11px] font-bold px-[10px] py-[4px] rounded-[6px] mb-[16px]">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <div className="inline-flex items-center gap-[4px] bg-[#00f5a0]/10 border border-[#00f5a0]/20 text-[#00f5a0] text-[10px] font-bold px-[8px] py-[3px] rounded-[5px] mb-[12px]">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                 {plan.savingsText}
               </div>
-              <div className="flex items-center gap-[8px] text-[13px] text-on-surface-variant bg-[#00f5a0]/10 border border-[#00f5a0]/15 rounded-[8px] px-[14px] py-[10px] mb-[24px]">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#00f5a0] shrink-0"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                <span className="text-on-surface-variant">{plan.limits}</span>
+              <div className="flex items-center gap-[6px] text-[12px] text-on-surface-variant bg-[#00f5a0]/10 border border-[#00f5a0]/15 rounded-[8px] px-[12px] py-[8px] mb-[20px]">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#00f5a0] shrink-0"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span className="text-on-surface-variant leading-tight">{plan.limits}</span>
               </div>
             </div>
 
-            <hr className="border-t border-outline/50 my-[24px]" />
+            <hr className="border-t border-outline/30 my-[20px]" />
 
-            <ul className="flex flex-col gap-[12px] mb-[36px] flex-1 list-none">
+            <ul className="flex flex-col gap-[10px] mb-[30px] flex-1 list-none">
               {plan.features.map((feature, idx) => {
                  const isPrioritySupport = feature === 'Suporte Prioritário via WhatsApp';
                  return (
-                <li key={idx} className="flex items-center gap-[10px] text-[14px] text-on-surface-variant">
-                  <div className={`w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0 border ${isPrioritySupport ? 'bg-[#00f5a0]/25 border-[#00f5a0]/50' : 'bg-[#00f5a0]/10 border-[#00f5a0]/30'}`}>
-                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke={isPrioritySupport ? "var(--color-primary)" : "currentColor"} strokeWidth={isPrioritySupport ? "2.5" : "2"} className={isPrioritySupport ? "" : "text-[#00f5a0]"}>
+                <li key={idx} className="flex items-center gap-[8px] text-[13px] text-on-surface-variant leading-snug">
+                  <div className={`w-[16px] h-[16px] rounded-full flex items-center justify-center shrink-0 border ${isPrioritySupport ? 'bg-[#00f5a0]/25 border-[#00f5a0]/50' : 'bg-[#00f5a0]/10 border-[#00f5a0]/30'}`}>
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke={isPrioritySupport ? "var(--color-primary)" : "currentColor"} strokeWidth={isPrioritySupport ? "2.5" : "2"} className={isPrioritySupport ? "" : "text-[#00f5a0]"}>
                       <polyline points="2 6 5 9 10 3"/>
                     </svg>
                   </div>
@@ -299,19 +306,15 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                 }
               }}
               disabled={plan.current}
-              className={`w-full py-[14px] rounded-[10px] font-headline text-[13px] font-bold tracking-[0.08em] uppercase transition-all flex items-center justify-center border ${
+              className={`w-full py-[12px] rounded-[8px] font-headline text-[12px] font-bold tracking-[0.08em] uppercase transition-all flex items-center justify-center border ${
                 plan.current
                   ? 'bg-[#00f5a0]/10 text-[#00f5a0] border-[#00f5a0]/20 cursor-default'
                   : plan.featured
-                    ? 'bg-primary text-background border-transparent hover:bg-primary-fixed-dim shadow-[0_8px_30px_rgba(0,245,160,0.3)]'
+                    ? 'bg-primary text-background border-transparent hover:bg-primary-fixed-dim shadow-[0_8px_20px_rgba(0,245,160,0.25)]'
                     : 'bg-transparent text-on-surface border-outline-variant hover:bg-white/5'
               }`}
             >
-              {plan.current ? (
-                'Plano Ativo'
-              ) : (
-                'Adquirir Plano'
-              )}
+              {plan.current ? 'Plano Ativo' : 'Adquirir Plano'}
             </button>
           </div>
         ))}

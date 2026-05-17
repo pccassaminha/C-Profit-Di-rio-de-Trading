@@ -92,25 +92,37 @@ export default function Community() {
     if (!newPost.legend || !auth.currentUser) return;
     setIsSubmitting(true);
     try {
-      let finalImageUrl = newPost.imageUrl;
-      let finalImageUrls = newPost.imageUrls || [];
-
-      if (!finalImageUrl && finalImageUrls.length > 0) {
-        finalImageUrl = finalImageUrls[0];
-      }
-
+      let finalImageUrls = [...(newPost.imageUrls || [])];
+      
+      // Upload do arquivo selecionado se houver
       if (selectedFile) {
         const fileRef = ref(storage, `community/${auth.currentUser.uid}/${Date.now()}_${selectedFile.name}`);
         await uploadBytes(fileRef, selectedFile);
-        finalImageUrl = await getDownloadURL(fileRef);
-        // Ensure the uploaded image is also in the array if needed, but it's okay to just keep in finalImageUrl.
+        const uploadedUrl = await getDownloadURL(fileRef);
+        finalImageUrls.push(uploadedUrl);
       }
+      
+      // Se tiver algo no input de URL agora, adiciona
+      if (newPost.imageUrl.trim() && !finalImageUrls.includes(newPost.imageUrl.trim())) {
+        finalImageUrls.push(newPost.imageUrl.trim());
+      }
+      
+      // Formatar links do TradingView para imagem direta se possível
+      const formattedUrls = finalImageUrls.map(url => {
+         if (url.includes('tradingview.com/x/')) {
+            // Se for link do tipo /x/abcd/, muitas vezes /x/abcd.png funciona
+            if (!url.endsWith('.png')) return url + '.png';
+         }
+         return url;
+      });
+
+      let finalImageUrl = formattedUrls.length > 0 ? formattedUrls[0] : '';
 
       if (editingPostId) {
         await updateDoc(doc(db, 'community_posts', editingPostId), {
           legend: newPost.legend,
           imageUrl: finalImageUrl,
-          imageUrls: finalImageUrls,
+          imageUrls: formattedUrls,
           type: newPost.type,
           updatedAt: serverTimestamp()
         });
@@ -121,7 +133,7 @@ export default function Community() {
           userPhoto: auth.currentUser.photoURL || '',
           legend: newPost.legend,
           imageUrl: finalImageUrl,
-          imageUrls: finalImageUrls,
+          imageUrls: formattedUrls,
           type: newPost.type,
           likesCount: 0,
           commentsCount: 0,
@@ -134,7 +146,8 @@ export default function Community() {
       setSelectedFile(null);
       setPreviewUrl(null);
     } catch (err) {
-      console.error(err);
+      console.error("Error saving post:", err);
+      alert("Erro ao publicar. Verifique sua conexão ou o link da imagem.");
     } finally {
       setIsSubmitting(false);
     }
@@ -453,9 +466,15 @@ export default function Community() {
                     );
                   }
 
+                  // TradingView link handle
+                  let displayUrl = post.imageUrl;
+                  if (displayUrl.includes('tradingview.com/x/') && !displayUrl.endsWith('.png')) {
+                    displayUrl += '.png';
+                  }
+
                   return (
                     <img 
-                      src={post.imageUrl} 
+                      src={displayUrl} 
                       alt="Análise" 
                       className="w-full h-auto max-h-[300px] object-cover rounded-[32px] border border-outline-variant/5 bg-black/20" 
                       referrerPolicy="no-referrer"
@@ -628,22 +647,10 @@ export default function Community() {
                       placeholder="Colar link de imagem/vídeo e pressionar Enter ou '+'..."
                       className="flex-1 bg-surface-container-low border border-outline-variant/20 rounded-2xl px-6 py-4 text-on-surface focus:outline-none focus:border-primary transition-all text-sm"
                     />
-                    <button 
-                      onClick={() => {
-                        if (newPost.imageUrl) {
-                            setNewPost({ ...newPost, imageUrls: [...(newPost.imageUrls || []), newPost.imageUrl], imageUrl: '' });
-                        }
-                      }}
-                      type="button"
-                      className="w-14 rounded-2xl border border-outline-variant/20 flex items-center justify-center transition-all bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
-                    >
-                      <Plus size={24} />
-                    </button>
-                    
                     <input 
                       type="file"
                       ref={fileInputRef}
-                      accept="image/*"
+                      accept="image/*,video/*"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -657,7 +664,7 @@ export default function Community() {
                     
                     <button 
                       onClick={() => fileInputRef.current?.click()}
-                      title="Upload Imagem do Dispositivo"
+                      title="Upload do Dispositivo"
                       type="button"
                       className={`w-14 rounded-2xl border border-outline-variant/20 flex items-center justify-center transition-all ${previewUrl ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'}`}
                     >
@@ -682,24 +689,34 @@ export default function Community() {
                 
                 {/* Media Preview */}
                 {(newPost.imageUrl || previewUrl) && (
-                  <div className="relative rounded-3xl overflow-hidden border border-outline-variant/20 bg-black/20 animate-in zoom-in duration-300">
+                  <div className="relative rounded-3xl overflow-hidden border border-outline-variant/20 bg-black/20 animate-in zoom-in duration-300 min-h-[100px]">
                     {previewUrl ? (
-                      <img src={previewUrl} alt="Preview" className="w-full h-auto max-h-[300px] object-contain" />
+                      selectedFile?.type.startsWith('video/') ? (
+                        <video src={previewUrl} controls className="w-full h-auto max-h-[300px] object-contain" />
+                      ) : (
+                        <img src={previewUrl} alt="Preview" className="w-full h-auto max-h-[300px] object-contain" />
+                      )
                     ) : (
                       (() => {
                         const link = newPost.imageUrl.toLowerCase();
-                        if (link.includes('youtube.com') || link.includes('youtu.be')) {
-                          const videoId = link.includes('v=') ? link.split('v=')[1]?.split('&')[0] : link.split('/').pop();
-                          return (
-                            <div className="aspect-video w-full">
-                              <iframe 
-                                src={`https://www.youtube.com/embed/${videoId}`}
-                                className="w-full h-full"
-                                title="Video Preview"
-                              ></iframe>
-                            </div>
-                          );
+                        const isVideo = link.match(/\.(mp4|webm|ogg|mov)$/) || link.includes('youtube.com') || link.includes('youtu.be') || link.includes('vimeo.com');
+                        
+                        if (isVideo) {
+                           if (link.includes('youtube.com') || link.includes('youtu.be')) {
+                             const videoId = link.includes('v=') ? link.split('v=')[1]?.split('&')[0] : link.split('/').pop();
+                             return (
+                               <div className="aspect-video w-full">
+                                 <iframe 
+                                   src={`https://www.youtube.com/embed/${videoId}`}
+                                   className="w-full h-full"
+                                   title="Video Preview"
+                                 ></iframe>
+                               </div>
+                             );
+                           }
+                           return <video src={newPost.imageUrl} controls className="w-full h-auto max-h-[300px] object-contain" />;
                         }
+
                         return (
                           <img 
                             src={newPost.imageUrl} 
@@ -792,7 +809,12 @@ export default function Community() {
                     return <video src={viewingPost.imageUrl} controls className="w-full h-auto rounded-3xl shadow-lg bg-black/20" />;
                   }
 
-                  return <img src={viewingPost.imageUrl} alt="Análise" className="w-full h-auto rounded-3xl shadow-lg border border-outline-variant/10 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(viewingPost.imageUrl, '_blank')} referrerPolicy="no-referrer" />;
+                  let displayUrl = viewingPost.imageUrl;
+                  if (displayUrl.includes('tradingview.com/x/') && !displayUrl.endsWith('.png')) {
+                    displayUrl += '.png';
+                  }
+
+                  return <img src={displayUrl} alt="Análise" className="w-full h-auto rounded-3xl shadow-lg border border-outline-variant/10 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(viewingPost.imageUrl, '_blank')} referrerPolicy="no-referrer" />;
                 })()}
                 
                 {viewingPost.imageUrls?.filter(url => url !== viewingPost.imageUrl).map((mediaUrl, idx) => {

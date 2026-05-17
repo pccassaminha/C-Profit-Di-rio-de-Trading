@@ -54,7 +54,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
 
         <div className="flex items-center gap-[24px] flex-wrap justify-center animate-in slide-in-from-bottom-6 duration-700 delay-300 fill-mode-both">
           <button onClick={onRegisterClick} className="bg-primary text-on-primary border-none py-[16px] px-[36px] rounded-[10px] font-headline text-[14px] font-bold tracking-[0.08em] uppercase cursor-pointer transition-all inline-flex items-center gap-[10px] hover:bg-primary-fixed-dim hover:-translate-y-[2px] hover:shadow-[0_12px_40px_rgba(0,245,160,0.35)] group">
-            Criar Conta Gratuita
+            Criar Conta Agora
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="transition-transform group-hover:translate-x-[3px]">
               <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>

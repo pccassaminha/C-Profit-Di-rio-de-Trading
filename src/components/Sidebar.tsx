@@ -19,7 +19,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
       'semestral_6': 'Semestral',
       'anual_16': 'Anual',
       'Unlimited Elite': 'Unlimited Elite',
-      'Iniciante': 'Terminal Free'
+      'Iniciante': 'Sem Acesso'
     };
     return maps[type] || type;
   };
