@@ -232,39 +232,39 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6 overflow-visible">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 xl:gap-3 overflow-visible">
         {finalPlans.map((plan) => (
           <div 
             key={plan.id}
-            className={`relative p-[32px_20px] rounded-[24px] border transition-all flex flex-col hover:-translate-y-[6px] hover:z-20 hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] ${
+            className={`relative p-[24px_16px] rounded-[24px] border transition-all flex flex-col hover:-translate-y-[6px] hover:z-20 hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] ${
               plan.featured 
-                ? 'bg-surface-container-high border-primary/40 shadow-[0_0_40px_rgba(0,245,160,0.08)] z-10' 
+                ? 'bg-surface-container-high border-primary/40 shadow-[0_0_30px_rgba(0,245,160,0.06)] z-10' 
                 : 'bg-surface-container border-outline hover:border-outline-variant shadow-lg z-0'
             }`}
           >
             {plan.featured && (
-              <div className="absolute -top-[14px] left-1/2 -translate-x-1/2 bg-primary text-background text-[10px] font-black py-[5px] px-[18px] rounded-[100px] uppercase tracking-[0.15em] border border-primary/20 shadow-lg shadow-primary/20">
+              <div className="absolute -top-[12px] left-1/2 -translate-x-1/2 bg-primary text-background text-[9px] font-black py-[4px] px-[16px] rounded-[100px] uppercase tracking-[0.15em] border border-primary/20 shadow-lg shadow-primary/20">
                 Best Choice
               </div>
             )}
 
-            <div className="mb-6">
-              <h3 className="text-[10px] font-black tracking-[0.15em] uppercase text-on-surface-variant/70 mb-[16px]">{plan.name}</h3>
-              <div className="flex items-center gap-[6px] text-[12px] text-on-surface-variant/60 line-through mb-[4px]">
-                {plan.oldPrice} Kz
+            <div className="mb-4">
+              <h3 className="text-[9px] font-bold tracking-[0.15em] uppercase text-on-surface-variant/70 mb-[12px]">{plan.name}</h3>
+              <div className="flex items-center gap-[6px] text-[11px] text-on-surface-variant/60 line-through mb-[2px]">
+                {plan.oldPrice}
                 {plan.discount && (
-                  <span className="inline-block bg-[#ff4b6e]/15 border border-[#ff4b6e]/30 text-[#ff4b6e] text-[8px] font-black tracking-[0.08em] uppercase px-[6px] py-[1px] rounded-[4px] no-underline">
+                  <span className="inline-block bg-[#ff4b6e]/15 border border-[#ff4b6e]/30 text-[#ff4b6e] text-[8px] font-black tracking-[0.08em] uppercase px-[5px] py-[1px] rounded-[4px] no-underline">
                     {plan.discount}
                   </span>
                 )}
               </div>
-              <div className="flex items-baseline gap-1.5 mb-[8px] overflow-visible">
-                <span className="text-[28px] xl:text-[32px] font-black font-headline tracking-tighter leading-none text-primary flex items-baseline drop-shadow-[0_4px_12px_rgba(0,245,160,0.15)]">
+              <div className="flex items-baseline gap-1 mb-[4px] overflow-visible">
+                <span className="text-[20px] xl:text-[24px] font-black font-headline tracking-tighter leading-none text-primary flex items-baseline drop-shadow-[0_4px_12px_rgba(0,245,160,0.15)]">
                   {plan.price}
-                  <span className="text-[12px] font-black tracking-widest ml-1.5 opacity-40 text-on-surface uppercase align-baseline">Kz</span>
+                  <span className="text-[10px] font-black tracking-widest ml-1 opacity-50 text-on-surface uppercase align-baseline">Kz</span>
                 </span>
                 {appliedCoupon && appliedCoupon.targetPlan === 'all' || appliedCoupon?.targetPlan === plan.id ? (
-                   <span className="text-[9px] text-on-surface-variant font-bold ml-1 line-through opacity-25 whitespace-nowrap">{plan.originalPriceStr} Kz</span>
+                   <span className="text-[9px] text-on-surface-variant font-bold ml-1 line-through opacity-25 whitespace-nowrap">{plan.originalPriceStr}</span>
                 ) : null}
               </div>
               <div className="text-[11px] font-medium text-on-surface-variant/60 mb-[18px] uppercase tracking-widest">

@@ -388,11 +388,12 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
 
         // Also normalize trade.date so it's always YYYY-MM-DD in the database
         const normalizedTrade = { ...trade, date: dateForDay || trade.date };
+        const uid = auth.currentUser!.uid;
 
-        return addDoc(collection(db, 'trades'), {
+        return addDoc(collection(db, 'usuarios', uid, 'trades'), {
           ...normalizedTrade,
           accountId: tradeData.accountId,
-          userId: auth.currentUser!.uid,
+          userId: uid,
           dayOfWeek: resolvedDayOfWeek
         });
       });

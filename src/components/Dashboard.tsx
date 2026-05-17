@@ -312,8 +312,11 @@ export default function Dashboard() {
 
     setIsSaving(true);
     try {
+      const uid = auth.currentUser.uid;
       const integrationToken = Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
-      await addDoc(collection(db, 'accounts'), {
+      
+      // Save to subcollection (SaaS path)
+      await addDoc(collection(db, 'usuarios', uid, 'accounts'), {
         accountNumber: newAccount.accountNumber,
         broker: newAccount.broker,
         initialBalance: Number(newAccount.initialBalance),
@@ -324,9 +327,10 @@ export default function Dashboard() {
         tradeType: newAccount.tradeType,
         status: 'active',
         integrationToken,
-        userId: auth.currentUser.uid,
+        userId: uid,
         createdAt: serverTimestamp()
       });
+      
       setIsAddAccountModalOpen(false);
       setNewAccount({
         accountNumber: '',

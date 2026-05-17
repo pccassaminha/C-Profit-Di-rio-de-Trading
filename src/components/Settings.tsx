@@ -252,17 +252,37 @@ export default function Settings() {
         if (!auth.currentUser) return;
         
         try {
-          // Delete all trades
-          const tradesQuery = query(collection(db, 'trades'), where('userId', '==', auth.currentUser.uid));
-          const tradesSnapshot = await getDocs(tradesQuery);
-          const deleteTradesPromises = tradesSnapshot.docs.map(tradeDoc => deleteDoc(doc(db, 'trades', tradeDoc.id)));
-          await Promise.all(deleteTradesPromises);
+          const uid = auth.currentUser.uid;
+          
+          // 1. Delete all trades (both paths)
+          const tradesPromises: Promise<any>[] = [];
+          
+          // Root path
+          const qRootTrades = query(collection(db, 'trades'), where('userId', '==', uid));
+          const snapshotRootTrades = await getDocs(qRootTrades);
+          snapshotRootTrades.forEach(d => tradesPromises.push(deleteDoc(doc(db, 'trades', d.id))));
+          
+          // Subcollection path
+          const qSubTrades = collection(db, 'usuarios', uid, 'trades');
+          const snapshotSubTrades = await getDocs(qSubTrades);
+          snapshotSubTrades.forEach(d => tradesPromises.push(deleteDoc(doc(db, 'usuarios', uid, 'trades', d.id))));
+          
+          await Promise.all(tradesPromises);
 
-          // Delete all accounts
-          const accountsQuery = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
-          const accountsSnapshot = await getDocs(accountsQuery);
-          const deleteAccountsPromises = accountsSnapshot.docs.map(accDoc => deleteDoc(doc(db, 'accounts', accDoc.id)));
-          await Promise.all(deleteAccountsPromises);
+          // 2. Delete all accounts (both paths)
+          const accountsPromises: Promise<any>[] = [];
+          
+          // Root path
+          const qRootAcc = query(collection(db, 'accounts'), where('userId', '==', uid));
+          const snapshotRootAcc = await getDocs(qRootAcc);
+          snapshotRootAcc.forEach(d => accountsPromises.push(deleteDoc(doc(db, 'accounts', d.id))));
+          
+          // Subcollection path
+          const qSubAcc = collection(db, 'usuarios', uid, 'accounts');
+          const snapshotSubAcc = await getDocs(qSubAcc);
+          snapshotSubAcc.forEach(d => accountsPromises.push(deleteDoc(doc(db, 'usuarios', uid, 'accounts', d.id))));
+          
+          await Promise.all(accountsPromises);
 
           // Clear local storage
           localStorage.removeItem('app_date_format');
@@ -317,9 +337,19 @@ export default function Settings() {
       onConfirm: async () => {
         if (!auth.currentUser) return;
         try {
-          const tradesQuery = query(collection(db, 'trades'), where('userId', '==', auth.currentUser.uid));
-          const tradesSnapshot = await getDocs(tradesQuery);
-          const deletePromises = tradesSnapshot.docs.map(tradeDoc => deleteDoc(doc(db, 'trades', tradeDoc.id)));
+          const uid = auth.currentUser.uid;
+          const deletePromises: Promise<any>[] = [];
+          
+          // Root path
+          const qRoot = query(collection(db, 'trades'), where('userId', '==', uid));
+          const snapshotRoot = await getDocs(qRoot);
+          snapshotRoot.forEach(d => deletePromises.push(deleteDoc(doc(db, 'trades', d.id))));
+          
+          // Subcollection path
+          const qSub = collection(db, 'usuarios', uid, 'trades');
+          const snapshotSub = await getDocs(qSub);
+          snapshotSub.forEach(d => deletePromises.push(deleteDoc(doc(db, 'usuarios', uid, 'trades', d.id))));
+          
           await Promise.all(deletePromises);
           
           setModalConfig({
@@ -354,9 +384,19 @@ export default function Settings() {
       onConfirm: async () => {
         if (!auth.currentUser) return;
         try {
-          const accQuery = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
-          const accSnapshot = await getDocs(accQuery);
-          const deletePromises = accSnapshot.docs.map(accDoc => deleteDoc(doc(db, 'accounts', accDoc.id)));
+          const uid = auth.currentUser.uid;
+          const deletePromises: Promise<any>[] = [];
+          
+          // Root path
+          const qRoot = query(collection(db, 'accounts'), where('userId', '==', uid));
+          const snapshotRoot = await getDocs(qRoot);
+          snapshotRoot.forEach(d => deletePromises.push(deleteDoc(doc(db, 'accounts', d.id))));
+          
+          // Subcollection path
+          const qSub = collection(db, 'usuarios', uid, 'accounts');
+          const snapshotSub = await getDocs(qSub);
+          snapshotSub.forEach(d => deletePromises.push(deleteDoc(doc(db, 'usuarios', uid, 'accounts', d.id))));
+          
           await Promise.all(deletePromises);
           
           setModalConfig({
@@ -413,9 +453,19 @@ export default function Settings() {
       onConfirm: async () => {
         if (!auth.currentUser) return;
         try {
-          const tradesQuery = query(collection(db, 'trades'), where('userId', '==', auth.currentUser.uid), where('accountId', '==', accountId));
-          const tradesSnapshot = await getDocs(tradesQuery);
-          const deletePromises = tradesSnapshot.docs.map(tradeDoc => deleteDoc(doc(db, 'trades', tradeDoc.id)));
+          const uid = auth.currentUser.uid;
+          const deletePromises: Promise<any>[] = [];
+          
+          // Root path
+          const qRoot = query(collection(db, 'trades'), where('userId', '==', uid), where('accountId', '==', accountId));
+          const snapshotRoot = await getDocs(qRoot);
+          snapshotRoot.forEach(d => deletePromises.push(deleteDoc(doc(db, 'trades', d.id))));
+          
+          // Subcollection path
+          const qSub = query(collection(db, 'usuarios', uid, 'trades'), where('accountId', '==', accountId));
+          const snapshotSub = await getDocs(qSub);
+          snapshotSub.forEach(d => deletePromises.push(deleteDoc(doc(db, 'usuarios', uid, 'trades', d.id))));
+          
           await Promise.all(deletePromises);
           
           setModalConfig({
@@ -449,7 +499,22 @@ export default function Settings() {
       onCancel: closeModal,
       onConfirm: async () => {
         try {
-          await deleteDoc(doc(db, 'accounts', accountId));
+          const uid = auth.currentUser?.uid;
+          if (!uid) return;
+          
+          // Try both paths for deletion
+          try {
+            await deleteDoc(doc(db, 'accounts', accountId));
+          } catch (e) {
+            console.warn("Could not delete from root accounts, trying subcollection...");
+          }
+          
+          try {
+            await deleteDoc(doc(db, 'usuarios', uid, 'accounts', accountId));
+          } catch (e) {
+            console.warn("Could not delete from subcollection accounts.");
+          }
+
           setModalConfig({
             isOpen: true,
             title: "Sucesso",
