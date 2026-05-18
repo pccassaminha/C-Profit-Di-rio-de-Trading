@@ -355,9 +355,14 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
       return;
     }
 
-    // Check for duplicates
-    const existingTickets = new Set(trades.filter(t => t.accountId === tradeData.accountId).map(t => t.ticket));
-    const newTrades = tradesToSave.filter(t => !existingTickets.has(t.ticket));
+    // Check for duplicates - comparison using String to avoid type issues
+    const existingTickets = new Set(
+      trades
+        .filter(t => t.accountId === tradeData.accountId && t.ticket)
+        .map(t => String(t.ticket))
+    );
+    
+    const newTrades = tradesToSave.filter(t => !existingTickets.has(String(t.ticket)));
 
     if (newTrades.length === 0) {
       setModalConfig({
@@ -389,12 +394,17 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
         // Also normalize trade.date so it's always YYYY-MM-DD in the database
         const normalizedTrade = { ...trade, date: dateForDay || trade.date };
         const uid = auth.currentUser!.uid;
+        const ticketId = String(normalizedTrade.ticket);
 
-        return addDoc(collection(db, 'usuarios', uid, 'trades'), {
+        // Use setDoc with ticketId to ensure uniqueness (idempotency)
+        // If the same file is imported again, it will just update existing entries
+        return setDoc(doc(db, 'usuarios', uid, 'trades', ticketId), {
           ...normalizedTrade,
           accountId: tradeData.accountId,
           userId: uid,
-          dayOfWeek: resolvedDayOfWeek
+          dayOfWeek: resolvedDayOfWeek,
+          ticket: ticketId,
+          source: 'automatic' // Ensures the hook identifies it correctly
         });
       });
       await Promise.all(promises);

@@ -250,7 +250,7 @@ export default function Settings() {
       onCancel: closeModal,
       onConfirm: async () => {
         if (!auth.currentUser) return;
-        
+        setIsSaving(true);
         try {
           const uid = auth.currentUser.uid;
           
@@ -317,10 +317,12 @@ export default function Settings() {
           setModalConfig({
             isOpen: true,
             title: "Erro",
-            message: "Erro ao reiniciar o sistema.",
+            message: "Erro ao reiniciar o sistema. Verifique sua conexão.",
             isError: true,
             onConfirm: closeModal
           });
+        } finally {
+          setIsSaving(false);
         }
       }
     });
@@ -336,6 +338,7 @@ export default function Settings() {
       onCancel: closeModal,
       onConfirm: async () => {
         if (!auth.currentUser) return;
+        setIsSaving(true);
         try {
           const uid = auth.currentUser.uid;
           const deletePromises: Promise<any>[] = [];
@@ -364,10 +367,12 @@ export default function Settings() {
           setModalConfig({
             isOpen: true,
             title: "Erro",
-            message: "Erro ao zerar trades.",
+            message: "Erro ao zerar trades. Verifique sua conexão.",
             isError: true,
             onConfirm: closeModal
           });
+        } finally {
+          setIsSaving(false);
         }
       }
     });
@@ -383,6 +388,7 @@ export default function Settings() {
       onCancel: closeModal,
       onConfirm: async () => {
         if (!auth.currentUser) return;
+        setIsSaving(true);
         try {
           const uid = auth.currentUser.uid;
           const deletePromises: Promise<any>[] = [];
@@ -411,10 +417,12 @@ export default function Settings() {
           setModalConfig({
             isOpen: true,
             title: "Erro",
-            message: "Erro ao zerar contas.",
+            message: "Erro ao zerar contas. Verifique sua conexão.",
             isError: true,
             onConfirm: closeModal
           });
+        } finally {
+          setIsSaving(false);
         }
       }
     });
@@ -452,6 +460,7 @@ export default function Settings() {
       onCancel: closeModal,
       onConfirm: async () => {
         if (!auth.currentUser) return;
+        setIsSaving(true);
         try {
           const uid = auth.currentUser.uid;
           const deletePromises: Promise<any>[] = [];
@@ -480,10 +489,12 @@ export default function Settings() {
           setModalConfig({
             isOpen: true,
             title: "Erro",
-            message: "Erro ao zerar trades da conta.",
+            message: "Erro ao zerar trades da conta. Verifique sua conexão.",
             isError: true,
             onConfirm: closeModal
           });
+        } finally {
+          setIsSaving(false);
         }
       }
     });
