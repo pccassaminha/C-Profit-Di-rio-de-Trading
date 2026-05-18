@@ -465,20 +465,41 @@ async function parseMT5HTML(file: File, accountId: string) {
 // SECÇÃO 5 — DETECÇÃO AUTOMÁTICA DO TIPO DE FICHEIRO
 // ============================================================
 
+function detectAccountNumber(text: string): string | null {
+  // Pattern 1: MT5 "Account: 123456"
+  const mt5Match = text.match(/Account:\s*(\d+)/i);
+  if (mt5Match) return mt5Match[1];
+
+  // Pattern 2: MatchTrades HTML header table often has account info
+  const mtMatch = text.match(/Account\s*ID:\s*(\d+)/i) || text.match(/Account:\s*(\d+)/i);
+  if (mtMatch) return mtMatch[1];
+  
+  return null;
+}
+
 export async function importTradeFile(file: File, accountId: string) {
   if (!file) throw new Error('Nenhum ficheiro seleccionado.');
 
   const fileName = file.name.toLowerCase();
   const ext      = fileName.split('.').pop();
+  let detectedAccountId: string | null = null;
 
   if (ext === 'csv') {
     const text   = await readFileAsText(file, 'UTF-8');
-    return { ...parseMatchTradesCSV(text, accountId), source: 'MATCHTRADES_CSV' };
+    detectedAccountId = detectAccountNumber(text);
+    return { ...parseMatchTradesCSV(text, accountId), source: 'MATCHTRADES_CSV', detectedAccountId };
   }
 
   if (ext === 'html' || ext === 'htm') {
     let previewText = '';
     try { previewText = await readFileAsText(file, 'UTF-8'); } catch (_) {}
+    
+    // Check for weird encodings for detection
+    if (!previewText || previewText.includes('\x00')) {
+       try { previewText = await readFileAsText(file, 'UTF-16LE'); } catch (_) {}
+    }
+
+    detectedAccountId = detectAccountNumber(previewText);
 
     const isMT5 =
       previewText.includes('Trade History Report') ||
@@ -494,17 +515,17 @@ export async function importTradeFile(file: File, accountId: string) {
 
     if (isMT5) {
       const result = await parseMT5HTML(file, accountId);
-      return { ...result, source: 'MT5_HTML' };
+      return { ...result, source: 'MT5_HTML', detectedAccountId };
     }
 
     if (isMatchTrades) {
       const result = parseMatchTradesHTML(previewText, accountId);
-      return { ...result, source: 'MATCHTRADES_HTML' };
+      return { ...result, source: 'MATCHTRADES_HTML', detectedAccountId };
     }
 
     // Fallback
     const result = parseMatchTradesHTML(previewText, accountId);
-    return { ...result, source: 'MATCHTRADES_HTML' };
+    return { ...result, source: 'MATCHTRADES_HTML', detectedAccountId };
   }
 
   throw new Error(`Formato "${ext}" não suportado. Aceites: .csv, .html`);

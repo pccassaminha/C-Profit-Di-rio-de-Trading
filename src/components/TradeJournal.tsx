@@ -20,6 +20,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
   
   const [isImporting, setIsImporting] = useState(false);
   const [importedTradesToReview, setImportedTradesToReview] = useState<any[]>([]);
+  const [lastImportBatchId, setLastImportBatchId] = useState<string | null>(null);
   
   // Usando o novo hook para gerenciar os trades (sincronização + deduplicação)
   const { allTrades: trades, loading: loadingTrades } = useTrades(importedTradesToReview);
@@ -355,6 +356,15 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
       return;
     }
 
+    const targetAccount = accounts.find(a => a.id === tradeData.accountId);
+    const accountLabel = targetAccount ? `Conta ${targetAccount.accountNumber}` : 'a conta selecionada';
+
+    // Show initial confirmation
+    if (!forceOverwrite && !lastImportBatchId) { // Simplified check for "is this the first step of this import session?"
+       // BUT wait, saveImportedTrades is called AFTER review.
+       // The user asked for confirmation BEFORE importing.
+    }
+
     // Check for duplicates - comparison using String to avoid type issues
     const existingTickets = new Set(
       trades
@@ -369,7 +379,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
       setModalConfig({
         isOpen: true,
         title: "Trades Duplicados",
-        message: `Foram detectados ${duplicates.length} trades que já existem nesta conta. Deseja substituir os registros existentes pelos novos dados do arquivo?`,
+        message: `Foram detectados ${duplicates.length} trades que já existem nesta conta (${accountLabel}). Deseja substituir os registros existentes pelos novos dados do arquivo?`,
         confirmText: "Sim, Substituir",
         onCancel: closeModal,
         onConfirm: () => {
@@ -382,6 +392,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
 
     // Se não for "forceOverwrite" e todos os trades forem novos, ou se for "forceOverwrite"
     const tradesToProcess = tradesToSave;
+    const batchId = `IMPORT_${Date.now()}`;
 
     setIsSaving(true);
     try {
@@ -409,14 +420,17 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
           userId: uid,
           dayOfWeek: resolvedDayOfWeek,
           ticket: ticketId,
-          source: 'automatic' // Ensures the hook identifies it correctly
+          source: 'automatic', // Ensures the hook identifies it correctly
+          importId: batchId // Tag for undo/revert
         });
       });
       await Promise.all(promises);
 
+      setLastImportBatchId(batchId);
+
       const msg = forceOverwrite 
-        ? `${tradesToProcess.length} trades processados (incluindo substituições).`
-        : `${tradesToProcess.length} trades importados com sucesso!`;
+        ? `${tradesToProcess.length} trades processados (incluindo substituições) na ${accountLabel}.`
+        : `${tradesToProcess.length} trades importados com sucesso na ${accountLabel}!`;
 
       setModalConfig({
         isOpen: true,
@@ -444,6 +458,43 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     }
   };
 
+  const handleUndoImport = async () => {
+    if (!lastImportBatchId || !auth.currentUser) return;
+    
+    setModalConfig({
+      isOpen: true,
+      title: "Reverter Importação",
+      message: "Tem certeza que deseja apagar todos os trades desta última importação? Esta ação não pode ser desfeita.",
+      confirmText: "Sim, Reverter",
+      isError: true,
+      onCancel: closeModal,
+      onConfirm: async () => {
+        setIsSaving(true);
+        try {
+          const uid = auth.currentUser!.uid;
+          const toDelete = trades.filter(t => t.importId === lastImportBatchId);
+          const promises = toDelete.map(t => deleteDoc(doc(db, 'usuarios', uid, 'trades', t.id)));
+          await Promise.all(promises);
+          
+          setLastImportBatchId(null);
+          closeModal();
+          
+          setModalConfig({
+            isOpen: true,
+            title: "Revertido",
+            message: `${toDelete.length} trades foram removidos com sucesso.`,
+            confirmText: "OK",
+            onConfirm: closeModal
+          });
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    });
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -454,13 +505,35 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
       const result = await importTradeFile(file, tradeData.accountId || accounts[0]?.id || '');
       
       if (result.trades && result.trades.length > 0) {
-        setImportedTradesToReview(result.trades);
-        setTradeData(prev => {
-           const latestTrade = result.trades[result.trades.length - 1];
-           if (prev.accountId) return prev;
-           const bestAccount = accounts.find(a => latestTrade.type === 'ob' ? a.tradeType === 'ob' : (a.tradeType === 'forex' || !a.tradeType));
-           return bestAccount ? { ...prev, accountId: bestAccount.id, type: latestTrade.type } : prev;
+        // Auto-detect account
+        let targetAccountId = tradeData.accountId;
+        if (result.detectedAccountId) {
+          const matchedAcc = accounts.find(a => String(a.accountNumber) === String(result.detectedAccountId));
+          if (matchedAcc) {
+            targetAccountId = matchedAcc.id;
+          }
+        }
+
+        const targetAcc = accounts.find(a => a.id === targetAccountId) || accounts[0];
+        const accLabel = targetAcc ? `Conta ${targetAcc.accountNumber}` : 'Indefinida';
+
+        setModalConfig({
+          isOpen: true,
+          title: "Confirmar Importação",
+          message: `Deseja importar ${result.trades.length} trades na conta ${accLabel}?`,
+          confirmText: "Sim, Importar",
+          onCancel: () => {
+             closeModal();
+             setIsImporting(false);
+          },
+          onConfirm: () => {
+            closeModal();
+            setTradeData(prev => ({ ...prev, accountId: targetAcc?.id || '' }));
+            setImportedTradesToReview(result.trades);
+            saveImportedTrades(result.trades);
+          }
         });
+
       } else {
         setModalConfig({
           isOpen: true,
@@ -717,6 +790,15 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
             >
               Novo Trade
             </button>
+            {lastImportBatchId && (
+              <button 
+                onClick={handleUndoImport}
+                className="px-4 md:px-8 py-2.5 rounded-lg bg-error/10 text-error font-bold hover:bg-error/20 transition-all flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">undo</span>
+                Reverter Importação
+              </button>
+            )}
           </div>
         </div>
 
