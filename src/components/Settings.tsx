@@ -269,7 +269,28 @@ export default function Settings() {
           
           await Promise.all(tradesPromises);
 
-          // 2. Delete all accounts (both paths)
+          // 2. Delete all withdrawals
+          const withdrawalsPromises: Promise<any>[] = [];
+          const qWith = query(collection(db, 'withdrawals'), where('userId', '==', uid));
+          const snapWith = await getDocs(qWith);
+          snapWith.forEach(d => withdrawalsPromises.push(deleteDoc(doc(db, 'withdrawals', d.id))));
+          await Promise.all(withdrawalsPromises);
+
+          // 3. Delete all psychology notes
+          const psyPromises: Promise<any>[] = [];
+          const qPsy = query(collection(db, 'psychology_notes'), where('userId', '==', uid));
+          const snapPsy = await getDocs(qPsy);
+          snapPsy.forEach(d => psyPromises.push(deleteDoc(doc(db, 'psychology_notes', d.id))));
+          await Promise.all(psyPromises);
+
+          // 4. Delete all planning entries
+          const planPromises: Promise<any>[] = [];
+          const qPlan = query(collection(db, 'planning'), where('userId', '==', uid));
+          const snapPlan = await getDocs(qPlan);
+          snapPlan.forEach(d => planPromises.push(deleteDoc(doc(db, 'planning', d.id))));
+          await Promise.all(planPromises);
+
+          // 5. Delete all accounts (both paths)
           const accountsPromises: Promise<any>[] = [];
           
           // Root path
@@ -357,10 +378,13 @@ export default function Settings() {
           
           setModalConfig({
             isOpen: true,
-            title: "Sucesso",
-            message: "Diário de trades zerado com sucesso.",
-            confirmText: "OK",
-            onConfirm: closeModal
+            title: "Sistema Limpo",
+            message: "Todos os seus trades foram eliminados definitivamente do banco de dados (Cloud Firestore).",
+            confirmText: "Entendido",
+            onConfirm: () => {
+              closeModal();
+              window.location.reload();
+            }
           });
         } catch (error) {
           console.error("Error deleting trades:", error);

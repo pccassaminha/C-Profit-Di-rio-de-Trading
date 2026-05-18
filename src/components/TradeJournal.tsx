@@ -342,7 +342,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     return new Date(`${year}-${month}-${day}T00:00:00`);
   };
 
-  const saveImportedTrades = async (tradesToSave: any[]) => {
+  const saveImportedTrades = async (tradesToSave: any[], forceOverwrite = false) => {
     if (!auth.currentUser) return;
     if (!tradeData.accountId) {
       setModalConfig({
@@ -362,25 +362,30 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
         .map(t => String(t.ticket))
     );
     
-    const newTrades = tradesToSave.filter(t => !existingTickets.has(String(t.ticket)));
+    const duplicates = tradesToSave.filter(t => existingTickets.has(String(t.ticket)));
 
-    if (newTrades.length === 0) {
+    // Se houver duplicados e o usuário ainda não confirmou a substituição
+    if (duplicates.length > 0 && !forceOverwrite) {
       setModalConfig({
         isOpen: true,
-        title: "Aviso",
-        message: "Todos os trades deste arquivo já foram importados anteriormente para esta conta.",
-        isError: true,
+        title: "Trades Duplicados",
+        message: `Foram detectados ${duplicates.length} trades que já existem nesta conta. Deseja substituir os registros existentes pelos novos dados do arquivo?`,
+        confirmText: "Sim, Substituir",
+        onCancel: closeModal,
         onConfirm: () => {
-           closeModal();
-           setImportedTradesToReview([]);
+          closeModal();
+          saveImportedTrades(tradesToSave, true);
         }
       });
       return;
     }
 
+    // Se não for "forceOverwrite" e todos os trades forem novos, ou se for "forceOverwrite"
+    const tradesToProcess = tradesToSave;
+
     setIsSaving(true);
     try {
-      const promises = newTrades.map(trade => {
+      const promises = tradesToProcess.map(trade => {
         let dateForDay = trade.date ? trade.date.replace(/\./g, '-').replace(/\//g, '-') : null;
         if (dateForDay && dateForDay.split('-').length === 3) {
           const parts = dateForDay.split('-');
@@ -408,11 +413,11 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
         });
       });
       await Promise.all(promises);
-      const skipped = tradesToSave.length - newTrades.length;
-      let msg = `${newTrades.length} trades importados com sucesso!`;
-      if (skipped > 0) {
-          msg += `\n${skipped} trades foram ignorados pois já existem na conta.`;
-      }
+
+      const msg = forceOverwrite 
+        ? `${tradesToProcess.length} trades processados (incluindo substituições).`
+        : `${tradesToProcess.length} trades importados com sucesso!`;
+
       setModalConfig({
         isOpen: true,
         title: "Sucesso",
@@ -819,10 +824,13 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                                 <p className="text-xs text-on-surface-variant">Sessão</p>
                                 <p className="text-sm font-bold text-on-surface">{trade.session}</p>
                               </div>
+                              {/* R:R hidden as per user request to avoid layout deformation */}
+                              {/* 
                               <div className="hidden md:block text-right">
                                 <p className="text-xs text-on-surface-variant">R:R</p>
                                 <p className="text-sm font-bold text-primary">{trade.rr ? `1:${trade.rr}` : '-'}</p>
                               </div>
+                              */}
                               <div className="text-right">
                                 <p className="text-xs text-on-surface-variant">P&L</p>
                                 <p className={`font-bold ${trade.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
@@ -970,12 +978,15 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 {selectedTrade.type === 'ob' ? (selectedTrade.action === 'Buy' ? 'Acima (Call)' : 'Abaixo (Put)') : selectedTrade.action}
               </p>
             </div>
+            {/* R:R hidden as per user request to avoid layout deformation */}
+            {/* 
             <div>
               <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">R:R</p>
               <p className="text-xl font-bold text-primary">
                 {selectedTrade.rr ? `1:${selectedTrade.rr}` : '-'}
               </p>
             </div>
+            */}
             <div>
               <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">P&L</p>
               <p className={`text-xl font-bold ${selectedTrade.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>

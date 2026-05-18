@@ -20,10 +20,6 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isDataOwner() {
-      return isAuthenticated() && resource != null && resource.data != null && resource.data.userId == request.auth.uid;
-    }
-
     function isStaticSuperAdmin() {
       return isAuthenticated() && request.auth.token.email == 'exportacoes.extras@gmail.com';
     }
@@ -36,16 +32,20 @@ service cloud.firestore {
       );
     }
 
+    function canReadData() {
+      return isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // ===============================================================
     // Collection Rules
     // ===============================================================
 
     // User Profiles / Billing
     match /user_profiles/{profileId} {
-      allow get: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow list: if isAuthenticated() && (isStaticSuperAdmin() || resource.data.userId == request.auth.uid);
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isStaticSuperAdmin());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow delete: if isStaticSuperAdmin();
     }
 
@@ -57,11 +57,9 @@ service cloud.firestore {
 
     // Payments
     match /payments/{paymentId} {
-      allow get: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow list: if isAuthenticated() && (isStaticSuperAdmin() || resource.data.userId == request.auth.uid);
+      allow get, list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow update, delete: if isAdmin();
     }
 
     // Community
@@ -71,7 +69,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
         isAdmin() || 
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount']))
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'commentsCount']))
       );
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
 
@@ -85,6 +83,12 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow write: if isAuthenticated() && request.auth.uid == userId;
       }
+    }
+
+    // Broadcasts (Avisos)
+    match /broadcasts/{broadcastId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
     // User Profile - Both paths for compatibility
@@ -108,32 +112,32 @@ service cloud.firestore {
       }
     }
 
-    // Accounts
+    // Legacy Accounts
     match /accounts/{accountId} {
-      allow get, list: if isDataOwner() || isAdmin();
+      allow get, list: if canReadData();
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isDataOwner() || isAdmin();
+      allow update, delete: if canReadData();
     }
 
     // Legacy Trades
     match /trades/{tradeId} {
-      allow get, list: if isDataOwner() || isAdmin();
+      allow get, list: if canReadData();
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isDataOwner() || isAdmin();
+      allow update, delete: if canReadData();
     }
 
     // Withdrawals
     match /withdrawals/{withdrawalId} {
-      allow get, list: if isDataOwner() || isAdmin();
+      allow get, list: if canReadData();
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isDataOwner() || isAdmin();
+      allow update, delete: if canReadData();
     }
 
     // Psychology Notes
     match /psychology_notes/{noteId} {
-      allow get, list: if isDataOwner();
+      allow get, list: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isDataOwner();
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
     // Coupons
@@ -144,9 +148,9 @@ service cloud.firestore {
 
     // Planning
     match /planning/{entryId} {
-      allow get, list: if isDataOwner();
+      allow get, list: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isDataOwner();
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
   }
 }

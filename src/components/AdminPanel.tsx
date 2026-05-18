@@ -297,6 +297,61 @@ export default function AdminPanel() {
         </div>
       </div>
 
+      {activeTab === 'users' && isSuperAdmin && (
+        <div className="bg-error/5 border border-error/20 rounded-3xl p-6 mb-8">
+           <div className="flex items-center gap-4 mb-4 text-error">
+             <AlertTriangle size={24} />
+             <h3 className="font-bold text-lg font-headline uppercase italic">Zona de Perigo Extremo (Super Admin)</h3>
+           </div>
+           <p className="text-sm text-on-surface-variant mb-6">
+             Como Super Administrador, podes realizar limpezas globais no banco de dados. Estas ações são IRREVERSÍVEIS.
+           </p>
+           <div className="flex flex-wrap gap-4">
+             <button 
+               onClick={async () => {
+                 if (!window.confirm('CUIDADO: Desejas apagar TODOS os trades de TODOS os usuários do banco de dados?')) return;
+                 setLoading(true);
+                 try {
+                    const snap = await getDocs(collection(db, 'trades'));
+                    const p = snap.docs.map(d => deleteDoc(d.ref));
+                    await Promise.all(p);
+                    alert('Limpeza de trades (root) concluída.');
+                 } catch (e) {
+                    console.error(e);
+                    alert('Erro na limpeza global.');
+                 } finally {
+                    setLoading(false);
+                 }
+               }}
+               className="bg-error text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-lg"
+             >
+               Apagar Todos os Trades (Global)
+             </button>
+
+             <button 
+               onClick={async () => {
+                 if (!window.confirm('CUIDADO: Desejas apagar TODAS as notificações/comunicados (broadcasts)?')) return;
+                 setLoading(true);
+                 try {
+                    const snap = await getDocs(collection(db, 'broadcasts'));
+                    const p = snap.docs.map(d => deleteDoc(d.ref));
+                    await Promise.all(p);
+                    alert('Broadcasts limpos.');
+                 } catch (e) {
+                    console.error(e);
+                    alert('Erro na limpeza.');
+                 } finally {
+                    setLoading(false);
+                 }
+               }}
+               className="bg-surface-container-high text-on-surface px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-surface-container-highest transition-all"
+             >
+               Limpar Comunicados
+             </button>
+           </div>
+        </div>
+      )}
+
       {activeTab === 'users' && (
         <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
           <table className="w-full text-left border-collapse">

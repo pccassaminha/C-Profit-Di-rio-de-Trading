@@ -1077,12 +1077,15 @@ export default function Dashboard() {
                 <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Taxa de Acerto</p>
                 <p className="text-on-surface font-bold text-2xl md:text-4xl">{data.winRate}%</p>
               </div>
+              {/* RR Médio hidden as per user request to avoid layout deformation */}
+              {/* 
               {tradeTypeFilter !== 'ob' && (
                 <div className="pb-6 lg:pb-0 border-b lg:border-b-0 border-outline-variant/20">
                   <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Risco/Retorno Médio</p>
                   <p className="text-on-surface font-bold text-2xl md:text-4xl">1:{data.averageRr}</p>
                 </div>
-              )}
+              )} 
+              */}
             </>
           )}
           <div>
@@ -1747,7 +1750,8 @@ export default function Dashboard() {
                     <th className="font-normal pb-4">Action</th>
                     <th className="font-normal pb-4">Profit/Loss</th>
                     {tradeTypeFilter !== 'ob' && <th className="font-normal pb-4">Commission</th>}
-                    {tradeTypeFilter !== 'ob' && <th className="font-normal pb-4">R:R</th>}
+                    {/* R:R hidden as per user request to avoid layout deformation */}
+                    {/* {tradeTypeFilter !== 'ob' && <th className="font-normal pb-4">R:R</th>} */}
                     {tradeTypeFilter !== 'ob' && <th className="font-normal pb-4">Swap</th>}
                     <th className="font-normal pb-4">Symbol</th>
                     <th className="font-normal pb-4">Price</th>
@@ -1767,7 +1771,8 @@ export default function Dashboard() {
                       {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl)}
                     </td>
                     {tradeTypeFilter !== 'ob' && <td className="py-5 px-4 text-on-surface-variant whitespace-nowrap">{trade.commission?.toFixed(1) || '0.0'}</td>}
-                    {tradeTypeFilter !== 'ob' && <td className="py-5 px-4 text-on-surface-variant whitespace-nowrap text-primary font-bold">{trade.rr ? `1:${trade.rr}` : '-'}</td>}
+                    {/* R:R hidden as per user request to avoid layout deformation */}
+                    {/* {tradeTypeFilter !== 'ob' && <td className="py-5 px-4 text-on-surface-variant whitespace-nowrap text-primary font-bold">{trade.rr ? `1:${trade.rr}` : '-'}</td>} */}
                     {tradeTypeFilter !== 'ob' && <td className="py-5 px-4 text-on-surface-variant whitespace-nowrap">{trade.swap?.toFixed(1) || '0.0'}</td>}
                     <td className="py-5 px-4 text-on-surface whitespace-nowrap">{trade.symbol}</td>
                     <td className="py-5 px-4 text-on-surface whitespace-nowrap">${trade.openPrice?.toFixed(2)}</td>
