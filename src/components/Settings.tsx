@@ -240,6 +240,124 @@ export default function Settings() {
     }
   };
 
+  const [selectedDateToDelete, setSelectedDateToDelete] = useState(new Date().toISOString().split('T')[0]);
+
+  const handleUndoLastImport = () => {
+    const lastBatchId = localStorage.getItem('app_last_import_batch_id');
+    if (!lastBatchId) {
+      setModalConfig({
+        isOpen: true,
+        title: "Nenhuma Importação encontrada",
+        message: "Não foram encontradas informações sobre a última importação neste navegador.",
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
+      return;
+    }
+
+    setModalConfig({
+      isOpen: true,
+      title: "Reverter Última Importação",
+      message: "Deseja apagar permanentemente todos os trades inseridos na última importação?",
+      confirmText: "Sim, Reverter",
+      isError: true,
+      onCancel: closeModal,
+      onConfirm: async () => {
+        if (!auth.currentUser) return;
+        setIsSaving(true);
+        try {
+          const uid = auth.currentUser.uid;
+          const tradesRef = collection(db, 'usuarios', uid, 'trades');
+          const q = query(tradesRef, where('importId', '==', lastBatchId));
+          const snap = await getDocs(q);
+          
+          if (snap.empty) {
+            setModalConfig({
+              isOpen: true,
+              title: "Aviso",
+              message: "Nenhum trade encontrado para este ID de importação. Pode ser que já tenham sido apagados.",
+              confirmText: "OK",
+              onConfirm: closeModal
+            });
+            return;
+          }
+
+          const deletePromises = snap.docs.map(d => deleteDoc(d.ref));
+          await Promise.all(deletePromises);
+          
+          localStorage.removeItem('app_last_import_batch_id');
+          
+          setModalConfig({
+            isOpen: true,
+            title: "Sucesso",
+            message: `${snap.size} trades foram removidos.`,
+            confirmText: "OK",
+            onConfirm: () => {
+               closeModal();
+               window.location.reload();
+            }
+          });
+        } catch (error) {
+          console.error(error);
+          alert('Erro ao reverter importação.');
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    });
+  };
+
+  const handleDeleteByDate = () => {
+    setModalConfig({
+      isOpen: true,
+      title: "Limpar por Data",
+      message: `Tem certeza que deseja apagar TODOS os trades realizados no dia ${selectedDateToDelete.split('-').reverse().join('/')}?`,
+      confirmText: "Sim, Apagar Dia",
+      isError: true,
+      onCancel: closeModal,
+      onConfirm: async () => {
+        if (!auth.currentUser) return;
+        setIsSaving(true);
+        try {
+          const uid = auth.currentUser.uid;
+          const tradesRef = collection(db, 'usuarios', uid, 'trades');
+          const q = query(tradesRef, where('date', '==', selectedDateToDelete));
+          const snap = await getDocs(q);
+          
+          if (snap.empty) {
+            setModalConfig({
+              isOpen: true,
+              title: "Nenhum Trade",
+              message: "Não foram encontrados trades para a data selecionada.",
+              confirmText: "OK",
+              onConfirm: closeModal
+            });
+            return;
+          }
+
+          const deletePromises = snap.docs.map(d => deleteDoc(d.ref));
+          await Promise.all(deletePromises);
+          
+          setModalConfig({
+            isOpen: true,
+            title: "Limpeza Concluída",
+            message: `${snap.size} trades foram apagados do dia selecionado.`,
+            confirmText: "OK",
+            onConfirm: () => {
+               closeModal();
+               window.location.reload();
+            }
+          });
+        } catch (error) {
+          console.error(error);
+          alert('Erro ao limpar trades.');
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    });
+  };
+
   const handleResetSystem = () => {
     setModalConfig({
       isOpen: true,
@@ -1271,7 +1389,48 @@ export default function Settings() {
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
               >
                 <div className="px-6 pb-6 pt-0 border-t border-error/10 mt-6 md:mt-0">
-                  <div className="flex flex-col md:flex-row gap-4 pt-6">
+                  {/* Gestão Específica */}
+                  <div className="bg-surface-container rounded-2xl p-6 border border-outline-variant/10 mt-6 mb-8">
+                    <h4 className="text-on-surface font-bold mb-4 flex items-center gap-2">
+                      <Zap size={18} className="text-primary" />
+                      Gestão de Histórico e Importações
+                    </h4>
+                    <p className="text-xs text-on-surface-variant mb-6">Limpeza cirúrgica de dados sem afetar o resto da conta.</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/5">
+                        <p className="text-sm font-bold text-on-surface mb-1">Reverter Última Importação</p>
+                        <p className="text-[10px] text-on-surface-variant mb-4 lowercase">Apaga apenas os trades carregados no último arquivo importado.</p>
+                        <button 
+                          onClick={handleUndoLastImport}
+                          className="w-fit bg-error/10 text-error px-4 py-2 rounded-lg text-xs font-bold hover:bg-error/20 transition-all flex items-center gap-2"
+                        >
+                          <span className="material-symbols-outlined text-sm">undo</span>
+                          Desfazer Importação
+                        </button>
+                      </div>
+
+                      <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/5">
+                        <p className="text-sm font-bold text-on-surface mb-3">Limpar trades de um Dia Específico</p>
+                        <div className="flex gap-2">
+                          <input 
+                            type="date" 
+                            value={selectedDateToDelete}
+                            onChange={(e) => setSelectedDateToDelete(e.target.value)}
+                            className="bg-surface-container-highest border-none text-on-surface px-3 py-2 rounded-lg text-xs outline-none focus:ring-1 focus:ring-primary/30"
+                          />
+                          <button 
+                            onClick={handleDeleteByDate}
+                            className="bg-error text-white px-4 py-2 rounded-lg text-xs font-bold hover:brightness-110 transition-all shadow-sm"
+                          >
+                            Eliminar Dia
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-4 pt-0">
                     <div className="relative group/btn-accounts flex-1">
                       <button 
                         onClick={handleResetAccounts}

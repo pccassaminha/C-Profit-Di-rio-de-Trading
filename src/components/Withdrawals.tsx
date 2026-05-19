@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
+import { useTrades } from '../hooks/useTrades';
 import { DateRangePicker } from './DateRangePicker';
 import { DatePicker } from './DatePicker';
 import { DateRange } from 'react-day-picker';
@@ -9,7 +10,7 @@ import { DateRange } from 'react-day-picker';
 export default function Withdrawals() {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [trades, setTrades] = useState<any[]>([]);
+  const { allTrades: trades, loading: loadingTrades } = useTrades();
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -63,15 +64,6 @@ export default function Withdrawals() {
     );
     unsubscribes.push(onSnapshot(withdrawalsQuery, (snapshot) => {
       setWithdrawals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }));
-
-    // --- TRADES ---
-    const tradesQuery = query(
-      collection(db, 'trades'),
-      where('userId', '==', auth.currentUser.uid)
-    );
-    unsubscribes.push(onSnapshot(tradesQuery, (snapshot) => {
-      setTrades(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }));
 
     return () => unsubscribes.forEach(unsub => unsub());
@@ -165,7 +157,7 @@ export default function Withdrawals() {
           <p className="text-4xl font-bold text-secondary">{formatCurrency(totalWithdrawn)}</p>
         </div>
         <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-          <h3 className="text-on-surface-variant font-bold text-sm uppercase tracking-wider mb-2">Saldo Restante Geral</h3>
+          <h3 className="text-on-surface-variant font-bold text-sm uppercase tracking-wider mb-2">Capital Geral (Disponível para Levantamento)</h3>
           <p className="text-4xl font-bold text-primary">{formatCurrency(remainingBalance)}</p>
         </div>
       </div>

@@ -9,7 +9,7 @@ import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Download, MoreVertical } from 'lucide-react';
+import { Download, MoreVertical, AlertTriangle } from 'lucide-react';
 
 // --- COMPONENTES AUXILIARES ---
 function CalendarCell({ date, muted, trades, pnl, isWin, isLoss, active }: any) {
@@ -478,6 +478,7 @@ export default function Dashboard() {
     let totalTrades = 0;
     let totalWins = 0;
     let totalPnl = 0;
+    let totalLossSum = 0; // NEW
     let totalRr = 0;
     let tradesWithRr = 0;
     
@@ -557,6 +558,7 @@ export default function Dashboard() {
     tradesToProcess.forEach(trade => {
       totalTrades += 1;
       if (trade.pnl > 0) totalWins += 1;
+      if (trade.pnl < 0) totalLossSum += Math.abs(trade.pnl); // NEW
       totalPnl += trade.pnl;
       if (trade.rr && !isNaN(Number(trade.rr))) {
         totalRr += Number(trade.rr);
@@ -810,6 +812,7 @@ export default function Dashboard() {
       maxLossPeriod,
       totalBalance, 
       totalPnl,
+      totalLossSum, // NEW
       todayPnl,
       totalTrades, 
       winRate, 
@@ -835,7 +838,9 @@ export default function Dashboard() {
       analysisPredominantPsychology,
       analysisBestTimeframes,
       analysisBestDaysOfWeek,
-      analysisTotalTrades
+      analysisTotalTrades,
+      pairsMap, // NEW
+      setupsMap // NEW
     };
   }, [selectedAccount, calendarDate, accounts, trades, analysisDateRange, tradeTypeFilter, objectives, withdrawals]);
 
@@ -895,6 +900,28 @@ export default function Dashboard() {
   const prevDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1);
   const prevMonthName = prevDate.toLocaleString('pt-BR', { month: 'long' });
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const [sortPairBy, setSortPairBy] = useState<'pnl' | 'trades' | 'winRate'>('pnl');
+  const [sortSetupBy, setSortSetupBy] = useState<'pnl' | 'trades' | 'winRate'>('pnl');
+  const [analysisMetric, setAnalysisMetric] = useState<'losses' | 'gains' | 'net'>('net');
+
+  const sortedPairs = useMemo(() => {
+    return Object.entries(data.pairsMap || {})
+      .map(([name, stats]: any) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
+      .sort((a, b) => {
+        if (sortPairBy === 'pnl') return a.pnl - b.pnl; // Sort by worst PnL by default 
+        if (sortPairBy === 'trades') return b.total - a.total;
+        return b.winRate - a.winRate;
+      });
+  }, [data.pairsMap, sortPairBy]);
+
+  const worstPairs = useMemo(() => {
+    return Object.entries(data.pairsMap || {})
+      .map(([name, stats]: any) => ({ name, ...stats }))
+      .filter(p => p.pnl < 0)
+      .sort((a, b) => a.pnl - b.pnl) // Biggest losses first
+      .slice(0, 5);
+  }, [data.pairsMap]);
 
   const handleMulticaixa = () => {
     window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'plans' }));
@@ -1060,7 +1087,7 @@ export default function Dashboard() {
             {/* Statistics */}
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
         <h3 className="text-on-surface font-bold mb-6 md:mb-8 text-base md:text-xl font-headline">Estatísticas Globais</h3>
-        <div className={`grid gap-6 md:gap-8 text-center lg:divide-x divide-outline-variant/20 ${tradeTypeFilter === 'all' ? 'grid-cols-2' : (tradeTypeFilter === 'ob' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5')}`}>
+        <div className={`grid gap-6 md:gap-8 text-center lg:divide-x divide-outline-variant/20 ${tradeTypeFilter === 'all' ? 'grid-cols-2' : 'grid-cols-2 lg:grid-cols-4'}`}>
           <div className="pb-6 lg:pb-0 border-b lg:border-b-0 border-outline-variant/20">
             <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Lucro/Prejuízo do Dia</p>
             <p className={`font-bold text-2xl md:text-4xl ${data.todayPnl >= 0 ? 'text-secondary' : 'text-error'}`}>
@@ -1074,18 +1101,9 @@ export default function Dashboard() {
                 <p className="text-on-surface font-bold text-2xl md:text-4xl">{data.totalTrades}</p>
               </div>
               <div className="pb-6 lg:pb-0 border-b lg:border-b-0 border-outline-variant/20">
-                <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Taxa de Acerto</p>
-                <p className="text-on-surface font-bold text-2xl md:text-4xl">{data.winRate}%</p>
+                 <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Taxa de Acerto</p>
+                 <p className="text-on-surface font-bold text-2xl md:text-4xl">{data.winRate}%</p>
               </div>
-              {/* RR Médio hidden as per user request to avoid layout deformation */}
-              {/* 
-              {tradeTypeFilter !== 'ob' && (
-                <div className="pb-6 lg:pb-0 border-b lg:border-b-0 border-outline-variant/20">
-                  <p className="text-on-surface-variant text-sm md:text-base mb-2 md:mb-4">Risco/Retorno Médio</p>
-                  <p className="text-on-surface font-bold text-2xl md:text-4xl">1:{data.averageRr}</p>
-                </div>
-              )} 
-              */}
             </>
           )}
           <div>
@@ -1448,6 +1466,8 @@ export default function Dashboard() {
             />
           </div>
 
+
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             {/* Best Setups */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
@@ -1662,6 +1682,42 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Trade Volumes */}
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
+              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">bar_chart</span>
+                Volumes de Trade
+              </h4>
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
+                <p className="text-on-surface font-bold text-4xl mb-2">{data.analysisTotalTrades}</p>
+                <p className="text-on-surface-variant text-sm">Trades Realizados</p>
+              </div>
+            </div>
+
+            {/* Maiores Perdas por Ativo */}
+            <div className="bg-surface-container-low border border-error/20 rounded-2xl p-6 md:p-8">
+              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
+                <span className="material-symbols-outlined text-error">trending_down</span>
+                Maiores Perdas por Ativo
+              </h4>
+              <div className="space-y-4">
+                {worstPairs.length > 0 ? worstPairs.map((pair, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl border-l-4 border-l-error">
+                    <div>
+                      <p className="font-bold text-on-surface">{pair.name}</p>
+                      <p className="text-xs text-on-surface-variant">{pair.total} trades realizados</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-error">-{formatCurrency(Math.abs(pair.pnl))}</p>
+                      <p className="text-[10px] text-on-surface-variant">Lucro total negativo</p>
+                    </div>
+                  </div>
+                )) : (
+                  <p className="text-on-surface-variant text-sm">Nenhuma perda registrada no período.</p>
+                )}
+              </div>
+            </div>
+
             {/* Best Timeframes (Only show if OB is selected) */}
             {tradeTypeFilter === 'ob' && (
               <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
@@ -1717,15 +1773,107 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Trade Volumes */}
-            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">bar_chart</span>
-                Volumes de Trade
-              </h4>
-              <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
-                <p className="text-on-surface font-bold text-4xl mb-2">{data.analysisTotalTrades}</p>
-                <p className="text-on-surface-variant text-sm">Trades Realizados</p>
+            {/* Volume Financeiro do Período */}
+            <div className={`bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 flex flex-col justify-between ${tradeTypeFilter === 'ob' ? '' : 'lg:col-span-2'}`}>
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                  <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">analytics</span>
+                    Volume Financeiro do Período
+                  </h4>
+                  {/* Metric Switcher */}
+                  <div className="flex bg-surface-container rounded-xl p-1 border border-outline-variant/10">
+                    <button 
+                      onClick={() => setAnalysisMetric('losses')}
+                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${analysisMetric === 'losses' ? 'bg-error text-white shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                    >
+                      Perdas
+                    </button>
+                    <button 
+                      onClick={() => setAnalysisMetric('gains')}
+                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${analysisMetric === 'gains' ? 'bg-secondary text-on-secondary shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                    >
+                      Ganhos
+                    </button>
+                    <button 
+                      onClick={() => setAnalysisMetric('net')}
+                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${analysisMetric === 'net' ? 'bg-outline-variant text-on-surface shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                    >
+                      Líquido
+                    </button>
+                  </div>
+                </div>
+
+                {/* Big Metric Display */}
+                <div className="flex flex-col items-center justify-center text-center py-6">
+                  {analysisMetric === 'losses' && (
+                    <>
+                      <div className="w-16 h-16 bg-error/10 text-error rounded-full flex items-center justify-center mb-3">
+                        <span className="material-symbols-outlined text-3xl font-bold">trending_down</span>
+                      </div>
+                      <span className="text-on-surface-variant text-xs uppercase tracking-widest font-bold mb-1">Volume Total de Perdas</span>
+                      <p className="text-error font-black text-4xl mb-2">-{formatCurrency(data.filteredHistoryTrades.filter(t => t.pnl < 0).reduce((acc, t) => acc + Math.abs(t.pnl), 0))}</p>
+                      <p className="text-on-surface-variant text-xs max-w-xs mt-1">
+                        Soma das operações negativas no período filtrado.
+                      </p>
+                    </>
+                  )}
+                  {analysisMetric === 'gains' && (
+                    <>
+                      <div className="w-16 h-16 bg-secondary/10 text-secondary rounded-full flex items-center justify-center mb-3">
+                        <span className="material-symbols-outlined text-3xl font-bold">trending_up</span>
+                      </div>
+                      <span className="text-on-surface-variant text-xs uppercase tracking-widest font-bold mb-1">Volume Total de Ganhos</span>
+                      <p className="text-secondary font-black text-4xl mb-2">+{formatCurrency(data.filteredHistoryTrades.filter(t => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0))}</p>
+                      <p className="text-on-surface-variant text-xs max-w-xs mt-1">
+                        Soma das operações positivas no período filtrado.
+                      </p>
+                    </>
+                  )}
+                  {analysisMetric === 'net' && (
+                    (() => {
+                      const netPnl = data.filteredHistoryTrades.reduce((acc, t) => acc + t.pnl, 0);
+                      const isProfit = netPnl >= 0;
+                      return (
+                        <>
+                          <div className={`w-16 h-16 ${isProfit ? 'bg-secondary/10 text-secondary' : 'bg-error/10 text-error'} rounded-full flex items-center justify-center mb-3`}>
+                            <span className="material-symbols-outlined text-3xl font-bold">balance</span>
+                          </div>
+                          <span className="text-on-surface-variant text-xs uppercase tracking-widest font-bold mb-1">Resultado Líquido do Período</span>
+                          <p className={`${isProfit ? 'text-secondary' : 'text-error'} font-black text-4xl mb-2`}>
+                            {isProfit ? '+' : ''}{formatCurrency(netPnl)}
+                          </p>
+                          <p className="text-on-surface-variant text-xs max-w-xs mt-1">
+                            Saldo total líquido das operações no período filtrado.
+                          </p>
+                        </>
+                      );
+                    })()
+                  )}
+                </div>
+              </div>
+
+              {/* Side-by-side Mini Overview */}
+              <div className="grid grid-cols-3 gap-2 border-t border-outline-variant/10 pt-4 text-center mt-auto">
+                <div>
+                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Perdas</p>
+                  <p className="text-error font-bold text-xs">-{formatCurrency(data.filteredHistoryTrades.filter(t => t.pnl < 0).reduce((acc, t) => acc + Math.abs(t.pnl), 0))}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Ganhos</p>
+                  <p className="text-secondary font-bold text-xs">+{formatCurrency(data.filteredHistoryTrades.filter(t => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0))}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Líquido</p>
+                  {(() => {
+                    const netVal = data.filteredHistoryTrades.reduce((acc, t) => acc + t.pnl, 0);
+                    return (
+                      <p className={`${netVal >= 0 ? 'text-secondary' : 'text-error'} font-bold text-xs`}>
+                        {netVal >= 0 ? '+' : ''}{formatCurrency(netVal)}
+                      </p>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
           </div>

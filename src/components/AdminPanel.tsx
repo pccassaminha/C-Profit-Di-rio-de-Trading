@@ -3,7 +3,7 @@ import { db, auth } from '../firebase';
 import { collection, getDocs, doc, updateDoc, onSnapshot, query, orderBy, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
-import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket } from 'lucide-react';
+import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, AlertTriangle } from 'lucide-react';
 
 export default function AdminPanel() {
   const { userPlan, globalSettings: initialSettings } = useTrades();

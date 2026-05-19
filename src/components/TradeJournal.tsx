@@ -20,7 +20,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
   
   const [isImporting, setIsImporting] = useState(false);
   const [importedTradesToReview, setImportedTradesToReview] = useState<any[]>([]);
-  const [lastImportBatchId, setLastImportBatchId] = useState<string | null>(null);
+  const [lastImportBatchId, setLastImportBatchId] = useState<string | null>(() => localStorage.getItem('app_last_import_batch_id'));
   
   // Usando o novo hook para gerenciar os trades (sincronização + deduplicação)
   const { allTrades: trades, loading: loadingTrades } = useTrades(importedTradesToReview);
@@ -427,6 +427,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
       await Promise.all(promises);
 
       setLastImportBatchId(batchId);
+      localStorage.setItem('app_last_import_batch_id', batchId);
 
       const msg = forceOverwrite 
         ? `${tradesToProcess.length} trades processados (incluindo substituições) na ${accountLabel}.`
@@ -477,6 +478,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
           await Promise.all(promises);
           
           setLastImportBatchId(null);
+          localStorage.removeItem('app_last_import_batch_id');
           closeModal();
           
           setModalConfig({
@@ -790,15 +792,6 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
             >
               Novo Trade
             </button>
-            {lastImportBatchId && (
-              <button 
-                onClick={handleUndoImport}
-                className="px-4 md:px-8 py-2.5 rounded-lg bg-error/10 text-error font-bold hover:bg-error/20 transition-all flex items-center gap-2"
-              >
-                <span className="material-symbols-outlined text-sm">undo</span>
-                Reverter Importação
-              </button>
-            )}
           </div>
         </div>
 
@@ -1045,7 +1038,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
         </div>
 
         <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-8">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-8 pb-8 border-b border-outline-variant/20">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-8 pb-8 border-b border-outline-variant/20">
             <div>
               <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-1">Ticket</p>
               <p className="text-xl font-bold text-on-surface truncate">{selectedTrade.ticket}</p>
