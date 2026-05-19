@@ -18,8 +18,10 @@ export default function AdminPanel() {
   const [payments, setPayments] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [showDangerZone, setShowDangerZone] = useState(false);
   const [settings, setSettings] = useState(initialSettings || {
     whatsappNumber: '',
+    expressNumber: '',
     iban: '',
     ibanName: '',
     multicaixaEntity: '',
@@ -27,14 +29,25 @@ export default function AdminPanel() {
     multicaixaName: '',
     showIban: true,
     showMulticaixa: true,
+    showExpress: true,
     multicaixaLogoUrl: ''
   });
 
   useEffect(() => {
     if (initialSettings) {
-      setSettings(initialSettings);
+      setSettings({
+        showExpress: true,
+        expressNumber: '',
+        ...initialSettings
+      });
     }
   }, [initialSettings]);
+
+  useEffect(() => {
+    if (activeTab !== 'maestros') {
+      setShowDangerZone(false);
+    }
+  }, [activeTab]);
 
   const [loading, setLoading] = useState(true);
 
@@ -294,63 +307,8 @@ export default function AdminPanel() {
           >
             <ShieldAlert size={18} /> Maestros
           </button>
-        </div>
+       </div>
       </div>
-
-      {activeTab === 'users' && isSuperAdmin && (
-        <div className="bg-error/5 border border-error/20 rounded-3xl p-6 mb-8">
-           <div className="flex items-center gap-4 mb-4 text-error">
-             <AlertTriangle size={24} />
-             <h3 className="font-bold text-lg font-headline uppercase italic">Zona de Perigo Extremo (Super Admin)</h3>
-           </div>
-           <p className="text-sm text-on-surface-variant mb-6">
-             Como Super Administrador, podes realizar limpezas globais no banco de dados. Estas ações são IRREVERSÍVEIS.
-           </p>
-           <div className="flex flex-wrap gap-4">
-             <button 
-               onClick={async () => {
-                 if (!window.confirm('CUIDADO: Desejas apagar TODOS os trades de TODOS os usuários do banco de dados?')) return;
-                 setLoading(true);
-                 try {
-                    const snap = await getDocs(collection(db, 'trades'));
-                    const p = snap.docs.map(d => deleteDoc(d.ref));
-                    await Promise.all(p);
-                    alert('Limpeza de trades (root) concluída.');
-                 } catch (e) {
-                    console.error(e);
-                    alert('Erro na limpeza global.');
-                 } finally {
-                    setLoading(false);
-                 }
-               }}
-               className="bg-error text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-lg"
-             >
-               Apagar Todos os Trades (Global)
-             </button>
-
-             <button 
-               onClick={async () => {
-                 if (!window.confirm('CUIDADO: Desejas apagar TODAS as notificações/comunicados (broadcasts)?')) return;
-                 setLoading(true);
-                 try {
-                    const snap = await getDocs(collection(db, 'broadcasts'));
-                    const p = snap.docs.map(d => deleteDoc(d.ref));
-                    await Promise.all(p);
-                    alert('Broadcasts limpos.');
-                 } catch (e) {
-                    console.error(e);
-                    alert('Erro na limpeza.');
-                 } finally {
-                    setLoading(false);
-                 }
-               }}
-               className="bg-surface-container-high text-on-surface px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-surface-container-highest transition-all"
-             >
-               Limpar Comunicados
-             </button>
-           </div>
-        </div>
-      )}
 
       {activeTab === 'users' && (
         <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
@@ -440,6 +398,15 @@ export default function AdminPanel() {
                   <div>
                     <h4 className="text-lg font-bold text-on-surface">Upgrade solicitado por {users.find(u => u.id === p.userId)?.name || p.userId}</h4>
                     <p className="text-sm text-on-surface-variant">Plano: <span className="text-on-surface font-bold uppercase tracking-widest">{p.planId?.replace('_', ' ')}</span></p>
+                    <p className="text-sm text-on-surface-variant">Método: <span className="text-on-surface font-bold uppercase tracking-wider">{
+                      p.paymentMethod === 'express' ? 'Express 📱' : 
+                      p.paymentMethod === 'iban' ? 'IBAN 🏛️' : 'MCX Referência 💳'
+                    }</span></p>
+                    {p.paymentMethod === 'express' && p.expressCode && (
+                      <p className="text-xs text-amber-500 font-extrabold mt-1.5 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl w-fit">
+                        CÓDIGO EXPRESS: {p.expressCode}
+                      </p>
+                    )}
                     <p className="text-sm font-black text-primary mt-1">{p.amount?.toLocaleString()} Kz</p>
                     <p className="text-[10px] text-on-surface-variant mt-2 font-mono opacity-50">ID Usuário: {getUserDisplayId(p.userId)}</p>
                   </div>
@@ -508,7 +475,7 @@ export default function AdminPanel() {
           </h3>
           
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-6 bg-surface-container/50 p-6 rounded-[24px] border border-outline-variant/10">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-surface-container/50 p-6 rounded-[24px] border border-outline-variant/10">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-bold text-on-surface">Ativar IBAN</p>
@@ -532,6 +499,19 @@ export default function AdminPanel() {
                   className={`w-12 h-6 rounded-full transition-all relative ${settings.showMulticaixa ? 'bg-primary' : 'bg-surface-container-high border border-outline-variant/30'}`}
                 >
                   <div className={`absolute top-1 w-4 h-4 rounded-full transition-all ${settings.showMulticaixa ? 'right-1 bg-on-primary' : 'left-1 bg-on-surface-variant'}`}></div>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-on-surface">Ativar Express</p>
+                  <p className="text-[10px] text-on-surface-variant uppercase tracking-tighter">Exibir Transferência Express</p>
+                </div>
+                <button 
+                  onClick={() => setSettings({ ...settings, showExpress: settings.showExpress !== false ? false : true })}
+                  className={`w-12 h-6 rounded-full transition-all relative ${settings.showExpress !== false ? 'bg-primary' : 'bg-surface-container-high border border-outline-variant/30'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 rounded-full transition-all ${settings.showExpress !== false ? 'right-1 bg-on-primary' : 'left-1 bg-on-surface-variant'}`}></div>
                 </button>
               </div>
             </div>
@@ -561,6 +541,17 @@ export default function AdminPanel() {
                   <img src={settings.multicaixaLogoUrl} alt="Logo Preview" className="h-12 w-12 object-contain bg-white rounded-xl p-1" />
                 )}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Telemóvel MCX Express (Destinatário)</label>
+              <input 
+                type="text" 
+                value={settings.expressNumber || ''}
+                onChange={(e) => setSettings({ ...settings, expressNumber: e.target.value })}
+                className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
+                placeholder="Ex: 921167980"
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -759,7 +750,78 @@ export default function AdminPanel() {
           </div>
         </div>
       )}
-      {activeTab === 'maestros' && (
+      {activeTab === 'maestros' && showDangerZone && isSuperAdmin ? (
+        <div className="bg-error/5 border border-error/20 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-error/20">
+            <div className="flex items-center gap-4 text-error">
+              <AlertTriangle size={32} className="animate-pulse" />
+              <div>
+                <h3 className="font-bold text-xl font-headline uppercase italic tracking-tighter">
+                  ZONA DE PERIGO EXTREMO
+                </h3>
+                <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">Acesso Super Admin</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowDangerZone(false)}
+              className="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-bold uppercase tracking-widest transition-colors border border-outline-variant/30"
+            >
+              Voltar para Maestros
+            </button>
+          </div>
+          
+          <div className="bg-background/50 border border-error/20 rounded-2xl p-4">
+            <p className="text-xs text-error font-bold uppercase tracking-wider mb-1">Aviso Crítico</p>
+            <p className="text-sm text-on-surface-variant">
+              Como Super Administrador, podes realizar limpezas globais no banco de dados. Estas ações são IRREVERSÍVEIS e afetam a todos os utilizadores da plataforma imediatamente.
+            </p>
+          </div>
+          
+          <div className="flex flex-wrap gap-4 pt-2">
+            <button 
+              onClick={async () => {
+                if (!window.confirm('CUIDADO: Desejas apagar TODOS os trades de TODOS os usuários do banco de dados?')) return;
+                setLoading(true);
+                try {
+                   const snap = await getDocs(collection(db, 'trades'));
+                   const p = snap.docs.map(d => deleteDoc(d.ref));
+                   await Promise.all(p);
+                   alert('Limpeza de trades (root) concluída.');
+                } catch (e) {
+                   console.error(e);
+                   alert('Erro na limpeza global.');
+                } finally {
+                   setLoading(false);
+                }
+              }}
+              className="bg-error text-white px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-lg shadow-error/20"
+            >
+              Apagar Todos os Trades (Global)
+            </button>
+
+            <button 
+              onClick={async () => {
+                if (!window.confirm('CUIDADO: Desejas apagar TODAS as notificações/comunicados (broadcasts)?')) return;
+                setLoading(true);
+                try {
+                   const snap = await getDocs(collection(db, 'broadcasts'));
+                   const p = snap.docs.map(d => deleteDoc(d.ref));
+                   await Promise.all(p);
+                   alert('Broadcasts limpos.');
+                } catch (e) {
+                   console.error(e);
+                   alert('Erro na limpeza.');
+                } finally {
+                   setLoading(false);
+                }
+              }}
+              className="bg-surface-container-high text-on-surface px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-surface-container-highest transition-all"
+            >
+              Limpar Comunicados
+            </button>
+          </div>
+        </div>
+      ) : activeTab === 'maestros' ? (
         <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
           <div className="p-6 border-b border-outline-variant/20">
              <h3 className="text-xl font-bold text-on-surface font-headline">Administradores e Maestros</h3>
@@ -834,8 +896,29 @@ export default function AdminPanel() {
               </button>
             </div>
           </div>
+
+          {isSuperAdmin && (
+            <div className="p-6 border-t border-outline-variant/20 bg-error/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <p className="font-bold text-xs text-error uppercase tracking-widest flex items-center gap-2">
+                  <AlertTriangle size={14} className="text-error" /> Zona de Manutenção
+                </p>
+                <p className="text-[11px] text-on-surface-variant">Ações de limpeza global de dados do sistema.</p>
+              </div>
+              <button
+                onClick={() => {
+                  if (window.confirm('ATENÇÃO: ESTOU A ENTRAR NA ZONA DE PERIGO!')) {
+                    setShowDangerZone(true);
+                  }
+                }}
+                className="px-4 py-2 bg-error/10 hover:bg-error/20 text-error rounded-xl text-[11px] font-black uppercase tracking-widest transition-all"
+              >
+                Acessar Zona de Perigo
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      ) : null}
 
       {editingUser && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">

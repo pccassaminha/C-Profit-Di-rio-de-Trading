@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
 import { useTrades } from '../hooks/useTrades';
+import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 
 export default function Topbar({ 
   toggleSidebar, 
@@ -21,19 +22,59 @@ export default function Topbar({
   const userName = currentUser?.displayName || 'Usuário';
   const initial = userName.charAt(0).toUpperCase();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [broadcasts, setBroadcasts] = useState<any[]>([]);
+  const [seenIds, setSeenIds] = useState<string[]>([]);
+  
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLDivElement>(null);
 
+  // Load seen broadcasts from localStorage
+  useEffect(() => {
+    if (currentUser) {
+      const key = `seen_broadcasts_${currentUser.uid}`;
+      try {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          setSeenIds(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error('Error loading seen notifications:', e);
+      }
+    }
+  }, [currentUser]);
+
+  // Subscribe to real-time broadcasts
+  useEffect(() => {
+    const bQ = query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(bQ, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setBroadcasts(docs);
+    }, (error) => {
+      console.error('Error fetching broadcasts:', error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Handle clicks outside dropdowns to close them
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setDropdownOpen(false);
+      }
+      if (bellRef.current && !bellRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [dropdownRef]);
+  }, [dropdownRef, bellRef]);
 
   const handleNavigate = (tab: string) => {
     setDropdownOpen(false);
@@ -43,6 +84,27 @@ export default function Topbar({
       onProfileClick();
     }
   };
+
+  const handleBellClick = () => {
+    const nextState = !notificationsOpen;
+    setNotificationsOpen(nextState);
+
+    if (nextState && currentUser && broadcasts.length > 0) {
+      // Mark all current broadcasts as read/seen
+      const allIds = broadcasts.map(b => b.id);
+      const updatedSeen = Array.from(new Set([...seenIds, ...allIds]));
+      setSeenIds(updatedSeen);
+      
+      const key = `seen_broadcasts_${currentUser.uid}`;
+      try {
+        localStorage.setItem(key, JSON.stringify(updatedSeen));
+      } catch (e) {
+        console.error('Error saving seen notifications:', e);
+      }
+    }
+  };
+
+  const unreadCount = broadcasts.filter(b => !seenIds.includes(b.id)).length;
 
   return (
     <header className="flex justify-between items-center px-6 w-full h-20 sticky top-0 z-40 bg-background border-b border-outline-variant/20">
@@ -62,6 +124,69 @@ export default function Topbar({
       </div>
 
       <div className="flex items-center gap-4 relative">
+        {/* BELL NOTIFICATION ICON */}
+        <div className="relative" ref={bellRef}>
+          <button
+            onClick={handleBellClick}
+            className={`w-10 h-10 rounded-full border border-outline-variant/20 flex items-center justify-center transition-colors relative ${notificationsOpen ? 'bg-surface-container-high ring-2 ring-primary text-primary' : 'text-on-surface hover:bg-surface-container'}`}
+          >
+            <span className="material-symbols-outlined text-xl">notifications</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-error text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow-md animate-bounce">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* NOTIFICATION BOX DROPDOWN */}
+          {notificationsOpen && (
+            <div className="absolute top-full right-0 mt-3 w-80 max-h-[450px] bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-4 duration-200 origin-top-right flex flex-col">
+              <div className="p-4 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container">
+                <p className="font-bold text-sm text-on-surface">Comunicados & Avisos</p>
+                {unreadCount > 0 && (
+                  <span className="text-[10px] bg-primary/20 text-primary font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    {unreadCount} Novo{unreadCount !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2 max-h-[350px]">
+                {broadcasts.length === 0 ? (
+                  <div className="text-center py-8 px-4 text-on-surface-variant text-xs italic">
+                    Nenhum comunicado oficial por enquanto.
+                  </div>
+                ) : (
+                  broadcasts.map((b) => {
+                    const isNew = !seenIds.includes(b.id);
+                    return (
+                      <div 
+                        key={b.id} 
+                        className={`p-3.5 rounded-xl border transition-colors ${
+                          isNew 
+                            ? 'bg-primary/5 border-primary/20 shadow-sm' 
+                            : 'bg-surface-container border-outline-variant/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="material-symbols-outlined text-primary text-[18px]">campaign</span>
+                          <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
+                            {b.author || 'Admin'}
+                          </span>
+                          <span className="text-[9px] text-on-surface-variant ml-auto opacity-70">
+                            {b.createdAt ? new Date(b.createdAt.toDate ? b.createdAt.toDate() : b.createdAt).toLocaleDateString() : ''}
+                          </span>
+                        </div>
+                        <p className="text-xs text-on-surface font-medium leading-relaxed whitespace-pre-wrap">
+                          {b.message}
+                        </p>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="relative" ref={dropdownRef}>
           <div 
             onClick={() => setDropdownOpen(!dropdownOpen)}

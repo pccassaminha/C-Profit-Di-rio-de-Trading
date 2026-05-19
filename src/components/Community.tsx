@@ -46,6 +46,9 @@ export default function Community() {
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [activeCommentDropdown, setActiveCommentDropdown] = useState<string | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
 
   const isAdmin = userPlan?.role === 'admin';
 
@@ -198,6 +201,7 @@ export default function Community() {
       await addDoc(collection(db, 'community_posts', postId, 'comments'), {
         userId: auth.currentUser.uid,
         userName: auth.currentUser.displayName || 'Membro C Profit',
+        userPhoto: auth.currentUser.photoURL || '',
         text: newComment,
         createdAt: serverTimestamp()
       });
@@ -207,6 +211,34 @@ export default function Community() {
       setNewComment('');
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    if (!window.confirm('Desculpe, tem certeza de que deseja eliminar este comentário?')) return;
+    try {
+      await deleteDoc(doc(db, 'community_posts', postId, 'comments', commentId));
+      await updateDoc(doc(db, 'community_posts', postId), {
+        commentsCount: increment(-1)
+      });
+      setActiveCommentDropdown(null);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao eliminar comentário.');
+    }
+  };
+
+  const handleSaveEditedComment = async (postId: string, commentId: string) => {
+    if (!editingCommentText.trim()) return;
+    try {
+      await updateDoc(doc(db, 'community_posts', postId, 'comments', commentId), {
+        text: editingCommentText.trim()
+      });
+      setEditingCommentId(null);
+      setEditingCommentText('');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao guardar comentário editado.');
     }
   };
 
@@ -518,20 +550,93 @@ export default function Community() {
                 <div className="space-y-6 max-h-[300px] overflow-y-auto mb-6 pr-2 custom-scrollbar">
                   {comments.map(c => (
                     <div key={c.id} className="flex gap-4">
-                      <div className="w-8 h-8 rounded-xl bg-primary text-on-primary flex items-center justify-center shrink-0 font-bold text-xs">
-                        {c.userName[0]}
-                      </div>
+                      {c.userPhoto ? (
+                        <img 
+                          src={c.userPhoto} 
+                          alt={c.userName} 
+                          className="w-8 h-8 rounded-xl object-cover border border-outline-variant/10 shrink-0" 
+                          referrerPolicy="no-referrer" 
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-xl bg-primary text-on-primary flex items-center justify-center shrink-0 font-bold text-xs">
+                          {c.userName ? c.userName[0] : 'U'}
+                        </div>
+                      )}
                       <div className="flex-1 bg-surface-container p-4 rounded-3xl rounded-tl-none">
                         <div className="flex justify-between items-center mb-1">
                           <div className="flex gap-1 items-center">
                             <p className="text-[10px] font-black text-primary uppercase">{c.userName}</p>
-                            <span className="material-symbols-outlined text-[10px] text-primary/70">notifications_active</span>
                           </div>
-                          <p className="text-[9px] text-on-surface-variant opacity-40 uppercase">
-                            {c.createdAt ? new Date(c.createdAt.toDate ? c.createdAt.toDate() : c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </p>
+                          <div className="flex items-center gap-1.5 relative">
+                            <p className="text-[9px] text-on-surface-variant opacity-40 uppercase">
+                              {c.createdAt ? new Date(c.createdAt.toDate ? c.createdAt.toDate() : c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </p>
+                            {((c.userId === auth.currentUser?.uid) || (post.userId === auth.currentUser?.uid)) && (
+                              <div className="relative">
+                                <button
+                                  onClick={() => setActiveCommentDropdown(activeCommentDropdown === c.id ? null : c.id)}
+                                  className="text-on-surface-variant hover:text-on-surface p-0.5 rounded-full hover:bg-surface-container-high transition-colors flex items-center justify-center"
+                                  title="Opções de comentário"
+                                >
+                                  <MoreVertical size={13} className="opacity-60" />
+                                </button>
+                                {activeCommentDropdown === c.id && (
+                                  <div className="absolute right-0 mt-1 w-28 bg-surface-container-highest border border-outline-variant/20 rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+                                    {c.userId === auth.currentUser?.uid && (
+                                      <button
+                                        onClick={() => {
+                                          setEditingCommentId(c.id);
+                                          setEditingCommentText(c.text);
+                                          setActiveCommentDropdown(null);
+                                        }}
+                                        className="w-full text-left px-3 py-1.5 text-xs text-on-surface hover:bg-surface-container font-semibold flex items-center gap-1.5 transition-colors"
+                                      >
+                                        Editar
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => handleDeleteComment(post.id, c.id)}
+                                      className="w-full text-left px-3 py-1.5 text-xs text-error hover:bg-error/10 font-semibold flex items-center gap-1.5 transition-colors"
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-sm text-on-surface leading-tight">{renderTextWithMentions(c.text)}</p>
+                        {editingCommentId === c.id ? (
+                          <div className="space-y-2 mt-2">
+                            <input 
+                              type="text" 
+                              value={editingCommentText}
+                              onChange={(e) => setEditingCommentText(e.target.value)}
+                              className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs text-on-surface focus:outline-none focus:border-primary transition-all"
+                              onKeyPress={(e) => e.key === 'Enter' && handleSaveEditedComment(post.id, c.id)}
+                              autoFocus
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <button 
+                                onClick={() => handleSaveEditedComment(post.id, c.id)}
+                                className="px-3 py-1 bg-primary text-on-primary rounded-lg text-[10px] font-black uppercase tracking-wider transition-all hover:scale-105"
+                              >
+                                Gravar
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  setEditingCommentId(null);
+                                  setEditingCommentText('');
+                                }}
+                                className="px-3 py-1 bg-surface-container-high text-on-surface-variant rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border border-outline-variant/10"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-on-surface leading-tight">{renderTextWithMentions(c.text)}</p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -647,28 +752,17 @@ export default function Community() {
                       placeholder="Colar link de imagem/vídeo e pressionar Enter ou '+'..."
                       className="flex-1 bg-surface-container-low border border-outline-variant/20 rounded-2xl px-6 py-4 text-on-surface focus:outline-none focus:border-primary transition-all text-sm"
                     />
-                    <input 
-                      type="file"
-                      ref={fileInputRef}
-                      accept="image/*,video/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setSelectedFile(file);
-                          setPreviewUrl(URL.createObjectURL(file));
-                          setNewPost({ ...newPost, imageUrl: '' });
+                    <button 
+                      onClick={() => {
+                        if (newPost.imageUrl.trim()) {
+                          setNewPost({ ...newPost, imageUrls: [...(newPost.imageUrls || []), newPost.imageUrl.trim()], imageUrl: '' });
                         }
                       }}
-                    />
-                    
-                    <button 
-                      onClick={() => fileInputRef.current?.click()}
-                      title="Upload do Dispositivo"
+                      title="Adicionar Link"
                       type="button"
-                      className={`w-14 rounded-2xl border border-outline-variant/20 flex items-center justify-center transition-all ${previewUrl ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'}`}
+                      className="w-14 rounded-2xl border border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high flex items-center justify-center transition-all"
                     >
-                      <ImageIcon size={24} />
+                      <Plus size={24} />
                     </button>
                   </div>
                   
@@ -744,7 +838,7 @@ export default function Community() {
                   </div>
                 )}
                 
-                <p className="text-[9px] text-on-surface-variant italic px-2">Dica: Você pode colar um link do TradingView/YouTube ou carregar uma imagem do seu dispositivo.</p>
+                <p className="text-[9px] text-on-surface-variant italic px-2">Dica: Você pode colar um link do TradingView/YouTube/Vimeo ou qualquer link direto de imagem/vídeo.</p>
               </div>
 
               <button 

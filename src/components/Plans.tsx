@@ -14,6 +14,21 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const [payerName, setPayerName] = useState(auth.currentUser?.displayName || '');
   const [payerPhone, setPayerPhone] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'iban' | 'multicaixa' | 'express'>('iban');
+  const [expressCode, setExpressCode] = useState('');
+
+  // Set default payment method when settings load
+  useEffect(() => {
+    if (globalSettings) {
+      if (globalSettings.showIban !== false) {
+        setPaymentMethod('iban');
+      } else if (globalSettings.showExpress !== false) {
+         setPaymentMethod('express');
+      } else {
+         setPaymentMethod('multicaixa');
+      }
+    }
+  }, [globalSettings]);
 
   // Função para gerar um ID numérico curto baseado no timestamp
   const generateNumericId = () => {
@@ -171,6 +186,10 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       alert('Por favor, preencha o seu nome completo.');
       return;
     }
+    if (paymentMethod === 'express' && !expressCode.trim()) {
+      alert('Por favor, insira o número de telemóvel do Express.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const numericId = generateNumericId();
@@ -185,6 +204,8 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         transactionCode: numericId,
         proofUrl: 'WhatsApp Support',
         usedCoupon: appliedCoupon ? appliedCoupon.code : null,
+        paymentMethod: paymentMethod,
+        expressCode: paymentMethod === 'express' ? expressCode.trim() : null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
@@ -341,7 +362,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       {/* Modal de Pagamento */}
       {showPaymentModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/95 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-surface-container border border-outline-variant/30 rounded-[40px] max-w-lg w-full p-8 md:p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] relative overflow-hidden">
+          <div className="bg-surface-container border border-outline-variant/30 rounded-[40px] max-w-lg w-full p-8 md:p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] relative max-h-[92vh] overflow-y-auto custom-scrollbar">
             <button 
               onClick={handleCloseModal}
               className="absolute top-8 right-8 text-on-surface-variant hover:text-on-surface transition-colors z-10"
@@ -390,9 +411,50 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                       <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.3em]">Total a Liquidar:</span>
                       <span className="text-3xl font-black text-primary font-mono tracking-tighter">{showPaymentModal.price} Kz</span>
                     </div>
-                    
+
+                    {/* Seleção do Método de Pagamento */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Selecione o Método</label>
+                      <div className="grid grid-cols-3 gap-2 bg-surface-container-low rounded-2xl p-1 border border-outline-variant/10">
+                        {globalSettings?.showIban !== false && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('iban')}
+                            className={`flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'iban' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                          >
+                            <Landmark size={14} />
+                            <span className="text-[9px] font-black uppercase tracking-tight">IBAN</span>
+                          </button>
+                        )}
+                        {globalSettings?.showExpress !== false && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('express')}
+                            className={`flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'express' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                          >
+                            <img 
+                              src={globalSettings?.multicaixaLogoUrl || "https://i.ibb.co/vz6W1fN/mcx-logo.png"} 
+                              alt="Express" 
+                              className={`h-[12px] object-contain shrink-0 ${paymentMethod === 'express' ? 'invert brightness-0 bg-transparent' : 'bg-white p-0.5 rounded-sm'}`} 
+                            />
+                            <span className="text-[9px] font-black uppercase tracking-tight">Express</span>
+                          </button>
+                        )}
+                        {globalSettings?.showMulticaixa !== false && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('multicaixa')}
+                            className={`flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'multicaixa' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                          >
+                            <Smartphone size={14} />
+                            <span className="text-[9px] font-black uppercase tracking-tight">Referência</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="space-y-6">
-                      {globalSettings?.showIban && (
+                      {paymentMethod === 'iban' && globalSettings?.showIban && (
                         <div className="space-y-2 group cursor-pointer" onClick={() => {
                           navigator.clipboard.writeText(globalSettings.iban);
                           alert('IBAN copiado para a área de transferência!');
@@ -415,7 +477,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                         </div>
                       )}
 
-                      {globalSettings?.showMulticaixa && (
+                      {paymentMethod === 'multicaixa' && globalSettings?.showMulticaixa && (
                         <div className="space-y-4 pt-4 border-t border-outline-variant/10">
                           <div className="flex items-center justify-between">
                             <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
@@ -423,7 +485,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                               Pagamento por Referência (MCX)
                             </label>
                             {globalSettings?.multicaixaLogoUrl && (
-                              <img src={globalSettings?.multicaixaLogoUrl} alt="Multicaixa Logo" className="h-8 object-contain bg-white rounded-md p-1 opacity-80" />
+                               <img src={globalSettings?.multicaixaLogoUrl} alt="Multicaixa Logo" className="h-8 object-contain bg-white rounded-md p-1 opacity-80" />
                             )}
                           </div>
                           {globalSettings?.multicaixaName && (
@@ -445,7 +507,41 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                         </div>
                       )}
 
-                      {!globalSettings?.showIban && !globalSettings?.showMulticaixa && (
+                      {paymentMethod === 'express' && (
+                        <div className="space-y-4 pt-4 border-t border-outline-variant/10">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+                              <img src={globalSettings?.multicaixaLogoUrl || "https://i.ibb.co/vz6W1fN/mcx-logo.png"} alt="Express Logo" className="h-[14px] object-contain bg-white rounded p-0.5 shrink-0" />
+                              Transferência por Express
+                            </label>
+                          </div>
+                          
+                          {(globalSettings?.expressNumber || globalSettings?.whatsappNumber) && (
+                            <div className="px-5 py-3 bg-amber-500/15 border border-amber-500/30 rounded-xl">
+                               <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">Telemóvel Destino</span>
+                               <span className="font-bold text-on-surface font-mono tracking-wider">{(globalSettings.expressNumber || globalSettings.whatsappNumber).replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}</span>
+                               {globalSettings?.ibanName && (
+                                 <p className="text-[9.5px] text-on-surface-variant italic mt-1 leading-normal">
+                                   Favorecido: <span className="font-semibold text-on-surface">{globalSettings.ibanName}</span>
+                                 </p>
+                               )}
+                            </div>
+                          )}
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Inserir Número de Telemóvel do Canal Express</label>
+                            <input 
+                              type="text" 
+                              value={expressCode}
+                              onChange={(e) => setExpressCode(e.target.value)}
+                              placeholder="921 167 980"
+                              className="w-full bg-surface-container border border-amber-500/30 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-amber-500 transition-all font-mono"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {!globalSettings?.showIban && !globalSettings?.showMulticaixa && globalSettings?.showExpress === false && (
                         <div className="text-center py-6 text-on-surface-variant italic text-sm">
                           Informações indisponíveis. Contacte o administrador via WhatsApp.
                         </div>
