@@ -1129,7 +1129,13 @@ export default function Dashboard() {
               {/* Lucro (Full Width) */}
               <div className="bg-surface-container-low border border-secondary/30 rounded-2xl p-6 md:p-8">
                 <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Lucro</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
+                  <div>
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Atual</p>
+                    <p className={`${data.totalPnl >= 0 ? 'text-secondary' : 'text-error'} font-bold text-base md:text-xl`}>
+                      {data.totalPnl >= 0 ? '+' : ''}{formatCurrency(data.totalPnl)}
+                    </p>
+                  </div>
                   <div>
                     <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Lucro</p>
                     <p className="text-on-surface font-bold text-base md:text-xl">{data.hasProfitTarget ? formatCurrency(data.totalProfitTarget) : 'Não definida'}</p>
@@ -1138,12 +1144,6 @@ export default function Dashboard() {
                     <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Remanescente</p>
                     <p className="text-on-surface font-bold text-base md:text-xl">
                       {data.hasProfitTarget ? formatCurrency(Math.max(0, data.totalProfitTarget - data.totalPnl)) : '-'}
-                    </p>
-                  </div>
-                  <div className="hidden md:block">
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Atual</p>
-                    <p className={`${data.totalPnl >= 0 ? 'text-secondary' : 'text-error'} font-bold text-base md:text-xl`}>
-                      {data.totalPnl >= 0 ? '+' : ''}{formatCurrency(data.totalPnl)}
                     </p>
                   </div>
                 </div>
@@ -1164,7 +1164,13 @@ export default function Dashboard() {
                 {/* Perda Máxima */}
                 <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
                   <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Máxima</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
+                    <div>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
+                      <p className="text-error font-bold text-base md:text-xl">
+                        {formatCurrency(data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0)}
+                      </p>
+                    </div>
                     <div>
                       <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Limite Máximo De Perda</p>
                       <p className="text-on-surface font-bold text-base md:text-xl">{data.hasMaxLoss ? formatCurrency(data.totalMaxLoss) : 'Não definida'}</p>
@@ -1173,12 +1179,6 @@ export default function Dashboard() {
                       <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Máxima Restante</p>
                       <p className="text-on-surface font-bold text-base md:text-xl">
                         {data.hasMaxLoss ? formatCurrency(Math.max(0, data.totalMaxLoss - (data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0))) : '-'}
-                      </p>
-                    </div>
-                    <div className="hidden md:block">
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
-                      <p className="text-error font-bold text-base md:text-xl">
-                        {formatCurrency(data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0)}
                       </p>
                     </div>
                   </div>
@@ -1198,7 +1198,13 @@ export default function Dashboard() {
                 {/* Perda Diária */}
                 <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
                   <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Diária</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
+                    <div>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
+                      <p className="text-error font-bold text-base md:text-xl">
+                        {formatCurrency(data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0)}
+                      </p>
+                    </div>
                     <div>
                       <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Perda Diária</p>
                       <p className="text-on-surface font-bold text-base md:text-xl">{data.hasDailyLoss ? formatCurrency(data.totalDailyLoss) : 'Não definida'}</p>
@@ -1207,12 +1213,6 @@ export default function Dashboard() {
                       <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Diária Restante</p>
                       <p className="text-on-surface font-bold text-base md:text-xl">
                         {data.hasDailyLoss ? formatCurrency(Math.max(0, data.totalDailyLoss - (data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0))) : '-'}
-                      </p>
-                    </div>
-                    <div className="hidden md:block">
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
-                      <p className="text-error font-bold text-base md:text-xl">
-                        {formatCurrency(data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0)}
                       </p>
                     </div>
                   </div>
