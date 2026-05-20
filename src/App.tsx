@@ -28,6 +28,8 @@ export default function App() {
   const [journalView, setJournalView] = useState<'list' | 'form' | 'detail'>('list');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [copiedCoupon, setCopiedCoupon] = useState(false);
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
@@ -139,8 +141,18 @@ export default function App() {
     }
   };
 
+  const handleCopyCoupon = () => {
+    navigator.clipboard.writeText('DESCONTODE50%');
+    setCopiedCoupon(true);
+    setTimeout(() => setCopiedCoupon(false), 3000);
+  };
+
+  const showCouponBanner = !!user && 
+    (userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'Iniciante' || isExpired) && 
+    !isBannerDismissed;
+
   return (
-    <div className="bg-background text-white font-body min-h-screen flex selection:bg-primary-container selection:text-white">
+    <div className="bg-background text-white font-body min-h-screen flex selection:bg-primary-container selection:text-white relative">
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
@@ -157,6 +169,52 @@ export default function App() {
           {renderContent()}
         </main>
       </div>
+
+      {showCouponBanner && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-[#0d1425] border-2 border-[#00f5a0]/40 rounded-3xl p-5 shadow-[0_10px_50px_rgba(0,245,160,0.2)] animate-in slide-in-from-bottom duration-500 text-white">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-[#00f5a0]/15 rounded-xl flex items-center justify-center text-[#00f5a0] shrink-0">
+                 <span className="material-symbols-outlined text-xl">local_activity</span>
+              </div>
+              <p className="font-extrabold text-xs uppercase tracking-wider text-[#00f5a0]">🎁 Cupom de 50% Ativado!</p>
+            </div>
+            <button 
+              onClick={() => setIsBannerDismissed(true)} 
+              className="text-white/40 hover:text-white transition-colors p-1"
+              title="Fechar"
+            >
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+          
+          <div className="mt-3 space-y-3">
+            <p className="text-[11px] text-white/80 leading-relaxed font-semibold">
+              Obtenha um <strong className="text-white font-black">Desconto de 50% Vitalício</strong> ao migrar para qualquer um dos planos profissionais. Copie e cole o código abaixo!
+            </p>
+            
+            <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 justify-between">
+              <code className="text-[#00f5a0] font-black tracking-widest text-xs font-mono">DESCONTODE50%</code>
+              <button 
+                onClick={handleCopyCoupon}
+                className="bg-[#00f5a0] hover:bg-[#00f5a0]/80 text-black px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shrink-0"
+              >
+                <span className="material-symbols-outlined text-[10px]">content_copy</span>
+                {copiedCoupon ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
+            
+            <button
+              onClick={() => {
+                setActiveTab('plans');
+              }}
+              className="w-full bg-[#00f5a0] hover:bg-[#00f5a0]/80 text-black text-xs py-2 rounded-xl font-black uppercase tracking-widest transition-all"
+            >
+              Ver Planos e Assinar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

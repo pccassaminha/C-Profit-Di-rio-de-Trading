@@ -16,6 +16,53 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<'iban' | 'multicaixa' | 'express'>('iban');
   const [expressCode, setExpressCode] = useState('');
+  const [activeCouponsList, setActiveCouponsList] = useState<any[]>([]);
+  const [typedCoupon, setTypedCoupon] = useState('');
+  const [validationMsg, setValidationMsg] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+
+  // Load active master coupons
+  useEffect(() => {
+    const qActiveCoupons = query(collection(db, 'coupons'), where('active', '==', true));
+    const unsubCoupons = onSnapshot(qActiveCoupons, (snapshot) => {
+      setActiveCouponsList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubCoupons();
+  }, []);
+
+  const handleApplyCouponCode = async (codeStr: string) => {
+    setValidationMsg(null);
+    const cleanCode = codeStr.trim().toUpperCase();
+    if (!cleanCode) return;
+
+    if (cleanCode === 'DESCONTODE50%') {
+       setAppliedCoupon({
+          id: 'descontode50_static',
+          code: 'DESCONTODE50%',
+          active: true,
+          discountType: 'percentage',
+          discountValue: 50,
+          targetPlan: 'all'
+       });
+       setValidationMsg({ text: 'Cupom "DESCONTODE50%" de 50% de DESCONTO aplicado com sucesso!', type: 'success' });
+       return;
+    }
+
+    try {
+      const q = query(collection(db, 'coupons'), where('code', '==', cleanCode), where('active', '==', true));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        setValidationMsg({ text: 'Cupom inválido ou inativo.', type: 'error' });
+        return;
+      }
+
+      const cp = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      setAppliedCoupon(cp);
+      setValidationMsg({ text: `Cupom "${cleanCode}" aplicado com sucesso!`, type: 'success' });
+    } catch (err) {
+      console.error(err);
+      setValidationMsg({ text: 'Erro ao validar cupom.', type: 'error' });
+    }
+  };
 
   // Set default payment method when settings load
   useEffect(() => {
@@ -140,16 +187,29 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
   // Aplicar Desconto do Cupão
   const getDiscountedPrice = (plan: any) => {
-     if (!appliedCoupon) return plan.price;
-     if (appliedCoupon.targetPlan !== 'all' && appliedCoupon.targetPlan !== plan.id) return plan.price;
+     let discountPercentage = 0;
+     let discountFixed = 0;
+
+     if (appliedCoupon) {
+        if (appliedCoupon.targetPlan === 'all' || appliedCoupon.targetPlan === plan.id) {
+           if (appliedCoupon.discountType === 'percentage') {
+              discountPercentage = appliedCoupon.discountValue;
+           } else if (appliedCoupon.discountType === 'fixed') {
+              discountFixed = appliedCoupon.discountValue;
+           }
+        }
+     } else if (userPlan?.plan_type === 'trial_15') {
+        // Auto 50% OFF trial conversion discount
+        discountPercentage = 50;
+     }
 
      const originalPriceNum = Number(plan.price.replace(/\./g, ''));
      let finalPriceNum = originalPriceNum;
 
-     if (appliedCoupon.discountType === 'percentage') {
-       finalPriceNum = originalPriceNum - (originalPriceNum * (appliedCoupon.discountValue / 100));
-     } else if (appliedCoupon.discountType === 'fixed') {
-       finalPriceNum = originalPriceNum - appliedCoupon.discountValue;
+     if (discountPercentage > 0) {
+        finalPriceNum = originalPriceNum - (originalPriceNum * (discountPercentage / 100));
+     } else if (discountFixed > 0) {
+        finalPriceNum = originalPriceNum - discountFixed;
      }
 
      if (finalPriceNum < 0) finalPriceNum = 0;
@@ -159,14 +219,17 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   };
 
   const getFinalDiscountLabel = (plan: any) => {
-     if (!appliedCoupon) return plan.discount;
-     if (appliedCoupon.targetPlan !== 'all' && appliedCoupon.targetPlan !== plan.id) return plan.discount;
-
-     if (appliedCoupon.discountType === 'percentage') {
-        return `-${appliedCoupon.discountValue}% PARCEIRO`;
-     } else {
-        return `-Kz ${appliedCoupon.discountValue} PARCEIRO`;
+     if (appliedCoupon) {
+        if (appliedCoupon.targetPlan !== 'all' && appliedCoupon.targetPlan !== plan.id) return plan.discount;
+        if (appliedCoupon.discountType === 'percentage') {
+           return `-${appliedCoupon.discountValue}% PARCEIRO`;
+        } else {
+           return `-Kz ${appliedCoupon.discountValue} PARCEIRO`;
+        }
+     } else if (userPlan?.plan_type === 'trial_15') {
+        return '-50% TRIAL DESC.';
      }
+     return plan.discount;
   };
 
   const finalPlans = plans.map(p => ({
@@ -232,15 +295,43 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
           </div>
           <div>
             <h2 className="text-error font-black text-xl uppercase tracking-tighter">
-              {userPlan?.plan_type === 'Iniciante' ? 'Acesso Restrito: Plano Inativo' : 'Acesso Bloqueado: Assinatura Expirada'}
+              {userPlan?.plan_type === 'trial_15'
+                ? 'Período de Teste Grátis de 15 Dias Expirado'
+                : userPlan?.plan_type === 'Iniciante' 
+                  ? 'Acesso Restrito: Plano Inativo' 
+                  : 'Acesso Bloqueado: Assinatura Expirada'
+              }
             </h2>
             <p className="text-on-surface-variant text-sm font-medium opacity-80">
-              {userPlan?.plan_type === 'Iniciante' 
-                ? 'Sua conta ainda não possui uma assinatura ativa. Escolha um plano abaixo para começar.' 
-                : 'Seu período de assinatura terminou. Renove agora para continuar gerenciando seus trades.'
+              {userPlan?.plan_type === 'trial_15'
+                ? 'O seu período de experimentação de 15 dias grátis chegou ao fim. Faça a subscrição para reativar todo o terminal profissional.'
+                : userPlan?.plan_type === 'Iniciante' 
+                  ? 'Sua conta ainda não possui uma assinatura ativa. Escolha um plano abaixo para começar.' 
+                  : 'Seu período de assinatura terminou. Renove agora para continuar gerenciando seus trades.'
               }
             </p>
           </div>
+        </div>
+      )}
+
+      {userPlan?.plan_type === 'trial_15' && (
+        <div className="bg-gradient-to-r from-[#00f5a0]/10 to-primary/10 border-2 border-[#00f5a0]/30 p-6 rounded-[24px] flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl animate-in slide-in-from-bottom duration-500">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-[#00f5a0]/20 rounded-2xl flex items-center justify-center text-[#00f5a0] shadow-[0_0_20px_rgba(0,245,160,0.15)] shrink-0 animate-pulse">
+              <span className="material-symbols-outlined text-3xl">celebration</span>
+            </div>
+            <div>
+              <h3 className="text-[#00f5a0] font-black text-lg uppercase tracking-wider">
+                🎁 Desconto de Conversão Especial – 50% OFF Ativado!
+              </h3>
+              <p className="text-on-surface-variant text-xs font-semibold leading-relaxed">
+                Como agradecimento especial por testar a plataforma Profit, você recebeu um <strong className="text-white">Desconto Exclusivo de 50%</strong> em qualquer assinatura ativa! O desconto já foi aplicado e está visível nos planos abaixo de forma automática.
+              </p>
+            </div>
+          </div>
+          <span className="bg-[#00f5a0] text-black text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-wider whitespace-nowrap">
+            Poupança Garantida
+          </span>
         </div>
       )}
 
@@ -252,6 +343,77 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
           <p className="text-on-surface-variant text-center max-w-2xl">Aumente sua capacidade analítica e tenha um terminal profissional de alta performance.</p>
         </div>
       )}
+
+      {/* Coupon Banner & Input */}
+      <div className="bg-surface-container border border-primary/20 rounded-[24px] p-6 shadow-xl max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-sm">
+        <div className="absolute top-0 left-0 w-24 h-24 bg-primary/5 rounded-full blur-2xl pointer-events-none"></div>
+        
+        <div className="space-y-3 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-2xl animate-bounce">local_activity</span>
+            <h3 className="text-lg font-black text-on-surface uppercase tracking-tight">Tem um Cupom de Desconto?</h3>
+          </div>
+          
+          {activeCouponsList.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-xs text-on-surface-variant font-medium">
+                {userPlan?.plan_type === 'trial_15' 
+                  ? 'Como está no período de Trial, aproveite os cupons criados pelo Maestro para converter o seu teste numa assinatura com desconto especial:'
+                  : 'Aproveite os cupons ativos criados pelos nossos Maestros e parceiros para economizar na sua assinatura:'
+                }
+              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {activeCouponsList.map((cp) => (
+                  <button
+                    key={cp.id}
+                    onClick={() => {
+                      setAppliedCoupon(cp);
+                      setValidationMsg({ text: `Cupom "${cp.code}" aplicado com sucesso!`, type: 'success' });
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all border ${
+                      appliedCoupon?.code === cp.code
+                        ? 'bg-primary/20 text-primary border-primary'
+                        : 'bg-surface-container-high border-outline hover:border-primary-variant hover:scale-102'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[14px]">sell</span>
+                    <span>{cp.code}</span>
+                    <span className="opacity-70">
+                      ({cp.discountType === 'percentage' ? `-${cp.discountValue}%` : `-Kz ${cp.discountValue}`})
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-on-surface-variant font-medium">Insira o seu código promocional ou de afiliado à direita para obter descontos exclusivos:</p>
+          )}
+        </div>
+
+        {/* Input Form */}
+        <div className="w-full md:w-auto shrink-0 flex flex-col items-stretch md:items-end gap-1.5">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={typedCoupon}
+              onChange={(e) => setTypedCoupon(e.target.value.toUpperCase())}
+              placeholder="CÓDIGO"
+              className="bg-surface-container border border-outline-variant/30 rounded-xl px-4 py-3 text-xs font-bold text-on-surface uppercase outline-none focus:border-primary max-w-[150px] placeholder:text-on-surface-variant/30"
+            />
+            <button
+              onClick={() => handleApplyCouponCode(typedCoupon)}
+              className="bg-primary text-on-primary text-xs font-black uppercase tracking-widest px-4 py-3 rounded-xl hover:bg-primary-fixed-dim transition-all"
+            >
+              Aplicar
+            </button>
+          </div>
+          {validationMsg && (
+            <span className={`text-[10px] font-bold ${validationMsg.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {validationMsg.text}
+            </span>
+          )}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 xl:gap-3 overflow-visible">
         {finalPlans.map((plan) => (

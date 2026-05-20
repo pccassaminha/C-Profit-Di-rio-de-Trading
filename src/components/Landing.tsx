@@ -49,7 +49,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
         </h1>
 
         <p className="max-w-[560px] text-[17px] text-on-surface-variant leading-[1.7] mb-[48px] animate-in slide-in-from-bottom-6 duration-700 delay-200 fill-mode-both">
-          O diário de trading definitivo para <strong className="text-on-surface font-bold">Forex, Índices e Opções Binárias</strong>. Monitore, analise e escale suas operações com a inteligência que os profissionais usam.
+          O diário de trading definitivo para <strong className="text-on-surface font-bold">Forex, Índices e Opções Binárias</strong>. Registe-se agora e receba instantaneamente <strong className="text-primary font-black uppercase bg-primary/10 px-2 py-0.5 rounded-md inline-block">15 dias de teste grátis</strong> para explorar todo o terminal sem barreiras!
         </p>
 
         <div className="flex items-center gap-[24px] flex-wrap justify-center animate-in slide-in-from-bottom-6 duration-700 delay-300 fill-mode-both">

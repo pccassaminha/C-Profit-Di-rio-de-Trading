@@ -18,6 +18,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
       'semestral_8': 'Semestral',
       'semestral_6': 'Semestral',
       'anual_16': 'Anual',
+      'trial_15': 'Trial 15 Dias',
       'Unlimited Elite': 'Unlimited Elite',
       'Iniciante': 'Sem Acesso'
     };

@@ -150,15 +150,21 @@ export default function AdminPanel() {
       });
 
       // 2. Update user plan and expiry
-      const daysToAdd = payment.planId === 'anual_16' ? 365 : (payment.planId === 'semestral_6' ? 180 : 30);
+      const daysToAdd = payment.planId === 'anual_16' ? 365 : (payment.planId === 'semestral_8' || payment.planId === 'semestral_6' ? 180 : (payment.planId === 'trimestral_6' ? 90 : 30));
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + daysToAdd);
 
-      await updateDoc(doc(db, 'usuarios', payment.userId), {
+      const userUpdateFields: any = {
         plan_type: payment.planId,
-        expiry_date: expiryDate,
+        expiry_date: expiryDate.toISOString(),
         updatedAt: new Date().toISOString()
-      });
+      };
+
+      if (payment.usedCoupon) {
+        userUpdateFields.usedCoupon = payment.usedCoupon;
+      }
+
+      await updateDoc(doc(db, 'usuarios', payment.userId), userUpdateFields);
 
       // 3. Referral check (affiliate commission)
       const userRef = doc(db, 'usuarios', payment.userId);
@@ -1324,7 +1330,7 @@ export default function AdminPanel() {
               <button 
                 onClick={async () => {
                   await setDoc(doc(db, 'settings', 'global'), { ...settings, affiliateMode: 'free_month' });
-                  alert('Modo Alterado: Convidar 2 Traders = 1 Mês Grátis!');
+                  alert('Modo Alterado: Convidar 5 Traders = 1 Mês Grátis!');
                 }}
                 className={`p-5 rounded-2xl border text-left flex items-start gap-4 transition-all ${
                   (settings?.affiliateMode || 'commission_30') === 'free_month' 
@@ -1334,9 +1340,9 @@ export default function AdminPanel() {
               >
                 <span className="material-symbols-outlined text-amber-500 text-3xl">gif_box</span>
                 <div>
-                  <p className="font-bold text-sm">Opção 1: Convidar 2 = 1 Mês Grátis</p>
+                  <p className="font-bold text-sm">Opção 1: Convidar 5 = 1 Mês Grátis (Modo Parceria)</p>
                   <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                    Ideal para crescimento orgânico sem custos de caixa. A cada 2 recomendações que ativarem um plano, o afiliado ganha 1 mês grátis.
+                    Ideal para crescimento orgânico acelerado. A cada 5 recomendações registadas, o afiliado ganha 1 mês grátis (as recomendações recebem 15 dias de teste grátis).
                   </p>
                 </div>
               </button>

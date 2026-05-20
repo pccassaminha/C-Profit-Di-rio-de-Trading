@@ -36,11 +36,14 @@ interface UserProfile {
   referredBy?: string;
   affiliateBalance?: number;
   freeMonthsEarned?: number;
+  refCode?: string;
 }
 
 export default function UserAffiliate() {
   const currentUser = auth.currentUser;
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [msgCopied, setMsgCopied] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [referrals, setReferrals] = useState<ReferralRecord[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
@@ -56,7 +59,8 @@ export default function UserAffiliate() {
   const [payoutSuccess, setPayoutSuccess] = useState(false);
   const [payoutError, setPayoutError] = useState<string | null>(null);
 
-  const referralLink = `${window.location.origin}?ref=${currentUser?.uid || ''}`;
+  const myRefCode = profile?.refCode || currentUser?.uid.substring(0, 6).toUpperCase() || '';
+  const referralLink = `${window.location.origin}?ref=${myRefCode}`;
 
   // Load user profile
   useEffect(() => {
@@ -104,6 +108,20 @@ export default function UserAffiliate() {
     navigator.clipboard.writeText(referralLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(myRefCode);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  };
+
+  const promoMessage = `📈 Conheça o C Profit — o terminal definitivo para traders profissionais! \n\nFaça o diário de todos os seus trades automáticos e manuais de Forex e Opções Binárias, controle limites, drawdown, winrate e analise métricas em tempo real!\n\n🎁 Clique no link para fazer o seu cadastro e ganhe 15 DIAS GRÁTIS de teste completo:\n\nLink: ${referralLink}\nOu use o código de indicação: ${myRefCode} na hora de se registrar!`;
+
+  const handleCopyMsg = () => {
+    navigator.clipboard.writeText(promoMessage);
+    setMsgCopied(true);
+    setTimeout(() => setMsgCopied(false), 2000);
   };
 
   const handleRequestPayout = async (e: React.FormEvent) => {
@@ -171,10 +189,9 @@ export default function UserAffiliate() {
   const approvedInvites = referrals.filter(r => r.status === 'approved');
   const approvedInvitedCount = approvedInvites.length;
   
-  // Progress when free month is selected (every 2 invites gets 1 month)
-  // Total months earned: Math.floor(approvedInvitedCount / 2). Progress of next month: approvedInvitedCount % 2
-  const freeMonthProgress = approvedInvitedCount % 2;
-  const totalFreeMonthsEarned = Math.floor(approvedInvitedCount / 2);
+  // Progress when free month is selected (every 5 invites gets 1 month gratis, since "nem todos vão assinar" but all count towards free month!)
+  const freeMonthProgress = totalInvitedCount % 5;
+  const totalFreeMonthsEarned = Math.floor(totalInvitedCount / 5);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
@@ -203,7 +220,7 @@ export default function UserAffiliate() {
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 font-black px-3 py-1 rounded-full uppercase tracking-widest">
-                  O Seu Link Único
+                  Parceria & Convites
                 </span>
                 <h3 className="text-xl font-bold mt-3 text-on-surface">Comece a Convidar Traders</h3>
               </div>
@@ -211,30 +228,89 @@ export default function UserAffiliate() {
             </div>
 
             <p className="text-xs text-on-surface-variant/80 leading-relaxed font-medium">
-              Abaixo está o seu link de convite exclusivo. Qualquer pessoa que criar conta na plataforma Profit através dele será associada a si como recomendado directo.
+              Abaixo estão suas credenciais exclusivas de convite. Os novos traders podem usar tanto o seu link direto quanto digitar o seu Código de Indicação manualmente durante o cadastro para receber o teste grátis de 15 dias. <strong className="text-primary">Lembre-se: os seus convites são 100% infinitos e ilimitados, mesmo para utilizadores em teste grátis (Trial)!</strong>
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input 
-                type="text" 
-                readOnly 
-                value={referralLink}
-                className="flex-1 bg-surface-container-high border border-outline-variant/30 rounded-2xl px-5 py-4 text-sm font-bold text-on-surface select-all text-ellipsis overflow-hidden font-mono outline-none"
-              />
-              <button 
-                onClick={handleCopyLink}
-                className={`flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-primary text-on-primary hover:scale-[1.02] active:scale-95'}`}
-              >
-                {copied ? (
-                  <>
-                    <Check size={16} /> Copiado!
-                  </>
-                ) : (
-                  <>
-                    <Copy size={16} /> Copiar Link
-                  </>
-                )}
-              </button>
+            <div className="space-y-4">
+              {/* Link Input Row */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-on-surface-variant tracking-wider block ml-1">O Seu Link Direto de Convite</label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input 
+                    type="text" 
+                    readOnly 
+                    value={referralLink}
+                    className="flex-1 bg-surface-container-high border border-outline-variant/30 rounded-2xl px-5 py-4 text-sm font-bold text-on-surface select-all text-ellipsis overflow-hidden font-mono outline-none"
+                  />
+                  <button 
+                    onClick={handleCopyLink}
+                    className={`flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shrink-0 ${copied ? 'bg-emerald-500 text-white animate-pulse' : 'bg-primary text-on-primary hover:scale-[1.02] active:scale-95'}`}
+                  >
+                    {copied ? (
+                      <>
+                        <Check size={16} /> Copiado!
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={16} /> Copiar Link
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Code Input Row */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-on-surface-variant tracking-wider block ml-1">O Seu Código de Indicação</label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input 
+                    type="text" 
+                    readOnly 
+                    value={myRefCode}
+                    className="flex-1 bg-surface-container-high border border-outline-variant/30 rounded-2xl px-5 py-4 text-sm font-black text-[#00f5a0] tracking-wider select-all font-mono outline-none"
+                  />
+                  <button 
+                    onClick={handleCopyCode}
+                    className={`flex items-center justify-center gap-2 px-3 sm:px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shrink-0 ${codeCopied ? 'bg-emerald-500 text-white' : 'bg-surface-container-high border border-outline hover:border-primary text-on-surface hover:scale-[1.02]'}`}
+                  >
+                    {codeCopied ? (
+                      <>
+                        <Check size={16} /> Copiado!
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={16} /> Copiar Código
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Promo Pitch Copy */}
+              <div className="space-y-2 pt-2 border-t border-outline-variant/10">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-[#00f5a0] tracking-widest">
+                    Anúncio Pronto de 15 Dias de Teste (WhatsApp / Telegram)
+                  </span>
+                  <button 
+                    onClick={handleCopyMsg}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${msgCopied ? 'bg-emerald-500 text-white' : 'bg-primary/20 text-primary hover:bg-primary/30'}`}
+                  >
+                    {msgCopied ? (
+                      <>
+                        <Check size={12} /> Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={12} /> Copiar Mensagem
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="bg-surface-container-high/40 rounded-2xl p-4 border border-outline-variant/10 text-xs font-medium text-on-surface-variant leading-relaxed select-all whitespace-pre-wrap max-h-[180px] overflow-y-auto font-sans">
+                  {promoMessage}
+                </div>
+              </div>
             </div>
 
             <div className="pt-4 border-t border-outline-variant/10 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -301,29 +377,29 @@ export default function UserAffiliate() {
                   <div className="flex items-center gap-4">
                     <Gift className="text-amber-500 shrink-0" size={32} />
                     <div>
-                      <p className="font-bold text-on-surface">Meta de Convidado: 2 Usuários = 1 Mês Grátis</p>
-                      <p className="text-xs text-on-surface-variant">Basta que 2 utilizadores ativem planos de assinatura usando o seu link.</p>
+                      <p className="font-bold text-on-surface">Meta de Convidado: 5 Usuários = 1 Mês Grátis</p>
+                      <p className="text-xs text-on-surface-variant">Basta convidar 5 pessoas (elas registam-se com o seu convite de 15 dias de teste e contam imediatamente!).</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-black text-on-surface-variant uppercase tracking-widest">Seu Progresso</p>
-                    <p className="text-3xl font-black text-amber-400 font-mono">{freeMonthProgress}/2</p>
+                    <p className="text-3xl font-black text-amber-400 font-mono">{freeMonthProgress}/5</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs text-on-surface-variant font-bold">
                     <span>Próximo Mês Grátis</span>
-                    <span>{freeMonthProgress === 1 ? '50%' : freeMonthProgress === 0 && approvedInvitedCount > 0 ? '100% Concluído!' : '0%'}</span>
+                    <span>{Math.round((freeMonthProgress / 5) * 100)}% ({freeMonthProgress === 0 && totalInvitedCount > 0 ? 'Concluído!' : `${freeMonthProgress} de 5`})</span>
                   </div>
                   <div className="w-full bg-surface-container-high rounded-full h-3 overflow-hidden">
                     <div 
                       className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${(freeMonthProgress / 2) * 100}%` }}
+                      style={{ width: `${(freeMonthProgress / 5) * 100}%` }}
                     ></div>
                   </div>
                   <p className="text-[11px] text-on-surface-variant/70 italic mt-1 pb-2">
-                    Já ganhou {totalFreeMonthsEarned} mês(es) inteiramente grátis de assinatura ativa! Estes serão liberados pelo suporte/administrador após validação.
+                    Já ganhou {totalFreeMonthsEarned} mês(es) inteiramente grátis de assinatura ativa! Como o modo de parceria grátis só é ativado por convite, cada utilizador registado conta diretamente para o seu progresso.
                   </p>
                 </div>
               </div>

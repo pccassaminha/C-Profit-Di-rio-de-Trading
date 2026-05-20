@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -8,7 +8,7 @@ import {
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, 
@@ -41,12 +41,22 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [couponCode, setCouponCode] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState('Iniciante');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLogin) {
+      const storedRef = localStorage.getItem('referredBy');
+      if (storedRef) {
+        setCouponCode(storedRef.toUpperCase());
+      }
+    }
+  }, [isLogin]);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -62,17 +72,58 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       
       if (isNewUser) {
         const referredBy = localStorage.getItem('referredBy') || null;
-        // Create initial profile for Google user
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + 15);
+
+        // Resolve referredBy if it is a short refCode or UID
+        let finalReferredUid: string | null = null;
+        if (referredBy) {
+          const cleanRef = referredBy.trim().toUpperCase();
+          const qUserRef = query(collection(db, 'usuarios'), where('refCode', '==', cleanRef));
+          const userRefSnap = await getDocs(qUserRef);
+          if (!userRefSnap.empty) {
+            finalReferredUid = userRefSnap.docs[0].id;
+          } else {
+            const directDoc = await getDoc(doc(db, 'usuarios', referredBy));
+            if (directDoc.exists()) {
+              finalReferredUid = directDoc.id;
+            }
+          }
+        }
+
+        const isTrialQualified = !!(finalReferredUid || referredBy);
+        const resolvedPlanType = isTrialQualified ? 'trial_15' : selectedPlan;
+        const resolvedExpiryDate = isTrialQualified ? expiryDate.toISOString() : new Date().toISOString();
+
+        // Create initial profile for Google user with trial restricted to referred users
         await setDoc(userRef, {
           nome: result.user.displayName || 'Usuário Google',
           email: result.user.email,
           createdAt: new Date().toISOString(),
-          plan_type: 'Iniciante',
-          account_limit: 2,
+          plan_type: resolvedPlanType,
+          expiry_date: resolvedExpiryDate,
+          account_limit: resolvedPlanType === 'anual_16' ? 32 : (resolvedPlanType === 'semestral_8' ? 16 : 12),
           role: 'user',
-          referredBy: referredBy,
+          refCode: result.user.uid.substring(0, 6).toUpperCase(),
+          referredBy: finalReferredUid || referredBy,
           affiliateBalance: 0
         });
+
+        // Register referral if referred
+        if (isTrialQualified) {
+          await addDoc(collection(db, 'referrals'), {
+            referrerId: finalReferredUid || referredBy,
+            referredId: result.user.uid,
+            referredName: result.user.displayName || 'Usuário Google',
+            referredEmail: result.user.email || '',
+            referredPlan: 'trial_15',
+            paymentAmount: 0,
+            rewardType: 'free_month',
+            rewardValue: '1_month_free_progress',
+            status: 'approved',
+            createdAt: new Date().toISOString()
+          });
+        }
       }
       
       onSuccess();
@@ -116,16 +167,36 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
 
     try {
       let validCoupon: any = null;
+      let solvedReferredUid: string | null = null;
 
       if (!isLogin && couponCode.trim() !== '') {
-        const qCoupons = query(collection(db, 'coupons'), where('code', '==', couponCode.trim().toUpperCase()), where('active', '==', true));
+        const uppercaseCode = couponCode.trim().toUpperCase();
+
+        // 1. Check if it's a promotional coupon (Maestro coupon)
+        const qCoupons = query(collection(db, 'coupons'), where('code', '==', uppercaseCode), where('active', '==', true));
         const couponSnap = await getDocs(qCoupons);
-        if (couponSnap.empty) {
-          setError('Cupom ou referência de parceiro inválido ou expirado.');
-          setLoading(false);
-          return;
+        
+        if (!couponSnap.empty) {
+          validCoupon = { id: couponSnap.docs[0].id, ...couponSnap.docs[0].data() };
+        } else {
+          // 2. See if it matches a user's reference code (refCode)
+          const qUserRef = query(collection(db, 'usuarios'), where('refCode', '==', uppercaseCode));
+          const userRefSnap = await getDocs(qUserRef);
+          
+          if (!userRefSnap.empty) {
+            solvedReferredUid = userRefSnap.docs[0].id; // The UID of the parent referrer user
+          } else {
+            // Check if they directly pasted a full UID as code
+            const parentUserDoc = await getDoc(doc(db, 'usuarios', couponCode.trim()));
+            if (parentUserDoc.exists()) {
+              solvedReferredUid = parentUserDoc.id;
+            } else {
+              setError('Cupom ou código de indicação (convite) inexistente ou inativo.');
+              setLoading(false);
+              return;
+            }
+          }
         }
-        validCoupon = { id: couponSnap.docs[0].id, ...couponSnap.docs[0].data() };
       }
 
       if (isLogin) {
@@ -137,16 +208,43 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         if (name) {
           await updateProfile(result.user, { displayName: name });
         }
+        
         const referredBy = localStorage.getItem('referredBy') || null;
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + 15);
+
+        let finalReferredUid: string | null = null;
+        if (solvedReferredUid) {
+          finalReferredUid = solvedReferredUid;
+        } else if (referredBy) {
+          const cleanRef = referredBy.trim().toUpperCase();
+          const qUserRef = query(collection(db, 'usuarios'), where('refCode', '==', cleanRef));
+          const userRefSnap = await getDocs(qUserRef);
+          if (!userRefSnap.empty) {
+            finalReferredUid = userRefSnap.docs[0].id;
+          } else {
+            const directDoc = await getDoc(doc(db, 'usuarios', referredBy));
+            if (directDoc.exists()) {
+              finalReferredUid = directDoc.id;
+            }
+          }
+        }
+
+        const isTrialQualified = !!(finalReferredUid || referredBy);
+        const resolvedPlanType = isTrialQualified ? 'trial_15' : selectedPlan;
+        const resolvedExpiryDate = isTrialQualified ? expiryDate.toISOString() : new Date().toISOString();
+
         const newUserData: any = {
           nome: name,
           email: email,
           phoneNumber: phoneNumber,
           createdAt: new Date().toISOString(),
-          plan_type: 'Iniciante',
-          account_limit: 2,
+          plan_type: resolvedPlanType,
+          expiry_date: resolvedExpiryDate,
+          account_limit: resolvedPlanType === 'anual_16' ? 32 : (resolvedPlanType === 'semestral_8' ? 16 : 12),
           role: 'user',
-          referredBy: referredBy,
+          refCode: result.user.uid.substring(0, 6).toUpperCase(),
+          referredBy: finalReferredUid || referredBy,
           affiliateBalance: 0
         };
 
@@ -158,6 +256,22 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         await setDoc(doc(db, 'usuarios', result.user.uid), newUserData);
+
+        // Register referral if referred
+        if (isTrialQualified) {
+          await addDoc(collection(db, 'referrals'), {
+            referrerId: finalReferredUid || referredBy,
+            referredId: result.user.uid,
+            referredName: name || 'Novo Trader',
+            referredEmail: email,
+            referredPlan: 'trial_15',
+            paymentAmount: 0,
+            rewardType: 'free_month',
+            rewardValue: '1_month_free_progress',
+            status: 'approved',
+            createdAt: new Date().toISOString()
+          });
+        }
         onSuccess();
       }
     } catch (err: any) {
@@ -321,16 +435,46 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-2 overflow-hidden"
                   >
-                    <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50">Código de Desconto / Parceiro</label>
+                    <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50">Código de Convite / Cupom</label>
                     <div className="relative">
                       <Target className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40" size={20} />
                       <input 
                         type="text" 
                         value={couponCode}
                         onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                        placeholder="Opcional"
+                        placeholder="Ex: Código de amigo ou cupom de desconto (Opcional)"
                         className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-4 text-on-surface outline-none focus:border-primary transition-all font-bold placeholder:text-on-surface-variant/30 uppercase"
                       />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence mode="wait">
+                {!isLogin && !isForgotPassword && !localStorage.getItem('referredBy') && !couponCode.trim() && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-2 overflow-hidden"
+                  >
+                    <label className="text-xs font-black uppercase tracking-widest text-[#00f5a0] ml-1 font-mono">Escolher Plano de Assinatura</label>
+                    <div className="relative">
+                      <Layout className="absolute left-4 top-1/2 -translate-y-1/2 text-[#00f5a0]" size={20} />
+                      <select 
+                        value={selectedPlan}
+                        onChange={(e) => setSelectedPlan(e.target.value)}
+                        className="w-full bg-surface-container border-2 border-[#00f5a0]/30 rounded-2xl pl-12 pr-10 py-4 text-white outline-none focus:border-[#00f5a0] transition-all font-bold text-sm appearance-none cursor-pointer"
+                      >
+                        <option value="Iniciante">Iniciante / Teste Básico (Gratuito)</option>
+                        <option value="mensal_6">Plano Mensal — Kz 5.000 / mês</option>
+                        <option value="trimestral_6">Plano Trimestral — Kz 15.000 / 3 meses</option>
+                        <option value="semestral_8">Plano Semestral — Kz 25.000 / 6 meses</option>
+                        <option value="anual_16">Plano Anual — Kz 45.000 / ano</option>
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
+                         <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                      </div>
                     </div>
                   </motion.div>
                 )}
