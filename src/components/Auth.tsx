@@ -18,7 +18,6 @@ import {
   User, 
   ArrowRight, 
   AlertCircle,
-  Layout,
   LineChart,
   Target,
   CheckCircle,
@@ -41,7 +40,6 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [couponCode, setCouponCode] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState('Iniciante');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -92,17 +90,17 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         const isTrialQualified = !!(finalReferredUid || referredBy);
-        const resolvedPlanType = isTrialQualified ? 'trial_15' : selectedPlan;
-        const resolvedExpiryDate = isTrialQualified ? expiryDate.toISOString() : new Date().toISOString();
+        const resolvedPlanType = 'trial_15';
+        const resolvedExpiryDate = expiryDate.toISOString();
 
-        // Create initial profile for Google user with trial restricted to referred users
+        // Create initial profile for Google user with 15 days free trial
         await setDoc(userRef, {
           nome: result.user.displayName || 'Usuário Google',
           email: result.user.email,
           createdAt: new Date().toISOString(),
           plan_type: resolvedPlanType,
           expiry_date: resolvedExpiryDate,
-          account_limit: resolvedPlanType === 'anual_16' ? 32 : (resolvedPlanType === 'semestral_8' ? 16 : 12),
+          account_limit: 2,
           role: 'user',
           refCode: result.user.uid.substring(0, 6).toUpperCase(),
           referredBy: finalReferredUid || referredBy,
@@ -231,8 +229,8 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         const isTrialQualified = !!(finalReferredUid || referredBy);
-        const resolvedPlanType = isTrialQualified ? 'trial_15' : selectedPlan;
-        const resolvedExpiryDate = isTrialQualified ? expiryDate.toISOString() : new Date().toISOString();
+        const resolvedPlanType = 'trial_15';
+        const resolvedExpiryDate = expiryDate.toISOString();
 
         const newUserData: any = {
           nome: name,
@@ -241,7 +239,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
           createdAt: new Date().toISOString(),
           plan_type: resolvedPlanType,
           expiry_date: resolvedExpiryDate,
-          account_limit: resolvedPlanType === 'anual_16' ? 32 : (resolvedPlanType === 'semestral_8' ? 16 : 12),
+          account_limit: 2,
           role: 'user',
           refCode: result.user.uid.substring(0, 6).toUpperCase(),
           referredBy: finalReferredUid || referredBy,
@@ -450,35 +448,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
                 )}
               </AnimatePresence>
 
-              <AnimatePresence mode="wait">
-                {!isLogin && !isForgotPassword && !localStorage.getItem('referredBy') && !couponCode.trim() && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="space-y-2 overflow-hidden"
-                  >
-                    <label className="text-xs font-black uppercase tracking-widest text-[#00f5a0] ml-1 font-mono">Escolher Plano de Assinatura</label>
-                    <div className="relative">
-                      <Layout className="absolute left-4 top-1/2 -translate-y-1/2 text-[#00f5a0]" size={20} />
-                      <select 
-                        value={selectedPlan}
-                        onChange={(e) => setSelectedPlan(e.target.value)}
-                        className="w-full bg-surface-container border-2 border-[#00f5a0]/30 rounded-2xl pl-12 pr-10 py-4 text-white outline-none focus:border-[#00f5a0] transition-all font-bold text-sm appearance-none cursor-pointer"
-                      >
-                        <option value="Iniciante">Iniciante / Teste Básico (Gratuito)</option>
-                        <option value="mensal_6">Plano Mensal — Kz 5.000 / mês</option>
-                        <option value="trimestral_6">Plano Trimestral — Kz 15.000 / 3 meses</option>
-                        <option value="semestral_8">Plano Semestral — Kz 25.000 / 6 meses</option>
-                        <option value="anual_16">Plano Anual — Kz 45.000 / ano</option>
-                      </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
-                         <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+
 
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50">E-mail Profissional</label>

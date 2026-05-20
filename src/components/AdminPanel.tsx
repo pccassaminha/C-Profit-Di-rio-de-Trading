@@ -1524,7 +1524,7 @@ export default function AdminPanel() {
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl">
             <h4 className="font-bold text-sm text-on-surface mb-3 uppercase tracking-wider">Premiação Especial: Conceder Plano / Mês Avulso</h4>
             <p className="text-xs text-on-surface-variant mb-6 leading-relaxed">
-              Desejas premiar um convidado de forma manual ou liberar prêmio avulso? Pode selecionar o afiliado abaixo e creditar 30 dias de acesso completo à plataforma (validando o bónus do convite de 2 utilizadores).
+              Desejas premiar um convidado de forma manual ou liberar prêmio avulso? Pode selecionar o afiliado abaixo e creditar 30 dias de acesso completo à plataforma (validando o bónus do convite de 5 utilizadores).
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <select id="freeMonthUserSelect" className="flex-1 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm font-medium">
