@@ -189,14 +189,86 @@ export default function UserAffiliate() {
   const approvedInvites = referrals.filter(r => r.status === 'approved');
   const approvedInvitedCount = approvedInvites.length;
   
-  // Progress when free month is selected (every 5 invites gets 1 month gratis, since "nem todos vão assinar" but all count towards free month!)
+  // Progress when free month is selected (every 5 invites gets 1 month gratis)
   const freeMonthProgress = totalInvitedCount % 5;
   const totalFreeMonthsEarned = Math.floor(totalInvitedCount / 5);
+
+  // Dynamic Tier Calculation for user
+  const getTier = (count: number) => {
+    if (count >= 50) {
+      return {
+        level: 5,
+        name: 'Nível 5 (Maestro Elite)',
+        commission: 30,
+        payoutType: 'Dinheiro Real (Payout IBAN Directo)',
+        color: 'text-[#00f5a0]',
+        bgColor: 'border-[#00f5a0]/40 bg-[#00f5a0]/5',
+        badge: '👑 N5',
+        gradient: 'from-[#00f5a0]/20 to-[#00f5a0]/5',
+        nextTarget: null,
+        description: 'Parabéns! Payout bancário real de 30% em dinheiro líquido para qualquer plano de inscrição contratado sob sua indicação!'
+      };
+    } else if (count >= 40) {
+      return {
+        level: 4,
+        name: 'Nível 4 (Diamante)',
+        commission: 0,
+        payoutType: 'Mês Grátis (Bónus 3 Meses)',
+        color: 'text-cyan-400',
+        bgColor: 'border-cyan-500/20 bg-cyan-500/5',
+        badge: '♦ N4',
+        gradient: 'from-cyan-500/10 to-transparent',
+        nextTarget: { targetCount: 50, name: 'Nível 5 (Maestro Elite)', needed: 50 - count },
+        description: 'Excelente! Alcançou o Nível 4 e garantiu 3 Meses Gratuitos de assinatura ativa na plataforma!'
+      };
+    } else if (count >= 25) {
+      return {
+        level: 3,
+        name: 'Nível 3 (Ouro)',
+        commission: 0,
+        payoutType: 'Mês Grátis (Bónus 2 Meses)',
+        color: 'text-yellow-400',
+        bgColor: 'border-yellow-500/20 bg-yellow-500/5',
+        badge: '★ N3',
+        gradient: 'from-yellow-500/10 to-transparent',
+        nextTarget: { targetCount: 40, name: 'Nível 4 (Diamante)', needed: 40 - count },
+        description: 'Óptimo trabalho! Garantiu de bónus 2 Meses Completamente Gratuitos de assinatura!'
+      };
+    } else if (count >= 10) {
+      return {
+        level: 2,
+        name: 'Nível 2 (Prata)',
+        commission: 0,
+        payoutType: 'Mês Grátis (Bónus 1 Mês)',
+        color: 'text-slate-300',
+        bgColor: 'border-slate-500/20 bg-slate-500/5',
+        badge: '✦ N2',
+        gradient: 'from-slate-500/10 to-transparent',
+        nextTarget: { targetCount: 25, name: 'Nível 3 (Ouro)', needed: 25 - count },
+        description: 'Parabéns! Alcançou o Nível 2 e garantiu 1 Mês Inteiro Gratuito de assinatura na plataforma!'
+      };
+    } else {
+      return {
+        level: 1,
+        name: 'Nível 1 (Bronze)',
+        commission: 0,
+        payoutType: 'Mês Grátis Progressivo',
+        color: 'text-orange-400',
+        bgColor: 'border-orange-500/20 bg-orange-500/5',
+        badge: '● N1',
+        gradient: 'from-orange-500/10 to-transparent',
+        nextTarget: { targetCount: 10, name: 'Nível 2 (Prata)', needed: 10 - count },
+        description: 'Partilhe com a sua rede de traders. Ao atingir 10 convites aprovados, desbloqueia meses de assinatura inteiramente grátis!'
+      };
+    }
+  };
+
+  const currentTier = getTier(approvedInvitedCount);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-surface-container-low border border-outline-variant/10 p-6 rounded-[24px] shadow-sm">
         <div>
           <h2 className="text-3xl font-black text-on-surface font-headline italic uppercase tracking-tighter">
             Área de <span className="text-primary italic">Afiliados</span>
@@ -204,6 +276,13 @@ export default function UserAffiliate() {
           <p className="text-sm text-on-surface-variant max-w-2xl mt-1 font-medium leading-relaxed">
             Convide amigos e outros traders para a plataforma Profit e ganhe prêmios exclusivos ou 30% de comissões em dinheiro diretamente na sua conta bancária.
           </p>
+        </div>
+        <div className={`px-5 py-3 rounded-2xl border ${currentTier.bgColor} flex items-center gap-3 shadow-md`}>
+          <span className="text-2xl font-black">{currentTier.badge}</span>
+          <div>
+            <p className="text-[10px] font-black uppercase text-on-surface-variant tracking-widest">Nível de Afiliados Actual</p>
+            <p className={`text-sm font-bold ${currentTier.color}`}>{currentTier.name}</p>
+          </div>
         </div>
       </div>
 
@@ -365,60 +444,90 @@ export default function UserAffiliate() {
             </div>
           </div>
 
-          {/* Current Strategy Progress card */}
-          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl">
-            <h4 className="text-base font-black uppercase tracking-widest text-on-surface-variant mb-4">
-              Método de Recompensa Ativo na Plataforma
-            </h4>
-
-            {activeMode === 'free_month' ? (
-              <div className="space-y-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-5 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
-                  <div className="flex items-center gap-4">
-                    <Gift className="text-amber-500 shrink-0" size={32} />
-                    <div>
-                      <p className="font-bold text-on-surface">Meta de Convidado: 5 Usuários = 1 Mês Grátis</p>
-                      <p className="text-xs text-on-surface-variant">Basta convidar 5 pessoas (elas registam-se com o seu convite de 15 dias de teste e contam imediatamente!).</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-black text-on-surface-variant uppercase tracking-widest">Seu Progresso</p>
-                    <p className="text-3xl font-black text-amber-400 font-mono">{freeMonthProgress}/5</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs text-on-surface-variant font-bold">
-                    <span>Próximo Mês Grátis</span>
-                    <span>{Math.round((freeMonthProgress / 5) * 100)}% ({freeMonthProgress === 0 && totalInvitedCount > 0 ? 'Concluído!' : `${freeMonthProgress} de 5`})</span>
-                  </div>
-                  <div className="w-full bg-surface-container-high rounded-full h-3 overflow-hidden">
-                    <div 
-                      className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${(freeMonthProgress / 5) * 100}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-[11px] text-on-surface-variant/70 italic mt-1 pb-2">
-                    Já ganhou {totalFreeMonthsEarned} mês(es) inteiramente grátis de assinatura ativa! Como o modo de parceria grátis só é ativado por convite, cada utilizador registado conta diretamente para o seu progresso.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-center gap-4">
-                  <DollarSign className="text-emerald-500 shrink-0" size={32} />
-                  <div>
-                    <h5 className="font-bold text-on-surface">30% de Comissão por Cada Venda</h5>
-                    <p className="text-xs text-on-surface-variant leading-relaxed">
-                      Por cada pessoa nova que utilizar o seu link e tiver o primeiro pagamento ativado na plataforma, você receberá instantaneamente 30% do valor do plano faturado!
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-on-surface-variant/80 italic leading-relaxed">
-                  As comissões aprovadas são acumuladas no seu Saldo Disponível acima. Pode clicar no botão na coluna à direita para solicitar o levantamento para a sua conta nacional angolana a partir do limite estipulado.
+          {/* Plano de Carreira & Níveis do Afiliado */}
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h4 className="text-base font-black uppercase tracking-widest text-[#00f5a0]">
+                  Seu Plano de Carreira de Afiliado
+                </h4>
+                <p className="text-xs text-on-surface-variant font-medium mt-1">
+                  Recomende mais traders para subir de nível e aumentar sua comissão e recompensas!
                 </p>
               </div>
-            )}
+              <div className="bg-surface-container border border-outline-variant/20 px-4 py-2 rounded-xl text-center">
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Taxa de Comissão Actual</p>
+                <p className="text-xl font-mono font-black text-[#00f5a0]">{currentTier.commission}%</p>
+              </div>
+            </div>
+
+            {/* Visual Level indicator cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-2">
+              {[
+                { lvl: 1, name: 'Bronze', count: '1-9', reward: 'Mês Progresso', bg: 'from-orange-600/20 to-transparent text-orange-400', minCount: 1 },
+                { lvl: 2, name: 'Prata', count: '10-24', reward: '1 Mês Grátis', bg: 'from-slate-400/20 to-transparent text-slate-300', minCount: 10 },
+                { lvl: 3, name: 'Ouro', count: '25-39', reward: '2 Meses Grátis', bg: 'from-yellow-500/20 to-transparent text-yellow-400', minCount: 25 },
+                { lvl: 4, name: 'Diamante', count: '40-49', reward: '3 Meses Grátis', bg: 'from-cyan-500/20 to-transparent text-cyan-400', minCount: 40 },
+                { lvl: 5, name: 'Maestro Elite', count: '50+', reward: '30% Dinheiro', bg: 'from-[#00f5a0]/20 to-transparent text-[#00f5a0]', minCount: 50, isMoney: true }
+              ].map((tierItem) => {
+                const isCurrent = currentTier.level === tierItem.lvl;
+                const isPassed = approvedInvitedCount >= tierItem.minCount;
+                
+                return (
+                  <div 
+                    key={tierItem.lvl} 
+                    className={`p-3.5 rounded-2xl border transition-all ${
+                      isCurrent 
+                        ? `border-[#00f5a0] bg-[#00f5a0]/5 shadow-lg shadow-[#00f5a0]/5 scale-105 relative z-10` 
+                        : isPassed 
+                        ? 'border-outline/40 bg-surface-container/30 opacity-75' 
+                        : 'border-outline-variant/15 bg-surface-container/10 opacity-40'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[10px] font-black font-mono tracking-widest opacity-80">N{tierItem.lvl}</span>
+                      {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-[#00f5a0] animate-pulse"></span>}
+                    </div>
+                    <p className="text-xs font-bold text-white leading-tight truncate">{tierItem.name}</p>
+                    <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">{tierItem.count} convites</p>
+                    <div className="mt-3 pt-2 border-t border-outline-variant/15 flex justify-between items-center text-[11px] font-bold">
+                      <span className="text-on-surface-variant font-normal">Recompensa:</span>
+                      <span className={isCurrent ? 'text-[#00f5a0] font-black' : 'text-white'}>{tierItem.reward}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Target description banner */}
+            <div className="p-4 bg-[#00f5a0]/5 border border-[#00f5a0]/15 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-white flex items-center gap-2">
+                  <span className="text-lg">🏆</span> {currentTier.description}
+                </p>
+                {currentTier.nextTarget && (
+                  <p className="text-[11px] text-[#00f5a0] font-mono font-medium">
+                    Faltam apenas {currentTier.nextTarget.needed} indicações válidas para atingir o {currentTier.nextTarget.name}!
+                  </p>
+                )}
+              </div>
+              {currentTier.nextTarget && (
+                <div className="text-xs text-on-surface-variant font-mono font-bold bg-surface-container px-3 py-1.5 rounded-xl border border-outline-variant/10 whitespace-nowrap">
+                  Progresso: {approvedInvitedCount} / {currentTier.nextTarget.targetCount}
+                </div>
+              )}
+            </div>
+
+            {/* Special payout rules banner */}
+            <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-center gap-4">
+              <DollarSign className="text-emerald-500 shrink-0" size={28} />
+              <div>
+                <h5 className="font-bold text-xs text-white uppercase tracking-wider">Regra de Levantamento em Dinheiro Real</h5>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed mt-0.5">
+                  Os afiliados do <strong className="text-[#00f5a0]">Nível 5 (50+ convites ativos)</strong> possuem payout direto. Suas recompensas de <strong className="text-white">30% sobre todo faturamento angariador</strong> serão pagas 100% em dinheiro líquido no seu IBAN cadastrado!
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Referral table list */}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { LineChart, ShieldCheck, Zap, TrendingUp, Wallet, ArrowRight, CheckCircle2, Globe, BarChart3, Lock } from 'lucide-react';
 import Plans from './Plans';
@@ -10,6 +10,16 @@ interface LandingProps {
 }
 
 export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: LandingProps) {
+  const [activePreviewTab, setActivePreviewTab] = useState<'dashboard' | 'diario' | 'psicologia' | 'planeador'>('dashboard');
+  const [couponCopied, setCouponCopied] = useState(false);
+
+  const copyCouponCode = () => {
+    navigator.clipboard.writeText('DESCONTODE50%');
+    setCouponCopied(true);
+    setTimeout(() => {
+      setCouponCopied(false);
+    }, 3000);
+  };
   return (
     <div className="min-h-screen bg-background text-on-surface font-body overflow-x-hidden">
       <div className="noise-overlay"></div>
@@ -24,6 +34,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
           <li><a href="#recursos" className="text-[13px] font-medium tracking-[0.08em] uppercase text-on-surface-variant hover:text-primary transition-colors">Recursos</a></li>
           <li><a href="#planos" className="text-[13px] font-medium tracking-[0.08em] uppercase text-on-surface-variant hover:text-primary transition-colors">Planos</a></li>
           <li><a href="#sobre" className="text-[13px] font-medium tracking-[0.08em] uppercase text-on-surface-variant hover:text-primary transition-colors">Sobre</a></li>
+          <li><a href="#afiliados" className="text-[13px] font-medium tracking-[0.08em] uppercase text-[#00f5a0] hover:text-[#00f5a0]/80 transition-colors">Afiliados</a></li>
         </ul>
         <div className="flex items-center gap-[16px]">
           <button onClick={onLoginClick} className="bg-transparent border-none text-on-surface-variant font-body text-[14px] font-medium cursor-pointer hover:text-on-surface transition-colors">Entrar</button>
@@ -204,87 +215,530 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
       <section className="px-[5%] pb-[120px] relative z-10">
         <div className="text-center mb-[48px]">
           <div className="inline-block text-[11px] font-bold tracking-[0.15em] uppercase text-primary mb-[16px]">Plataforma</div>
-          <h2 className="font-headline text-[clamp(36px,4vw,56px)] font-extrabold leading-none tracking-[-0.02em] text-center">Visão geral do <em className="italic text-on-surface-variant font-normal">seu terminal</em></h2>
+          <h2 className="font-headline text-[clamp(36px,4vw,56px)] font-extrabold leading-none tracking-[-0.02em] text-center">
+            Conheça o <em className="italic text-on-surface-variant font-normal">seu terminal de trading</em>
+          </h2>
+          <p className="text-xs text-on-surface-variant max-w-xl mx-auto mt-3 font-medium">
+            Navegue pelos módulos internos e veja como a nossa estrutura organiza os seus trades com dados matematicamente comprováveis e 100% positivos!
+          </p>
         </div>
-        <div className="rounded-[16px] border border-outline-variant overflow-hidden bg-surface-container-low shadow-[0_40px_120px_rgba(0,0,0,0.6),0_0_0_1px_rgba(0,245,160,0.05)] relative">
-          <div className="bg-surface-container-lowest border-b border-outline p-[14px_20px] flex items-center gap-[12px]">
+
+        {/* Tab selection indicators */}
+        <div className="flex flex-wrap justify-center gap-2 mb-8 select-none">
+          <button 
+            onClick={() => setActivePreviewTab('dashboard')} 
+            className={`px-5 py-3 rounded-2xl border text-xs uppercase font-black tracking-widest transition-all ${activePreviewTab === 'dashboard' ? 'bg-[#00f5a0] text-background border-[#00f5a0] shadow-xl shadow-[#00f5a0]/15' : 'bg-surface-container border-outline-variant/15 text-on-surface-variant hover:text-white hover:border-outline-variant/40'}`}
+          >
+            📊 Dashboard Analítico
+          </button>
+          <button 
+            onClick={() => setActivePreviewTab('diario')} 
+            className={`px-5 py-3 rounded-2xl border text-xs uppercase font-black tracking-widest transition-all ${activePreviewTab === 'diario' ? 'bg-[#00f5a0] text-background border-[#00f5a0] shadow-xl shadow-[#00f5a0]/15' : 'bg-surface-container border-outline-variant/15 text-on-surface-variant hover:text-white hover:border-outline-variant/40'}`}
+          >
+            📓 Diário de Trades
+          </button>
+          <button 
+            onClick={() => setActivePreviewTab('psicologia')} 
+            className={`px-5 py-3 rounded-2xl border text-xs uppercase font-black tracking-widest transition-all ${activePreviewTab === 'psicologia' ? 'bg-[#00f5a0] text-background border-[#00f5a0] shadow-xl shadow-[#00f5a0]/15' : 'bg-surface-container border-outline-variant/15 text-on-surface-variant hover:text-white hover:border-outline-variant/40'}`}
+          >
+            🧠 Controlo Psicológico
+          </button>
+          <button 
+            onClick={() => setActivePreviewTab('planeador')} 
+            className={`px-5 py-3 rounded-2xl border text-xs uppercase font-black tracking-widest transition-all ${activePreviewTab === 'planeador' ? 'bg-[#00f5a0] text-background border-[#00f5a0] shadow-xl shadow-[#00f5a0]/15' : 'bg-surface-container border-outline-variant/15 text-on-surface-variant hover:text-white hover:border-outline-variant/40'}`}
+          >
+            📅 Planeador Diário
+          </button>
+        </div>
+
+        {/* Display Panel */}
+        <div className="rounded-[24px] border border-outline-variant/20 overflow-hidden bg-surface-container-low shadow-[0_40px_120px_rgba(0,0,0,0.65),0_0_0_1px_rgba(0,245,160,0.05)] relative">
+          <div className="bg-surface-container-lowest border-b border-outline/10 p-[16px_24px] flex items-center justify-between gap-[12px]">
             <div className="flex gap-[6px]">
               <div className="w-[10px] h-[10px] rounded-full bg-[#ff5f57]"></div>
               <div className="w-[10px] h-[10px] rounded-full bg-[#febc2e]"></div>
               <div className="w-[10px] h-[10px] rounded-full bg-[#28c840]"></div>
             </div>
-            <div className="flex-1 bg-white/5 rounded-[6px] p-[6px_14px] text-[12px] text-on-surface-variant/70 font-mono text-center">
-              cprofit.app/dashboard
+            <div className="flex-1 max-w-sm bg-white/5 rounded-[8px] p-[6px_14px] text-[11px] text-[#00f5a0]/80 font-mono text-center border border-outline-variant/5">
+              cprofit.app/app/{activePreviewTab}
             </div>
+            <span className="text-[10px] font-mono font-bold bg-[#00f5a0]/10 text-[#00f5a0] px-3 py-1 rounded border border-[#00f5a0]/20 hidden sm:inline-block animate-pulse">
+              ● SESSÃO ACTIVADA
+            </span>
           </div>
-          <div className="p-[28px] grid grid-cols-1 md:grid-cols-[220px_1fr_240px] gap-[16px] min-h-[420px]">
-            
-            <div className="hidden md:block bg-surface-container-lowest rounded-[10px] border border-outline p-[20px_16px] row-span-2">
-              <div className="text-[11px] tracking-[0.08em] uppercase text-on-surface-variant/70 mb-[16px] px-[12px]">Navegação</div>
-              <div className="flex items-center gap-[10px] p-[10px_12px] rounded-[8px] text-[13px] mb-[4px] cursor-pointer transition-all bg-primary/10 text-primary">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                Dashboard
-              </div>
-              <div className="flex items-center gap-[10px] p-[10px_12px] rounded-[8px] text-[13px] text-on-surface-variant mb-[4px] cursor-pointer transition-all hover:bg-surface-container">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-70"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                Diário
-              </div>
-              <div className="flex items-center gap-[10px] p-[10px_12px] rounded-[8px] text-[13px] text-on-surface-variant mb-[4px] cursor-pointer transition-all hover:bg-surface-container">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-70"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>
-                Analytics
-              </div>
-            </div>
 
-            <div className="bg-surface-container-lowest rounded-[10px] border border-outline p-[20px]">
-              <div className="flex justify-between items-center mb-[16px]">
-                <div>
-                  <div className="text-[13px] text-on-surface-variant/70 mb-[4px]">Performance Semanal</div>
-                  <div className="font-headline text-[22px] font-extrabold text-[#00f5a0]">+12.4%</div>
+          <div className="p-6 md:p-8 min-h-[460px] bg-gradient-to-br from-surface-container-low to-surface-container-lowest text-left">
+            {activePreviewTab === 'dashboard' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+                {/* Lateral helper list */}
+                <div className="bg-surface-container-lowest rounded-2xl border border-outline/10 p-5 space-y-4">
+                  <h4 className="text-xs font-black uppercase text-[#00f5a0] tracking-widest">Painel Analítico de Risco</h4>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    A análise de performance calcula em tempo real o fator de drawdown, rácio de Sharpe e retorno sobre contas conectadas.
+                  </p>
+                  <div className="p-4 bg-[#00f5a0]/5 border border-[#00f5a0]/10 rounded-xl space-y-3">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-on-surface-variant">Rácio de Sharpe:</span>
+                      <span className="text-white font-black font-mono">3.45 (Excelente)</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-on-surface-variant">Drawdown Máx:</span>
+                      <span className="text-[#00f5a0] font-black font-mono">0.45%</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-[11px] tracking-[0.06em] uppercase bg-primary/10 p-[6px_12px] rounded-[6px] text-primary">Mai 2025</div>
+
+                {/* Growth stats chart box */}
+                <div className="bg-surface-container p-6 rounded-2xl border border-outline/10 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-widest text-on-surface-variant">Lucro Líquido Acumulado</p>
+                      <h4 className="text-2xl font-black text-[#00f5a0] font-mono mt-1">+920.400 Kz</h4>
+                    </div>
+                    <span className="text-[10px] font-black uppercase bg-[#00f5a0]/10 text-[#00f5a0] px-2.5 py-1 rounded">Consistente</span>
+                  </div>
+
+                  {/* Simulated Recharts Line chart area */}
+                  <div className="h-32 flex items-end justify-between pt-6 border-b border-outline-variant/10">
+                    <div className="w-[10%] bg-[#00f5a0] rounded-t-sm" style={{ height: '30%' }}></div>
+                    <div className="w-[10%] bg-[#00f5a0] rounded-t-sm" style={{ height: '45%' }}></div>
+                    <div className="w-[10%] bg-[#00f5a0] rounded-t-sm" style={{ height: '40%' }}></div>
+                    <div className="w-[10%] bg-[#00f5a0] rounded-t-sm" style={{ height: '65%' }}></div>
+                    <div className="w-[10%] bg-[#00f5a0] rounded-t-sm" style={{ height: '58%' }}></div>
+                    <div className="w-[10%] bg-[#00f5a0] rounded-t-sm" style={{ height: '85%' }}></div>
+                    <div className="w-[10%] bg-[#00f5a0] rounded-t-sm" style={{ height: '78%' }}></div>
+                    <div className="w-[10%] bg-[#00f5a0] rounded-t-sm" style={{ height: '100%' }}></div>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-on-surface-variant font-mono">
+                    <span>Semana 1</span>
+                    <span>Semana 2</span>
+                    <span>Semana 3</span>
+                    <span>Semana 4 (Hoje)</span>
+                  </div>
+                </div>
+
+                {/* Live indicators list */}
+                <div className="space-y-4">
+                  <div className="bg-surface-container-lowest p-5 rounded-2xl border border-outline/10">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-on-surface-variant">Taxa de Acerto (Winrate)</p>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <h4 className="text-3xl font-black text-[#00f5a0] font-mono">78.5%</h4>
+                      <span className="text-[11px] text-[#00f5a0] font-semibold">↑ +5.4% de melhoria</span>
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant mt-2">Média global de 35 trades registados sob risco controlado.</p>
+                  </div>
+
+                  <div className="bg-surface-container-lowest p-5 rounded-2xl border border-outline/10">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-on-surface-variant">Fator de Lucro (Profit Factor)</p>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <h4 className="text-3xl font-black text-secondary font-mono">2.84</h4>
+                      <span className="text-[11px] text-secondary font-semibold">Excecional</span>
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant mt-2">Rácio ideal acima de 1.5, comprovando consistência matemática.</p>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-end gap-[4px] h-[120px] pt-[10px]">
-                <div className="flex-1 rounded-t-[4px] bg-[#00f5a0]/60 hover:opacity-80 transition-opacity" style={{height: '45%'}}></div>
-                <div className="flex-1 rounded-t-[4px] bg-[#00f5a0]/60 hover:opacity-80 transition-opacity" style={{height: '60%'}}></div>
-                <div className="flex-1 rounded-t-[4px] bg-[#ff4b6e]/50 hover:opacity-80 transition-opacity" style={{height: '25%'}}></div>
-                <div className="flex-1 rounded-t-[4px] bg-[#00f5a0]/60 hover:opacity-80 transition-opacity" style={{height: '80%'}}></div>
-                <div className="flex-1 rounded-t-[4px] bg-[#00f5a0]/60 hover:opacity-80 transition-opacity" style={{height: '55%'}}></div>
+            )}
+
+            {activePreviewTab === 'diario' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+                {/* Description helper list */}
+                <div className="bg-surface-container-lowest rounded-2xl border border-outline/10 p-5 space-y-4 lg:col-span-1">
+                  <h4 className="text-xs font-black uppercase text-[#00f5a0] tracking-widest">Diário Fotográfico & Clássico</h4>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    Registe as suas entradas automaticamente ou de forma manual. Adicione links de imagens, anotações de sentimento do mercado e gatilhos técnicos.
+                  </p>
+                  <div className="p-4 bg-white/5 border border-outline-variant/10 rounded-xl">
+                    <p className="text-[10px] font-black text-white uppercase tracking-wider mb-2">💡 Estatística de hoje:</p>
+                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                      "Utilizou diários detalhados em 100% dos seus trades hoje, protegendo o seu capital contra o overtrading."
+                    </p>
+                  </div>
+                </div>
+
+                {/* Positive Trades visual list */}
+                <div className="lg:col-span-2 space-y-3">
+                  <h4 className="text-xs font-black uppercase text-on-surface-variant tracking-widest mb-2">Lista de Trades de Alta Performance</h4>
+                  
+                  {/* Trade 1 */}
+                  <div className="bg-surface-container p-4 rounded-xl border border-outline/10 flex flex-col sm:flex-row justify-between sm:items-center gap-3 hover:border-[#00f5a0]/30 transition-all">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs bg-emerald-500/10 text-emerald-400 font-extrabold px-2 py-0.5 rounded">GANHO (WIN)</span>
+                        <span className="text-xs font-black text-white">EURUSD · Compra</span>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        <strong className="text-on-surface font-semibold">Gatilho técnico:</strong> Respeitou a zona de liquidez em M15. Retorno de risco 1:3 cumprido.
+                      </p>
+                      <div className="flex gap-2 text-[10px] text-on-surface-variant/70 font-mono">
+                        <span>Lote: 0.50</span>
+                        <span>·</span>
+                        <span>Estado: 🟢 Calmo e Paciente</span>
+                      </div>
+                    </div>
+                    <div className="text-right whitespace-nowrap">
+                      <span className="text-base font-mono font-black text-[#00f5a0]">+124.500 Kz</span>
+                    </div>
+                  </div>
+
+                  {/* Trade 2 */}
+                  <div className="bg-surface-container p-4 rounded-xl border border-outline/10 flex flex-col sm:flex-row justify-between sm:items-center gap-3 hover:border-[#00f5a0]/30 transition-all">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs bg-emerald-500/10 text-emerald-400 font-extrabold px-2 py-0.5 rounded">GANHO (WIN)</span>
+                        <span className="text-xs font-black text-white">XAUUSD (Ouro) · Venda</span>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        <strong className="text-on-surface font-semibold">Gatilho técnico:</strong> Pullback perfeito após forte quebra estrutural na abertura de Nova Iorque.
+                      </p>
+                      <div className="flex gap-2 text-[10px] text-on-surface-variant/70 font-mono">
+                        <span>Lote: 0.20</span>
+                        <span>·</span>
+                        <span>Estado: 🟢 Altamente Focado</span>
+                      </div>
+                    </div>
+                    <div className="text-right whitespace-nowrap">
+                      <span className="text-base font-mono font-black text-[#00f5a0]">+95.000 Kz</span>
+                    </div>
+                  </div>
+
+                  {/* Trade 3 */}
+                  <div className="bg-surface-container p-4 rounded-xl border border-outline/10 flex flex-col sm:flex-row justify-between sm:items-center gap-3 hover:border-[#00f5a0]/30 transition-all">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs bg-emerald-500/10 text-emerald-400 font-extrabold px-2 py-0.5 rounded">GANHO (WIN)</span>
+                        <span className="text-xs font-black text-white">GBPUSD · Compra</span>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        <strong className="text-on-surface font-semibold">Gatilho técnico:</strong> Rejeição de suporte psicológico com confirmação de volume no indicador.
+                      </p>
+                      <div className="flex gap-2 text-[10px] text-on-surface-variant/70 font-mono">
+                        <span>Lote: 1.00</span>
+                        <span>·</span>
+                        <span>Estado: 🟢 Calmo e Disciplinado</span>
+                      </div>
+                    </div>
+                    <div className="text-right whitespace-nowrap">
+                      <span className="text-base font-mono font-black text-[#00f5a0]">+280.000 Kz</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activePreviewTab === 'psicologia' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+                {/* Psychology cards layout */}
+                <div className="bg-surface-container-lowest rounded-xl border border-outline/10 p-5 space-y-4 lg:col-span-1">
+                  <h4 className="text-xs font-black uppercase text-[#00f5a0] tracking-widest">Mapeamento Emocional</h4>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    Evite a indisciplina e o overtrading antes que afetem a sua banca. Descubra qual é o estado de espírito em que mais lucra.
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant bg-white/5 p-3 rounded-lg border border-outline-variant/10">
+                    💡 <strong className="text-white">Alerta de IA:</strong> "A sua taxa de ganho cresce <strong className="text-[#00f5a0]">72%</strong> quando se sente <strong className="text-white">Calmo</strong>. Posições abertas sob ansiedade registaram perdas menores hoje."
+                  </p>
+                </div>
+
+                <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Box 1 */}
+                  <div className="bg-surface-container p-6 rounded-2xl border border-outline/10 space-y-4">
+                    <h5 className="text-[11px] font-black uppercase tracking-widest text-[#00f5a0]">Métricas Emocionais Globais</h5>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex justify-between text-xs font-bold text-white mb-1.5">
+                          <span>Calmo &amp; Sereno</span>
+                          <span className="text-[#00f5a0]">85%</span>
+                        </div>
+                        <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-full bg-[#00f5a0] rounded-full" style={{ width: '85%' }}></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs font-bold text-white mb-1.5">
+                          <span>Focado &amp; Paciente</span>
+                          <span className="text-secondary">12%</span>
+                        </div>
+                        <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-full bg-secondary rounded-full" style={{ width: '12%' }}></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs font-bold text-white mb-1.5">
+                          <span>Ansioso ou Impaciente</span>
+                          <span className="text-red-400">3%</span>
+                        </div>
+                        <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-full bg-red-500 rounded-full" style={{ width: '3%' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Box 2 */}
+                  <div className="bg-surface-container p-6 rounded-2xl border border-outline/10 flex flex-col justify-between">
+                    <div>
+                      <h5 className="text-[11px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Erros Evitados (Filtros Psicológicos)</h5>
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        Defina gatilhos pré-trade que bloqueiam a sua conta se tentar operar fora do plano habitual de negociação.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 mt-4">
+                      <div className="flex items-center gap-2 p-2.5 bg-[#00f5a0]/5 border border-[#00f5a0]/15 rounded-xl text-[11px] text-[#00f5a0] font-bold">
+                        <span className="text-base">🛡️</span> Bloqueio de Overtrading Ativo (0 violações)
+                      </div>
+                      <div className="flex items-center gap-2 p-2.5 bg-[#00f5a0]/5 border border-[#00f5a0]/15 rounded-xl text-[11px] text-[#00f5a0] font-bold">
+                        <span className="text-base">🛡️</span> Filtro de Vingança contra o mercado: Zero Ativações
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activePreviewTab === 'planeador' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+                {/* Overview descriptions */}
+                <div className="bg-surface-container-lowest rounded-xl border border-outline/10 p-5 space-y-4 lg:col-span-1">
+                  <h4 className="text-xs font-black uppercase text-[#00f5a0] tracking-widest">Planeador de Metas Diárias</h4>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    Crie tarefas, estabeleça checklists rigorosas antes de iniciar a sua sessão no mercado e cumpra metas a curto prazo.
+                  </p>
+                  <div className="p-3 bg-white/5 border border-outline-variant/10 rounded-xl">
+                    <p className="text-[10px] font-black uppercase text-white tracking-widest">Disciplina Actual:</p>
+                    <p className="text-[13px] font-extrabold text-[#00f5a0] font-mono mt-1">CUMPRIMENTO 100%</p>
+                    <p className="text-[10px] text-on-surface-variant mt-0.5">12 dias consecutivos dentro do plano.</p>
+                  </div>
+                </div>
+
+                {/* Practical interactive items */}
+                <div className="lg:col-span-2 space-y-4">
+                  <h4 className="text-xs font-black uppercase text-on-surface-variant tracking-widest">Checklist de Consistência (Cumprido Hoje)</h4>
+                  
+                  <div className="space-y-2">
+                    <div className="bg-surface-container p-3.5 rounded-xl border border-outline/10 flex items-center gap-3">
+                      <div className="w-5 h-5 bg-[#00f5a0] text-background rounded-full flex items-center justify-center font-bold text-xs">✓</div>
+                      <div>
+                        <p className="text-xs font-bold text-white">Análise Económica no Calendário de Eventos</p>
+                        <p className="text-[10px] text-on-surface-variant">Consultado às 07:30 antes do faturamento continental.</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-surface-container p-3.5 rounded-xl border border-outline/10 flex items-center gap-3">
+                      <div className="w-5 h-5 bg-[#00f5a0] text-background rounded-full flex items-center justify-center font-bold text-xs">✓</div>
+                      <div>
+                        <p className="text-xs font-bold text-white">Definição Externa de Stop Loss Diário no MT5</p>
+                        <p className="text-[10px] text-on-surface-variant">Protegendo o capital global contra movimentos rápidos.</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-surface-container p-3.5 rounded-xl border border-outline/10 flex items-center gap-3">
+                      <div className="w-5 h-5 bg-[#00f5a0] text-background rounded-full flex items-center justify-center font-bold text-xs">✓</div>
+                      <div>
+                        <p className="text-xs font-bold text-white">Cumprimento de Risco Máximo de 1% por Operação</p>
+                        <p className="text-[10px] text-on-surface-variant">Estabilidade matemática preservada. Sem pressa.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-[#00f5a0]/5 border border-[#00f5a0]/15 rounded-xl flex items-center justify-between text-xs">
+                    <span className="text-on-surface-variant font-medium">Drawdown Diário Restante:</span>
+                    <span className="font-mono font-black text-[#00f5a0] bg-[#00f5a0]/10 px-3 py-1 rounded border border-[#00f5a0]/10">5.000 Kz (Intacto)</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Sistema de Afiliados */}
+      <section id="afiliados" className="px-[5%] py-[120px] relative z-10 border-t border-outline bg-gradient-to-b from-background to-surface-container-lowest/30 animate-in fade-in duration-300">
+        <div className="absolute top-[20%] right-[-10%] w-[45%] h-[45%] bg-[#00f5a0]/5 rounded-full blur-[120px] pointer-events-none"></div>
+        <div className="max-w-6xl mx-auto space-y-16">
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#00f5a0]/30 bg-[#00f5a0]/5 text-xs font-black uppercase tracking-widest text-[#00f5a0]">
+              🎯 Sistema de Indicação &amp; Parcerias
+            </div>
+            <h2 className="font-headline text-[clamp(28px,4vw,48px)] font-extrabold tracking-[-0.02em] text-white">
+              Ganhe Dinheiro com o <em className="italic text-[#00f5a0] font-normal">Nosso Sistema de Afiliados</em>
+            </h2>
+            <p className="text-sm text-on-surface-variant max-w-xl mx-auto leading-relaxed">
+              Partilhe o Profit Terminal com a sua comunidade de traders e suba de nível para desbloquear comissões monetárias de até 30% pagas diretamente na sua conta bancária!
+            </p>
+          </div>
+
+          {/* Highlight/Explanation Block */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div className="bg-surface-container border border-outline-variant/30 rounded-[32px] p-8 space-y-6 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5">
+                <Globe size={180} className="text-[#00f5a0]" />
+              </div>
+
+              <span className="text-[10px] bg-[#00f5a0]/10 text-[#00f5a0] border border-[#00f5a0]/20 font-black px-3 py-1 rounded-full uppercase tracking-widest">
+                Regra Especial Nível 5 Elite
+              </span>
+
+              <h3 className="text-2xl font-bold font-headline text-white mt-1">Como funciona o Payout Bancário?</h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed font-medium font-body bg-white/5 p-4 rounded-xl border border-outline-variant/10">
+                À medida que recomenda novos traders, o seu Nível de Afiliado sobe. Os <strong className="text-white">Níveis 1 a 4</strong> desbloqueiam <strong className="text-[#00f5a0]">meses grátis adicionais</strong> de ferramenta. Ao alcançar o <strong className="text-[#00f5a0]">Nível 5 (após convidar 50 pessoas ou mais)</strong>, o seu plano torna-se Elite e desbloqueia ganhos financeiros líquidos:
+              </p>
+
+              <div className="p-5 bg-[#00f5a0]/5 border border-[#00f5a0]/20 rounded-2xl flex items-start gap-4">
+                <div className="w-10 h-10 bg-[#00f5a0]/10 rounded-xl flex items-center justify-center text-[#00f5a0] shrink-0 font-bold font-mono text-sm">
+                  30%
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-white">Ganhos Reais em Dinheiro Vivo</h4>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed mt-1">
+                    Como Afiliado Nível 5, receberá <strong className="text-[#00f5a0]">30% do valor de inscrição/pagamento de cada usuário</strong> indicado por si. Sem barreiras, com faturamento pago diretamente via transferência bancária para o seu IBAN angolano!
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-xs text-on-surface-variant font-medium">
+                  <span className="w-2 h-2 rounded-full bg-[#00f5a0]"></span>
+                  <span>Convites ilimitados com link exclusivo ou código.</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-on-surface-variant font-medium">
+                  <span className="w-2 h-2 rounded-full bg-[#00f5a0]"></span>
+                  <span>Acompanhamento em tempo real no dashboard de Afiliados.</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-on-surface-variant font-medium">
+                  <span className="w-2 h-2 rounded-full bg-[#00f5a0]"></span>
+                  <span>Pedido de saque direto com IBAN nacional (mínimo 5.000 Kz).</span>
+                </div>
+              </div>
+
+              <div className="pt-4 flex flex-col sm:flex-row gap-4">
+                <button 
+                  onClick={onRegisterClick}
+                  className="flex-grow bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background font-black py-4 px-6 rounded-2xl text-xs uppercase tracking-widest transition-all text-center animate-pulse"
+                >
+                  Registar &amp; Começar Agora
+                </button>
               </div>
             </div>
 
-            <div className="flex flex-col gap-[12px] md:row-span-2">
-              <div className="bg-surface-container-lowest rounded-[10px] border border-outline p-[16px_18px]">
-                <div className="text-[11px] tracking-[0.08em] uppercase text-on-surface-variant/70 mb-[6px]">Winrate</div>
-                <div className="font-headline text-[26px] font-extrabold text-[#00f5a0]">68.4%</div>
-                <div className="text-[12px] text-on-surface-variant/70 mt-[4px]">↑ +4.2% vs semana anterior</div>
-              </div>
-              <div className="bg-surface-container-lowest rounded-[10px] border border-outline p-[16px_18px]">
-                <div className="text-[11px] tracking-[0.08em] uppercase text-on-surface-variant/70 mb-[6px]">Profit Factor</div>
-                <div className="font-headline text-[26px] font-extrabold text-secondary">2.14</div>
-                <div className="text-[12px] text-on-surface-variant/70 mt-[4px]">Acima do benchmark (1.5)</div>
+            {/* Levels visual steps */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold font-headline text-white flex items-center gap-2">
+                🏆 Níveis de Afiliado &amp; Plano de Carreira
+              </h3>
+              <p className="text-xs text-on-surface-variant font-body">Suba na carreira recomendando traders. Nível 1 a 4 garante bónus de tempo de uso; Nível 5 garante renda real:</p>
+
+              <div className="space-y-3 pt-2">
+                {/* Level 1 */}
+                <div className="bg-surface-container/50 border border-outline-variant/15 rounded-2xl p-4 flex justify-between items-center gap-4 hover:border-outline-variant/40 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-orange-600/10 text-orange-400 rounded-xl flex items-center justify-center font-bold text-xs">N1</div>
+                    <div>
+                      <h4 className="font-bold text-xs text-white">Nível 1 (Bronze)</h4>
+                      <p className="text-[10px] text-on-surface-variant">Requisito: 1 a 9 pessoas convidadas</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-mono font-black text-on-surface bg-surface-container px-2.5 py-1 rounded-lg">Mês Progresso</span>
+                  </div>
+                </div>
+
+                {/* Level 2 */}
+                <div className="bg-surface-container/50 border border-outline-variant/15 rounded-2xl p-4 flex justify-between items-center gap-4 hover:border-outline-variant/40 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-slate-400/10 text-slate-300 rounded-xl flex items-center justify-center font-bold text-xs">N2</div>
+                    <div>
+                      <h4 className="font-bold text-xs text-white">Nível 2 (Prata)</h4>
+                      <p className="text-[10px] text-on-surface-variant">Requisito: 10 a 24 pessoas convidadas</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-mono font-black text-[#00f5a0] bg-[#00f5a0]/5 border border-[#00f5a0]/10 px-2.5 py-1 rounded-lg">Bónus 1 Mês Grátis</span>
+                  </div>
+                </div>
+
+                {/* Level 3 */}
+                <div className="bg-surface-container/50 border border-outline-variant/15 rounded-2xl p-4 flex justify-between items-center gap-4 hover:border-outline-variant/40 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-yellow-500/10 text-yellow-400 rounded-xl flex items-center justify-center font-bold text-xs">N3</div>
+                    <div>
+                      <h4 className="font-bold text-xs text-white">Nível 3 (Ouro)</h4>
+                      <p className="text-[10px] text-on-surface-variant">Requisito: 25 a 39 pessoas convidadas</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-mono font-black text-[#00f5a0] bg-[#00f5a0]/5 border border-[#00f5a0]/10 px-2.5 py-1 rounded-lg">Bónus 2 Meses Grátis</span>
+                  </div>
+                </div>
+
+                {/* Level 4 */}
+                <div className="bg-surface-container/50 border border-[#00f5a0]/15 rounded-2xl p-4 flex justify-between items-center gap-4 hover:border-[#00f5a0]/40 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-[#00f5a0]/10 text-[#00f5a0] rounded-xl flex items-center justify-center font-bold text-xs">N4</div>
+                    <div>
+                      <h4 className="font-bold text-xs text-white">Nível 4 (Diamante)</h4>
+                      <p className="text-[10px] text-on-surface-variant">Requisito: 40 a 49 pessoas convidadas</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-mono font-black text-[#00f5a0] bg-[#00f5a0]/5 px-2.5 py-1 rounded-lg border border-[#00f5a0]/20">Bónus 3 Meses Grátis</span>
+                  </div>
+                </div>
+
+                {/* Level 5 */}
+                <div className="bg-[#00f5a0]/5 border border-[#00f5a0]/40 rounded-2xl p-4 flex justify-between items-center gap-4 shadow-md shadow-[#00f5a0]/5 hover:bg-[#00f5a0]/10 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-[#00f5a0] text-background rounded-xl flex items-center justify-center font-extrabold text-xs">👑 N5</div>
+                    <div>
+                      <h4 className="font-bold text-xs text-white">Nível 5 (Maestro Elite)</h4>
+                      <p className="text-[10px] text-[#00f5a0] font-bold uppercase tracking-wider">Requisito: 50+ convites ativos</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-mono font-black text-background bg-[#00f5a0] px-3 py-1.5 rounded-lg inline-block shadow-lg shadow-[#00f5a0]/20">30% Payout real $</span>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div className="bg-surface-container-lowest rounded-[10px] border border-outline p-[16px_18px] md:col-start-2">
-              <div className="text-[11px] tracking-[0.08em] uppercase text-on-surface-variant/70 mb-[12px]">Últimas Operações</div>
-              <div className="flex justify-between items-center py-[8px] border-b border-outline text-[12px]">
-                <span className="font-semibold text-on-surface">EURUSD</span>
-                <span className="text-on-surface-variant/70 text-[11px]">Buy · 0.5 Lote</span>
-                <span className="text-[#00f5a0] font-semibold">+$84.50</span>
-              </div>
-              <div className="flex justify-between items-center py-[8px] border-b border-outline text-[12px]">
-                <span className="font-semibold text-on-surface">XAUUSD</span>
-                <span className="text-on-surface-variant/70 text-[11px]">Sell · 0.2 Lote</span>
-                <span className="text-[#ff4b6e] font-semibold">-$32.00</span>
-              </div>
-            </div>
-
           </div>
         </div>
       </section>
 
       {/* Pricing Section inline (or use Plans component) */}
       <section id="planos" className="px-[5%] py-[120px] relative z-10 border-t border-outline">
+        <div className="max-w-4xl mx-auto text-center mb-12 space-y-4">
+          <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black px-3 py-1 rounded-full uppercase tracking-widest inline-block animate-pulse">
+            🔥 CAMPANHA DE LANÇAMENTO EXCLUSIVA
+          </span>
+          <h2 className="font-headline text-[clamp(28px,3vw,38px)] font-extrabold tracking-[-0.02em] text-white">
+            Garanta <span className="text-[#00f5a0]">50% de Desconto</span> no Seu Acesso
+          </h2>
+          <p className="text-xs text-on-surface-variant max-w-lg mx-auto">
+            Facilitamos o seu início! Clique no botão abaixo para copiar o cupão oficial e cole-o diretamente na barra de checkout durante o pagamento.
+          </p>
+
+          <div className="mt-6 inline-flex flex-col sm:flex-row items-center gap-3 bg-white/5 border border-outline-variant/15 p-3 rounded-2xl max-w-md mx-auto">
+            <div className="flex items-center gap-2 px-4 py-2 bg-black/40 rounded-xl border border-outline-variant/10 font-mono text-xs font-black text-white select-all">
+              🏷️ <span className="text-[#00f5a0]">DESCONTODE50%</span>
+            </div>
+            
+            <button
+              onClick={copyCouponCode}
+              className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all w-full sm:w-auto ${couponCopied ? 'bg-[#00f5a0] text-background' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+            >
+              {couponCopied ? '✓ COPIADO!' : '📋 COPIAR CUPÃO'}
+            </button>
+          </div>
+
+          {couponCopied && (
+            <p className="text-[11px] text-[#00f5a0] font-black tracking-wider animate-bounce select-none">
+              🎉 Cupão copiado para a área de transferência! Cole-o no campo de cupão ao pagar.
+            </p>
+          )}
+        </div>
+
         <Plans hideHeader onAuthRequired={onRegisterClick} />
       </section>
 
@@ -330,6 +784,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                <li><button onClick={() => window.scrollTo(0,0)} className="text-[14px] text-on-surface-variant/70 hover:text-on-surface transition-colors cursor-pointer bg-transparent border-none">Home</button></li>
                <li><a href="#recursos" className="text-[14px] text-on-surface-variant/70 hover:text-on-surface transition-colors">Recursos</a></li>
                <li><a href="#planos" className="text-[14px] text-on-surface-variant/70 hover:text-on-surface transition-colors">Planos</a></li>
+               <li><a href="#afiliados" className="text-[14px] text-[#00f5a0] font-bold hover:text-white transition-colors">Afiliados</a></li>
             </ul>
           </div>
           <div>

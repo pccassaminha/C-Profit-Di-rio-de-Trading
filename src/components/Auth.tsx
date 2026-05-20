@@ -171,11 +171,29 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         const uppercaseCode = couponCode.trim().toUpperCase();
 
         // 1. Check if it's a promotional coupon (Maestro coupon)
-        const qCoupons = query(collection(db, 'coupons'), where('code', '==', uppercaseCode), where('active', '==', true));
+        const qCoupons = query(collection(db, 'coupons'), where('code', '==', uppercaseCode));
         const couponSnap = await getDocs(qCoupons);
         
         if (!couponSnap.empty) {
-          validCoupon = { id: couponSnap.docs[0].id, ...couponSnap.docs[0].data() };
+          const couponDoc = couponSnap.docs[0].data();
+          if (couponDoc.active) {
+            validCoupon = { id: couponSnap.docs[0].id, ...couponDoc };
+          } else {
+            setError('Cupom de desconto inativo.');
+            setLoading(false);
+            return;
+          }
+        } else if (uppercaseCode === 'DESCONTODE50%') {
+          // Fallback if coupon collection is not synced or loaded yet
+          validCoupon = {
+            id: 'descontode50_static',
+            code: 'DESCONTODE50%',
+            discountType: 'percentage',
+            discountValue: 50,
+            targetPlan: 'all',
+            partnerRef: 'Plataforma',
+            active: true
+          };
         } else {
           // 2. See if it matches a user's reference code (refCode)
           const qUserRef = query(collection(db, 'usuarios'), where('refCode', '==', uppercaseCode));

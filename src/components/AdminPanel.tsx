@@ -3,7 +3,7 @@ import { db, auth } from '../firebase';
 import { collection, getDocs, doc, getDoc, updateDoc, onSnapshot, query, orderBy, setDoc, addDoc, deleteDoc, where } from 'firebase/firestore';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
-import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, AlertTriangle } from 'lucide-react';
+import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, AlertTriangle, Search, Calendar, SlidersHorizontal, ArrowUpDown, Megaphone, History, Plus, Trash2 } from 'lucide-react';
 
 export default function AdminPanel() {
   const { userPlan, globalSettings: initialSettings } = useTrades();
@@ -12,8 +12,12 @@ export default function AdminPanel() {
   // Super Admin check
   const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
 
-  const [activeTab, setActiveTab] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast' | 'maestros' | 'affiliates'>('users');
+  const [activeTab, setActiveTab ] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast' | 'maestros' | 'affiliates'>('users');
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [showBillingModal, setShowBillingModal] = useState<boolean>(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState<boolean>(false);
+  const [broadcastTab, setBroadcastTab] = useState<'create' | 'history'>('create');
+  const [broadcasts, setBroadcasts] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -22,6 +26,28 @@ export default function AdminPanel() {
   const [selectedStatList, setSelectedStatList] = useState<'faturado' | 'descontos' | 'parceiros' | null>(null);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [showDangerZone, setShowDangerZone] = useState(false);
+
+  // Filter & Search states for users tab
+  const [userSearch, setUserSearch] = useState('');
+  const [userPlanFilter, setUserPlanFilter] = useState('');
+  const [userDatePreset, setUserDatePreset] = useState('all'); // 'all', 'today', 'last7', 'last30', 'custom'
+  const [userStartDate, setUserStartDate] = useState('');
+  const [userEndDate, setUserEndDate] = useState('');
+  const [userSortOrder, setUserSortOrder] = useState<'newest' | 'oldest'>('newest');
+
+  // Filter & Search states for payments tab
+  const [paymentSearch, setPaymentSearch] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
+  const [paymentDatePreset, setPaymentDatePreset] = useState('all'); // 'all', 'today', 'last7', 'last30', 'custom'
+  const [paymentStartDate, setPaymentStartDate] = useState('');
+  const [paymentEndDate, setPaymentEndDate] = useState('');
+  const [paymentSortOrder, setPaymentSortOrder] = useState<'newest' | 'oldest'>('newest');
+
+  // Coupon search and filter states
+  const [couponSearchQuery, setCouponSearchQuery] = useState('');
+  const [selectedCouponFilter, setSelectedCouponFilter] = useState('');
+
   const [settings, setSettings] = useState(initialSettings || {
     whatsappNumber: '',
     expressNumber: '',
@@ -72,12 +98,154 @@ export default function AdminPanel() {
     return `${getInitials(user?.name)}${numericStr}`;
   };
 
+  const filteredUsers = users
+    .filter(u => u.status !== 'deleted')
+    .filter(u => {
+      // 1. Search term check
+      const searchLower = userSearch.toLowerCase().trim();
+      if (searchLower) {
+        const uIdDisplay = getUserDisplayId(u.id).toLowerCase();
+        const uIdRaw = u.id.toLowerCase();
+        const uName = (u.name || u.nome || 'Sem Nome').toLowerCase();
+        const uEmail = (u.email || '').toLowerCase();
+        const uPhone = (u.phoneNumber || u.phone || '').toLowerCase();
+        
+        const matchesSearch = 
+          uName.includes(searchLower) || 
+          uEmail.includes(searchLower) || 
+          uIdDisplay.includes(searchLower) || 
+          uIdRaw.includes(searchLower) ||
+          uPhone.includes(searchLower);
+          
+        if (!matchesSearch) return false;
+      }
+      
+      // 2. Plan filter check
+      if (userPlanFilter) {
+        const plan = u.plan_type || 'Iniciante';
+        if (plan !== userPlanFilter) return false;
+      }
+      
+      // 3. Date check
+      if (userDatePreset !== 'all') {
+        if (!u.createdAt) return false;
+        const regDate = new Date(u.createdAt);
+        const today = new Date();
+        
+        if (userDatePreset === 'today') {
+          const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          if (regDate < startOfToday) return false;
+        } else if (userDatePreset === 'last7') {
+          const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+          if (regDate < sevenDaysAgo) return false;
+        } else if (userDatePreset === 'last30') {
+          const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+          if (regDate < thirtyDaysAgo) return false;
+        } else if (userDatePreset === 'custom') {
+          if (userStartDate) {
+            const startLimit = new Date(userStartDate);
+            startLimit.setHours(0, 0, 0, 0);
+            if (regDate < startLimit) return false;
+          }
+          if (userEndDate) {
+            const endLimit = new Date(userEndDate);
+            endLimit.setHours(23, 59, 59, 999);
+            if (regDate > endLimit) return false;
+          }
+        }
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return userSortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+
   const getPaymentDisplayId = (paymentId: string) => {
     const sortedPayments = [...payments].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
     const index = sortedPayments.findIndex(p => p.id === paymentId);
     const numericStr = String(1000 + (index >= 0 ? index : payments.length));
     return `PG${numericStr}`;
   };
+
+  const filteredPayments = payments
+    .filter(p => p.status !== 'deleted')
+    .filter(p => {
+      // 1. Search term check
+      const searchLower = paymentSearch.toLowerCase().trim();
+      if (searchLower) {
+        const associatedUser = users.find(u => u.id === p.userId);
+        const uName = (associatedUser?.name || associatedUser?.nome || p.userId || '').toLowerCase();
+        const uEmail = (associatedUser?.email || '').toLowerCase();
+        const pIdDisplay = getPaymentDisplayId(p.id).toLowerCase();
+        const pIdRaw = p.id.toLowerCase();
+        const uIdDisplay = getUserDisplayId(p.userId).toLowerCase();
+        const pMethod = (p.paymentMethod || '').toLowerCase();
+        const pPlan = (p.planId || '').toLowerCase();
+        const pExpr = (p.expressCode || '').toLowerCase();
+
+        const matchesSearch =
+          uName.includes(searchLower) ||
+          uEmail.includes(searchLower) ||
+          pIdDisplay.includes(searchLower) ||
+          pIdRaw.includes(searchLower) ||
+          uIdDisplay.includes(searchLower) ||
+          pMethod.includes(searchLower) ||
+          pPlan.includes(searchLower) ||
+          pExpr.includes(searchLower);
+
+        if (!matchesSearch) return false;
+      }
+
+      // 2. Status filter
+      if (paymentStatusFilter) {
+        const status = p.status || 'pending';
+        if (status !== paymentStatusFilter) return false;
+      }
+
+      // 3. Method filter
+      if (paymentMethodFilter) {
+        if (p.paymentMethod !== paymentMethodFilter) return false;
+      }
+
+      // 4. Date filter
+      if (paymentDatePreset !== 'all') {
+        if (!p.createdAt) return false;
+        const pDate = new Date(p.createdAt);
+        const today = new Date();
+
+        if (paymentDatePreset === 'today') {
+          const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          if (pDate < startOfToday) return false;
+        } else if (paymentDatePreset === 'last7') {
+          const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+          if (pDate < sevenDaysAgo) return false;
+        } else if (paymentDatePreset === 'last30') {
+          const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+          if (pDate < thirtyDaysAgo) return false;
+        } else if (paymentDatePreset === 'custom') {
+          if (paymentStartDate) {
+            const startLimit = new Date(paymentStartDate);
+            startLimit.setHours(0, 0, 0, 0);
+            if (pDate < startLimit) return false;
+          }
+          if (paymentEndDate) {
+            const endLimit = new Date(paymentEndDate);
+            endLimit.setHours(23, 59, 59, 999);
+            if (pDate > endLimit) return false;
+          }
+        }
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return paymentSortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -96,7 +264,21 @@ export default function AdminPanel() {
     // Listen to coupons
     const qCoupons = query(collection(db, 'coupons'));
     const unsubCoupons = onSnapshot(qCoupons, (snapshot) => {
-      setCoupons(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const fetchedCoupons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCoupons(fetchedCoupons);
+      
+      const hasDesconto50 = fetchedCoupons.some((c: any) => c.code === 'DESCONTODE50%');
+      if (!hasDesconto50) {
+        addDoc(collection(db, 'coupons'), {
+          code: 'DESCONTODE50%',
+          discountType: 'percentage',
+          discountValue: 50,
+          targetPlan: 'all',
+          partnerRef: 'Plataforma',
+          active: true,
+          createdAt: new Date().toISOString()
+        }).catch(err => console.error('Erro ao auto-criar cupão DESCONTODE50%:', err));
+      }
     });
 
     // Listen to referrals
@@ -107,6 +289,11 @@ export default function AdminPanel() {
     // Listen to affiliate payouts
     const unsubPayouts = onSnapshot(query(collection(db, 'affiliate_payouts'), orderBy('createdAt', 'desc')), (snapshot) => {
       setAdminPayouts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    // Listen to broadcasts
+    const unsubBroadcasts = onSnapshot(query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setBroadcasts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     // Listen to global settings to keep settings state fully active in real time
@@ -126,6 +313,7 @@ export default function AdminPanel() {
       unsubCoupons();
       unsubReferrals();
       unsubPayouts();
+      unsubBroadcasts();
       unsubGlobalSettings();
     };
   }, [isSuperAdmin]);
@@ -186,12 +374,27 @@ export default function AdminPanel() {
             const activeSettings = settingsSnap.exists() ? settingsSnap.data() : {};
             const activeMode = activeSettings.affiliateMode || 'commission_30';
             
-            // Calculate reward
+            // Let's count how many approved referrals this referrer has already accomplished
+            const qReferrerApproved = query(
+              collection(db, 'referrals'),
+              where('referrerId', '==', userData.referredBy),
+              where('status', '==', 'approved')
+            );
+            const referrerApprovedSnap = await getDocs(qReferrerApproved);
+            const refCount = referrerApprovedSnap.size;
+
+            const isLevel5 = refCount >= 50; // Level 5 is unlocked at 50+ approved referrals
+
+            // Calculate reward: Level 1-4 is strictly free month progression, Level 5 is cash commission
+            let rewardType = 'free_month';
             let rewardVal: any = 0;
-            if (activeMode === 'commission_30') {
-              rewardVal = Math.round(payment.amount * 0.30);
+
+            if (isLevel5) {
+              rewardType = 'commission_30';
+              rewardVal = Math.round(payment.amount * 0.30); // 30% of subscription value in cash
             } else {
-              rewardVal = '1_month_free_progress';
+              rewardType = 'free_month';
+              rewardVal = '1_month_free_progress'; // Progress towards free months
             }
 
             // Create referral doc with pending_approval status, which the maestro approves
@@ -202,7 +405,7 @@ export default function AdminPanel() {
               referredEmail: userData.email,
               referredPlan: payment.planId,
               paymentAmount: payment.amount,
-              rewardType: activeMode,
+              rewardType: rewardType,
               rewardValue: rewardVal,
               status: 'pending_approval',
               createdAt: new Date().toISOString()
@@ -261,6 +464,7 @@ export default function AdminPanel() {
   const handleSaveSettings = async () => {
     await setDoc(doc(db, 'settings', 'global'), settings);
     alert('Configurações salvas!');
+    setShowBillingModal(false);
   };
 
   const handleSendBroadcast = async () => {
@@ -276,6 +480,17 @@ export default function AdminPanel() {
     } catch (e) {
       console.error(e);
       alert('Erro ao enviar comunicado.');
+    }
+  };
+
+  const handleDeleteBroadcast = async (id: string) => {
+    if (!window.confirm('Tem a certeza que deseja apagar este comunicado?')) return;
+    try {
+      await deleteDoc(doc(db, 'broadcasts', id));
+      alert('Comunicado apagado com sucesso!');
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao apagar comunicado.');
     }
   };
 
@@ -455,18 +670,6 @@ export default function AdminPanel() {
             <CreditCard size={18} /> Pagamentos
           </button>
           <button 
-            onClick={() => setActiveTab('settings')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'settings' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
-          >
-            <Settings size={18} /> Configs
-          </button>
-          <button 
-            onClick={() => setActiveTab('broadcast')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'broadcast' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
-          >
-            <Phone size={18} /> Avisos
-          </button>
-          <button 
             onClick={() => setActiveTab('coupons')}
             className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'coupons' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
@@ -488,78 +691,395 @@ export default function AdminPanel() {
       </div>
 
       {activeTab === 'users' && (
-        <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-surface-container text-on-surface-variant text-xs uppercase tracking-widest border-b border-outline-variant/20">
-              <tr>
-                <th className="p-6 font-black">Usuário</th>
-                <th className="p-6 font-black">Plano</th>
-                <th className="p-6 font-black">Expiração</th>
-                <th className="p-6 font-black">Status</th>
-                <th className="p-6 font-black">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/10">
-              {users.filter(u => u.status !== 'deleted').map(u => (
-                <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
-                  <td className="p-6">
-                    <p className="font-bold text-on-surface flex items-center gap-2">
-                       {u.name || 'Sem Nome'}
-                       <span className="text-xs bg-surface-container font-mono px-2 py-0.5 rounded text-on-surface-variant font-black">
-                         {getUserDisplayId(u.id)}
-                       </span>
-                    </p>
-                    <p className="text-xs text-on-surface-variant italic">{u.email}</p>
-                  </td>
-                  <td className="p-6">
-                    <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-black uppercase">
-                      {u.plan_type || 'Iniciante'}
-                    </span>
-                  </td>
-                  <td className="p-6">
-                    <p className="text-sm text-on-surface">
-                      {u.expiry_date ? (u.expiry_date.toDate ? u.expiry_date.toDate() : new Date(u.expiry_date)).toLocaleDateString() : '-'}
-                    </p>
-                  </td>
-                  <td className="p-6">
-                    <div className="flex items-center gap-2">
-                       <div className={`w-2 h-2 rounded-full ${u.expiry_date && (u.expiry_date.toDate ? u.expiry_date.toDate() : new Date(u.expiry_date)) > new Date() ? 'bg-emerald-500' : 'bg-error'}`}></div>
-                       <span className="text-xs font-medium">{u.expiry_date && (u.expiry_date.toDate ? u.expiry_date.toDate() : new Date(u.expiry_date)) > new Date() ? 'Ativo' : 'Inativo'}</span>
-                    </div>
-                  </td>
-                  <td className="p-6">
-                    <div className="flex flex-col gap-2">
-                      <button 
-                        onClick={() => setEditingUser(u)}
-                        className="text-primary hover:underline text-[12px] font-black uppercase text-left tracking-widest"
-                      >
-                        Editar Plano & Expiração
-                      </button>
-                      <button 
-                        onClick={() => handleUpdateUser(u.id, { expiry_date: new Date(Date.now() - 86400000).toISOString() })}
-                        className="text-error hover:underline text-[10px] font-black uppercase text-left"
-                      >
-                        Desativar Acesso
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteUser(u.id)}
-                        className="text-error hover:underline text-[10px] font-black uppercase text-left opacity-30 hover:opacity-100"
-                        title="Apagar Usuário Totalmente"
-                      >
-                        Apagar Registro
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-4">
+          {/* Polished Controls Bar with Search & Filters */}
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h3 className="font-extrabold text-[#00f5a0] flex items-center gap-2 text-base md:text-lg">
+                  <Users size={20} /> Painel de Clientes & Usuários
+                </h3>
+                <p className="text-xs text-on-surface-variant font-medium mt-0.5">
+                  Mostrando <span className="text-white font-black">{filteredUsers.length}</span> de <span className="text-white font-black">{users.filter(u => u.status !== 'deleted').length}</span> usuários cadastrados.
+                </p>
+              </div>
+
+              {/* Reset Filters button if any filter is active */}
+              {(userSearch || userPlanFilter || userDatePreset !== 'all' || userStartDate || userEndDate) && (
+                <button
+                  onClick={() => {
+                    setUserSearch('');
+                    setUserPlanFilter('');
+                    setUserDatePreset('all');
+                    setUserStartDate('');
+                    setUserEndDate('');
+                    setUserSortOrder('newest');
+                  }}
+                  className="bg-primary/10 hover:bg-[#00f5a0]/15 hover:text-[#00f5a0] text-primary transition-all px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 border border-primary/20 hover:border-[#00f5a0]/30"
+                >
+                  <X size={14} /> Limpar Filtros
+                </button>
+              )}
+            </div>
+
+            {/* Inputs Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Search input with magnfiying glass icon */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40" size={16} />
+                <input
+                  type="text"
+                  placeholder="Nome, e-mail ou Código ID..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-4 py-3.5 text-sm text-on-surface outline-none focus:border-primary transition-all placeholder:text-on-surface-variant/40 font-medium"
+                />
+              </div>
+
+              {/* Plan Filter dropdown */}
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none">
+                  <SlidersHorizontal size={16} />
+                </div>
+                <select
+                  value={userPlanFilter}
+                  onChange={(e) => setUserPlanFilter(e.target.value)}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-10 py-3.5 text-sm text-on-surface outline-none focus:border-primary appearance-none cursor-pointer font-bold"
+                >
+                  <option value="">Filtro: Todos Planos</option>
+                  <option value="Iniciante">Iniciante / Gratuito</option>
+                  <option value="trial_15">Trial 15 dias (Grátis)</option>
+                  <option value="mensal_6">Mensal (6 Contas)</option>
+                  <option value="trimestral_6">Trimestral (6 Contas)</option>
+                  <option value="semestral_8">Semestral (8 Contas)</option>
+                  <option value="anual_16">Anual (16 Contas)</option>
+                </select>
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
+                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                </div>
+              </div>
+
+              {/* Date Preset Selection */}
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none">
+                  <Calendar size={16} />
+                </div>
+                <select
+                  value={userDatePreset}
+                  onChange={(e) => setUserDatePreset(e.target.value)}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-10 py-3.5 text-sm text-on-surface outline-none focus:border-primary appearance-none cursor-pointer font-bold"
+                >
+                  <option value="all">Data de Inscrição: Qualquer</option>
+                  <option value="today">Sinalizado: Hoje</option>
+                  <option value="last7">Inscrito: Últimos 7 dias</option>
+                  <option value="last30">Inscrito: Últimos 30 dias</option>
+                  <option value="custom">Filtrar por Período...</option>
+                </select>
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
+                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                </div>
+              </div>
+
+              {/* Ordering order Selection */}
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none">
+                  <ArrowUpDown size={16} />
+                </div>
+                <select
+                  value={userSortOrder}
+                  onChange={(e) => setUserSortOrder(e.target.value as 'newest' | 'oldest')}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-10 py-3.5 text-sm text-on-surface outline-none focus:border-primary appearance-none cursor-pointer font-bold"
+                >
+                  <option value="newest">Inscrição: Mais Recente</option>
+                  <option value="oldest">Inscrição: Mais Antigo</option>
+                </select>
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
+                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Date Ranges inputs */}
+            {userDatePreset === 'custom' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-outline-variant/10 animate-in slide-in-from-top-2 duration-200">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#00f5a0] ml-1 flex items-center gap-1">
+                     <Calendar size={12} /> Data de Início
+                  </span>
+                  <input
+                    type="date"
+                    value={userStartDate}
+                    onChange={(e) => setUserStartDate(e.target.value)}
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary cursor-pointer text-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#00f5a0] ml-1 flex items-center gap-1">
+                     <Calendar size={12} /> Data Limite
+                  </span>
+                  <input
+                    type="date"
+                    value={userEndDate}
+                    onChange={(e) => setUserEndDate(e.target.value)}
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary cursor-pointer text-white"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Table Container */}
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead className="bg-surface-container text-on-surface-variant text-xs uppercase tracking-widest border-b border-outline-variant/20">
+                  <tr>
+                    <th className="p-6 font-black">Usuário</th>
+                    <th className="p-6 font-black">Plano</th>
+                    <th className="p-6 font-black">Inscrição</th>
+                    <th className="p-6 font-black">Expiração / Status</th>
+                    <th className="p-6 font-black text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-16 text-center text-on-surface-variant/40 font-bold text-sm">
+                        Nenhum usuário correspondente aos filtros aplicados.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
+                        <td className="p-6">
+                          <p className="font-bold text-on-surface flex items-center gap-2">
+                             {u.name || u.nome || 'Sem Nome'}
+                             <span className="text-xs bg-surface-container font-mono px-2 py-0.5 rounded text-on-surface-variant font-black shrink-0">
+                               {getUserDisplayId(u.id)}
+                             </span>
+                          </p>
+                          <p className="text-xs text-on-surface-variant italic font-medium">{u.email}</p>
+                        </td>
+                        <td className="p-6">
+                          <span className={`${
+                            u.plan_type === 'trial_15'
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              : u.plan_type === 'Iniciante' || !u.plan_type
+                              ? 'bg-neutral-500/10 text-neutral-400 border border-neutral-500/25'
+                              : 'bg-primary/10 text-[#00f5a0] border border-[#00f5a0]/20'
+                          } px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider`}>
+                            {u.plan_type || 'Iniciante'}
+                          </span>
+                        </td>
+                        <td className="p-6">
+                          <p className="text-xs font-mono font-medium text-on-surface-variant">
+                            {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}
+                          </p>
+                        </td>
+                        <td className="p-6">
+                          <p className="text-xs font-bold text-on-surface mb-1">
+                            {u.expiry_date ? (u.expiry_date.toDate ? u.expiry_date.toDate() : new Date(u.expiry_date)).toLocaleDateString() : '-'}
+                          </p>
+                          <div className="flex items-center gap-2">
+                             <div className={`w-2 h-2 rounded-full ${u.expiry_date && (u.expiry_date.toDate ? u.expiry_date.toDate() : new Date(u.expiry_date)) > new Date() ? 'bg-emerald-500' : 'bg-error'}`}></div>
+                             <span className="text-[10px] font-black uppercase tracking-wider">{u.expiry_date && (u.expiry_date.toDate ? u.expiry_date.toDate() : new Date(u.expiry_date)) > new Date() ? 'Ativo' : 'Inativo'}</span>
+                          </div>
+                        </td>
+                        <td className="p-6">
+                          <div className="flex flex-col sm:items-end gap-1.5">
+                            <button 
+                              onClick={() => setEditingUser(u)}
+                              className="text-[#00f5a0] hover:text-[#00f5a0]/80 hover:underline text-[10px] font-black uppercase tracking-wider text-right shrink-0"
+                            >
+                              Editar Plano & Expiração
+                            </button>
+                            <button 
+                              onClick={() => handleUpdateUser(u.id, { expiry_date: new Date(Date.now() - 86400000).toISOString() })}
+                              className="text-error hover:text-error/80 hover:underline text-[10px] font-black uppercase tracking-wider text-right shrink-0"
+                            >
+                              Desativar Acesso
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteUser(u.id)}
+                              className="text-error/55 hover:text-error hover:underline text-[10px] font-bold uppercase tracking-wider text-right opacity-80 hover:opacity-100 shrink-0"
+                              title="Apagar Usuário Totalmente"
+                            >
+                              Apagar Registro
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
       {activeTab === 'payments' && (
         <div className="space-y-4">
-          {payments.filter(p => p.status !== 'deleted').length > 0 ? payments.filter(p => p.status !== 'deleted').map(p => (
+          {/* Polished Controls Bar with Search & Filters for Payments */}
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h3 className="font-extrabold text-[#00f5a0] flex items-center gap-2 text-base md:text-lg">
+                  <CreditCard size={20} /> Controle e Filtro de Pagamentos
+                </h3>
+                <p className="text-xs text-on-surface-variant font-medium mt-0.5">
+                  Mostrando <span className="text-white font-black">{filteredPayments.length}</span> de <span className="text-white font-black">{payments.filter(p => p.status !== 'deleted').length}</span> solicitações de upgrade.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <button
+                  onClick={() => setShowBillingModal(true)}
+                  className="w-full md:w-auto bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#00f5a0]/15 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  <Settings size={14} /> Configurar Dados de Cobrança
+                </button>
+
+
+                {/* Reset Filters button if any filter is active */}
+                {(paymentSearch || paymentStatusFilter || paymentMethodFilter || paymentDatePreset !== 'all' || paymentStartDate || paymentEndDate) && (
+                  <button
+                    onClick={() => {
+                      setPaymentSearch('');
+                      setPaymentStatusFilter('');
+                      setPaymentMethodFilter('');
+                      setPaymentDatePreset('all');
+                      setPaymentStartDate('');
+                      setPaymentEndDate('');
+                      setPaymentSortOrder('newest');
+                    }}
+                    className="w-full md:w-auto bg-primary/10 hover:bg-[#00f5a0]/15 hover:text-[#00f5a0] text-primary transition-all px-3.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-primary/20 hover:border-[#00f5a0]/30"
+                  >
+                    <X size={14} /> Limpar Filtros
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Inputs Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Search input with magnifying glass icon */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40" size={16} />
+                <input
+                  type="text"
+                  placeholder="Nome, e-mail, ID, Cód Express..."
+                  value={paymentSearch}
+                  onChange={(e) => setPaymentSearch(e.target.value)}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-4 py-3.5 text-sm text-on-surface outline-none focus:border-primary transition-all placeholder:text-on-surface-variant/40 font-medium"
+                />
+              </div>
+
+              {/* Status Filter dropdown */}
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none">
+                  <SlidersHorizontal size={16} />
+                </div>
+                <select
+                  value={paymentStatusFilter}
+                  onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-10 py-3.5 text-sm text-on-surface outline-none focus:border-primary appearance-none cursor-pointer font-bold"
+                >
+                  <option value="">Filtro: Todos Status</option>
+                  <option value="pending">Pendente</option>
+                  <option value="approved">Aprovado</option>
+                  <option value="rejected">Rejeitado</option>
+                </select>
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
+                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                </div>
+              </div>
+
+              {/* Method Filter dropdown */}
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none">
+                  <SlidersHorizontal size={16} />
+                </div>
+                <select
+                  value={paymentMethodFilter}
+                  onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-10 py-3.5 text-sm text-on-surface outline-none focus:border-primary appearance-none cursor-pointer font-bold"
+                >
+                  <option value="">Filtro: Todo Método</option>
+                  <option value="express">Express</option>
+                  <option value="iban">IBAN</option>
+                  <option value="mcx">MCX / Referência</option>
+                </select>
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
+                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                </div>
+              </div>
+
+              {/* Date Preset Selection */}
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none">
+                  <Calendar size={16} />
+                </div>
+                <select
+                  value={paymentDatePreset}
+                  onChange={(e) => setPaymentDatePreset(e.target.value)}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-10 py-3.5 text-sm text-on-surface outline-none focus:border-primary appearance-none cursor-pointer font-bold"
+                >
+                  <option value="all">Data: Qualquer Período</option>
+                  <option value="today">Sinalizado: Hoje</option>
+                  <option value="last7">Feito nos Últimos 7 dias</option>
+                  <option value="last30">Feito nos Últimos 30 dias</option>
+                  <option value="custom">Filtrar por Período...</option>
+                </select>
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
+                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Ordering and Dates */}
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between border-t border-outline-variant/10 pt-4">
+              <div className="relative w-full sm:w-72">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none">
+                  <ArrowUpDown size={16} />
+                </div>
+                <select
+                  value={paymentSortOrder}
+                  onChange={(e) => setPaymentSortOrder(e.target.value as 'newest' | 'oldest')}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-10 py-3 text-xs text-on-surface outline-none focus:border-primary appearance-none cursor-pointer font-extrabold uppercase tracking-wider"
+                >
+                  <option value="newest">Mais Recentes Primeiro</option>
+                  <option value="oldest">Mais Antigos Primeiro</option>
+                </select>
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
+                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                </div>
+              </div>
+
+              {paymentDatePreset === 'custom' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 w-full animate-in slide-in-from-top-2 duration-200">
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={paymentStartDate}
+                      onChange={(e) => setPaymentStartDate(e.target.value)}
+                      className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs text-on-surface outline-none focus:border-primary cursor-pointer text-white font-bold"
+                    />
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={paymentEndDate}
+                      onChange={(e) => setPaymentEndDate(e.target.value)}
+                      className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs text-on-surface outline-none focus:border-primary cursor-pointer text-white font-bold"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {filteredPayments.length > 0 ? filteredPayments.map(p => (
             <div key={p.id} className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl">
               <div>
                 <div className="flex items-center gap-3 mb-2">
@@ -638,184 +1158,302 @@ export default function AdminPanel() {
             </div>
           )) : (
             <div className="text-center p-12 bg-surface-container-low rounded-3xl border border-dashed border-outline-variant/30">
-              <p className="text-on-surface-variant">Nenhum pagamento pendente no momento.</p>
+              <p className="text-on-surface-variant">Nenhum pagamento correspondente aos filtros aplicados.</p>
             </div>
           )}
         </div>
       )}
 
-      {activeTab === 'settings' && (
-        <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 max-w-2xl mx-auto shadow-xl">
-          <h3 className="text-xl font-bold text-on-surface mb-8 font-headline flex items-center gap-3">
-            <Landmark className="text-primary" />
-            Dados para Recebimento
-          </h3>
-          
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-surface-container/50 p-6 rounded-[24px] border border-outline-variant/10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-on-surface">Ativar IBAN</p>
-                  <p className="text-[10px] text-on-surface-variant uppercase tracking-tighter">Exibir transferência bancária</p>
-                </div>
-                <button 
-                  onClick={() => setSettings({ ...settings, showIban: !settings.showIban })}
-                  className={`w-12 h-6 rounded-full transition-all relative ${settings.showIban ? 'bg-primary' : 'bg-surface-container-high border border-outline-variant/30'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 rounded-full transition-all ${settings.showIban ? 'right-1 bg-on-primary' : 'left-1 bg-on-surface-variant'}`}></div>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-on-surface">Ativar Multicaixa</p>
-                  <p className="text-[10px] text-on-surface-variant uppercase tracking-tighter">Exibir Entidade/Referência</p>
-                </div>
-                <button 
-                  onClick={() => setSettings({ ...settings, showMulticaixa: !settings.showMulticaixa })}
-                  className={`w-12 h-6 rounded-full transition-all relative ${settings.showMulticaixa ? 'bg-primary' : 'bg-surface-container-high border border-outline-variant/30'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 rounded-full transition-all ${settings.showMulticaixa ? 'right-1 bg-on-primary' : 'left-1 bg-on-surface-variant'}`}></div>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-on-surface">Ativar Express</p>
-                  <p className="text-[10px] text-on-surface-variant uppercase tracking-tighter">Exibir Transferência Express</p>
-                </div>
-                <button 
-                  onClick={() => setSettings({ ...settings, showExpress: settings.showExpress !== false ? false : true })}
-                  className={`w-12 h-6 rounded-full transition-all relative ${settings.showExpress !== false ? 'bg-primary' : 'bg-surface-container-high border border-outline-variant/30'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 rounded-full transition-all ${settings.showExpress !== false ? 'right-1 bg-on-primary' : 'left-1 bg-on-surface-variant'}`}></div>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">WhatsApp de Suporte</label>
-              <input 
-                type="text" 
-                value={settings.whatsappNumber}
-                onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
-                className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
-                placeholder="Ex: 244921319200"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Logo Multicaixa Express (URL)</label>
-              <div className="flex gap-4 items-center">
-                <input 
-                  type="text" 
-                  value={settings.multicaixaLogoUrl}
-                  onChange={(e) => setSettings({ ...settings, multicaixaLogoUrl: e.target.value })}
-                  className="flex-1 bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
-                  placeholder="https://..."
-                />
-                {settings.multicaixaLogoUrl && (
-                  <img src={settings.multicaixaLogoUrl} alt="Logo Preview" className="h-12 w-12 object-contain bg-white rounded-xl p-1" />
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Telemóvel MCX Express (Destinatário)</label>
-              <input 
-                type="text" 
-                value={settings.expressNumber || ''}
-                onChange={(e) => setSettings({ ...settings, expressNumber: e.target.value })}
-                className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
-                placeholder="Ex: 921167980"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">IBAN de Depósito</label>
-                <input 
-                  type="text" 
-                  value={settings.iban}
-                  onChange={(e) => setSettings({ ...settings, iban: e.target.value })}
-                  className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Titular da Conta (IBAN)</label>
-                <input 
-                  type="text" 
-                  value={settings.ibanName || ''}
-                  onChange={(e) => setSettings({ ...settings, ibanName: e.target.value })}
-                  className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Entidade MCX (Código)</label>
-                <input 
-                  type="text" 
-                  value={settings.multicaixaEntity}
-                  onChange={(e) => setSettings({ ...settings, multicaixaEntity: e.target.value })}
-                  className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Referência MCX</label>
-                <input 
-                  type="text" 
-                  value={settings.multicaixaReference}
-                  onChange={(e) => setSettings({ ...settings, multicaixaReference: e.target.value })}
-                  className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-xs font-black text-on-surface-variant uppercase tracking-widest pl-1">Nome do Beneficiário (Cobrador MCX)</label>
-              <input 
-                type="text" 
-                value={settings.multicaixaName || ''}
-                onChange={(e) => setSettings({ ...settings, multicaixaName: e.target.value })}
-                className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-5 py-4 text-on-surface focus:outline-none focus:border-primary transition-all font-medium"
-                placeholder="Nome da Empresa / Negócio"
-              />
-            </div>
-
-            <button 
-              onClick={handleSaveSettings}
-              className="w-full bg-primary text-on-primary py-4 rounded-2xl font-black mt-8 hover:scale-[1.02] transition-all shadow-xl shadow-primary/30 uppercase tracking-widest flex items-center justify-center gap-2"
+      {showBillingModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-surface-container border border-outline-variant/30 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setShowBillingModal(false)}
+              className="absolute top-6 right-6 p-2 text-on-surface-variant hover:text-white hover:bg-surface-container-high rounded-full transition-all"
+              id="close-billing-modal-btn"
             >
-              <Check size={20} />
-              Salvar Alterações
+              <X size={20} />
             </button>
+
+            <h3 className="text-xl font-bold text-[#00f5a0] mb-2 font-headline flex items-center gap-3">
+              <Settings className="text-[#00f5a0]" />
+              Dados para Recebimento (Cobrança)
+            </h3>
+            <p className="text-xs text-on-surface-variant mb-6"> Configure as opções de cobrança exibidas aos traders no momento do upgrade de plano.</p>
+            
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-surface-container-low p-4 rounded-2xl border border-outline-variant/15">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-bold text-on-surface text-xs">Ativar IBAN</p>
+                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">Transferência bancária</p>
+                  </div>
+                  <button 
+                    onClick={() => setSettings({ ...settings, showIban: !settings.showIban })}
+                    className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showIban ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showIban ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-bold text-on-surface text-xs">Ativar Multicaixa</p>
+                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">Entidade / Referência</p>
+                  </div>
+                  <button 
+                    onClick={() => setSettings({ ...settings, showMulticaixa: !settings.showMulticaixa })}
+                    className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showMulticaixa ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showMulticaixa ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-bold text-on-surface text-xs">Ativar Express</p>
+                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">MCX Express</p>
+                  </div>
+                  <button 
+                    onClick={() => setSettings({ ...settings, showExpress: settings.showExpress !== false ? false : true })}
+                    className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showExpress !== false ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showExpress !== false ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">WhatsApp de Suporte</label>
+                <input 
+                  type="text" 
+                  value={settings.whatsappNumber}
+                  onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
+                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                  placeholder="Ex: 244921319200"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Logo Multicaixa Express (URL)</label>
+                <div className="flex gap-4 items-center">
+                  <input 
+                    type="text" 
+                    value={settings.multicaixaLogoUrl}
+                    onChange={(e) => setSettings({ ...settings, multicaixaLogoUrl: e.target.value })}
+                    className="flex-1 bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                    placeholder="https://..."
+                  />
+                  {settings.multicaixaLogoUrl && (
+                    <img src={settings.multicaixaLogoUrl} alt="Logo Preview" className="h-10 w-10 object-contain bg-white rounded-xl p-1 shrink-0 animate-in fade-in" />
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Telemóvel MCX Express (Destinatário)</label>
+                <input 
+                  type="text" 
+                  value={settings.expressNumber || ''}
+                  onChange={(e) => setSettings({ ...settings, expressNumber: e.target.value })}
+                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                  placeholder="Ex: 921167980"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">IBAN de Depósito</label>
+                  <input 
+                    type="text" 
+                    value={settings.iban}
+                    onChange={(e) => setSettings({ ...settings, iban: e.target.value })}
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Titular da Conta (IBAN)</label>
+                  <input 
+                    type="text" 
+                    value={settings.ibanName || ''}
+                    onChange={(e) => setSettings({ ...settings, ibanName: e.target.value })}
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Entidade MCX (Código)</label>
+                  <input 
+                    type="text" 
+                    value={settings.multicaixaEntity}
+                    onChange={(e) => setSettings({ ...settings, multicaixaEntity: e.target.value })}
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Referência MCX</label>
+                  <input 
+                    type="text" 
+                    value={settings.multicaixaReference}
+                    onChange={(e) => setSettings({ ...settings, multicaixaReference: e.target.value })}
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Nome do Beneficiário (Cobrador MCX)</label>
+                <input 
+                  type="text" 
+                  value={settings.multicaixaName || ''}
+                  onChange={(e) => setSettings({ ...settings, multicaixaName: e.target.value })}
+                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                  placeholder="Nome da Empresa / Negócio"
+                />
+              </div>
+
+              <div className="flex gap-4 pt-6 border-t border-outline-variant/10">
+                <button 
+                  onClick={() => setShowBillingModal(false)}
+                  className="flex-grow py-3 px-6 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/20 text-on-surface hover:text-white transition-all rounded-xl font-bold uppercase tracking-widest text-xs"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleSaveSettings}
+                  className="flex-grow bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background py-3 px-6 rounded-xl font-black hover:scale-[1.01] transition-all shadow-xl shadow-[#00f5a0]/15 uppercase tracking-widest flex items-center justify-center gap-2 text-xs"
+                >
+                  <Check size={16} />
+                  Salvar Alterações
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {activeTab === 'broadcast' && (
-        <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 max-w-2xl mx-auto shadow-xl">
-          <h3 className="text-xl font-bold text-on-surface mb-6 font-headline flex items-center gap-3">
-            <Phone className="text-primary" />
-            Comunicados à Comunidade
-          </h3>
-          <p className="text-sm text-on-surface-variant mb-6">Envie atualizações ou comunicados para todos os membros da comunidade.</p>
-          
-          <div className="space-y-4">
-            <textarea
-              value={broadcastMessage}
-              onChange={(e) => setBroadcastMessage(e.target.value)}
-              placeholder="Escreva a atualização ou comunicado..."
-              className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-6 py-4 text-on-surface focus:outline-none focus:border-primary transition-all min-h-[150px] resize-none"
-            />
+      {showBroadcastModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-surface-container border border-outline-variant/30 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             <button
-              onClick={handleSendBroadcast}
-              className="w-full bg-primary text-on-primary py-4 rounded-2xl font-black hover:scale-[1.02] transition-all shadow-xl shadow-primary/30 uppercase tracking-widest"
+              onClick={() => setShowBroadcastModal(false)}
+              className="absolute top-6 right-6 p-2 text-on-surface-variant hover:text-white hover:bg-surface-container-high rounded-full transition-all"
+              id="close-broadcast-modal-btn"
             >
-              Publicar Comunicado
+              <X size={20} />
             </button>
+
+            <h3 className="text-xl font-bold text-[#00f5a0] mb-2 font-headline flex items-center gap-3">
+              <Megaphone className="text-[#00f5a0]" />
+              Comunicados &amp; Avisos à Comunidade
+            </h3>
+            <p className="text-xs text-on-surface-variant mb-6">Podes publicar comunicados urgentes ou atualizações que todos os membros verão instantaneamente ao carregar a plataforma.</p>
+
+            {/* Inner Tabs for Writing Mode & History Mode */}
+            <div className="flex gap-2 p-1.5 bg-surface-container-low rounded-xl border border-outline-variant/15 mb-6">
+              <button
+                onClick={() => setBroadcastTab('create')}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                  broadcastTab === 'create'
+                    ? 'bg-[#00f5a0] text-background font-black shadow-md shadow-[#00f5a0]/10'
+                    : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'
+                }`}
+              >
+                <Plus size={14} /> Novo Comunicado
+              </button>
+              <button
+                onClick={() => setBroadcastTab('history')}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                  broadcastTab === 'history'
+                    ? 'bg-[#00f5a0] text-background font-black shadow-md shadow-[#00f5a0]/10'
+                    : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'
+                }`}
+              >
+                <History size={14} /> Histórico de Envios ({broadcasts.length})
+              </button>
+            </div>
+
+            {/* Tab 1: Create Broadcast */}
+            {broadcastTab === 'create' && (
+              <div className="space-y-4 animate-in fade-in duration-150">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Texto do Comunicado</label>
+                  <textarea
+                    value={broadcastMessage}
+                    onChange={(e) => setBroadcastMessage(e.target.value)}
+                    placeholder="Escreva a nova atualização, aviso ou comunicado importante..."
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-[#00f5a0] transition-all min-h-[160px] resize-none text-sm placeholder:text-on-surface-variant/40"
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4 border-t border-outline-variant/10">
+                  <button 
+                    onClick={() => setShowBroadcastModal(false)}
+                    className="flex-grow py-3 px-6 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/20 text-on-surface hover:text-white transition-all rounded-xl font-bold uppercase tracking-widest text-xs"
+                  >
+                    Fechar
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      if (!broadcastMessage.trim()) return alert('Por favor, escreva uma mensagem antes de publicar.');
+                      await handleSendBroadcast();
+                      setBroadcastTab('history');
+                    }}
+                    className="flex-grow bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background py-3 px-6 rounded-xl font-black hover:scale-[1.01] transition-all shadow-xl shadow-[#00f5a0]/15 uppercase tracking-widest flex items-center justify-center gap-2 text-xs"
+                  >
+                    <Check size={16} />
+                    Publicar Agora
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: History List */}
+            {broadcastTab === 'history' && (
+              <div className="space-y-4 animate-in fade-in duration-150">
+                <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                  {broadcasts.length === 0 ? (
+                    <div className="text-center py-12 bg-surface-container-low rounded-2xl border border-dashed border-outline-variant/20">
+                      <p className="text-xs text-on-surface-variant italic">Nenhum comunicado enviado até ao momento.</p>
+                    </div>
+                  ) : (
+                    broadcasts.map((b) => (
+                      <div key={b.id} className="bg-surface-container-low border border-outline-variant/15 rounded-2xl p-4 space-y-3 hover:border-[#00f5a0]/20 transition-all">
+                        <div className="flex justify-between items-start gap-3">
+                          <div>
+                            <p className="text-xs font-bold text-[#00f5a0]">{b.author || 'Admin'}</p>
+                            <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">
+                              {b.createdAt ? new Date(b.createdAt).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteBroadcast(b.id)}
+                            className="p-1.5 text-error/60 hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                            title="Eliminar este comunicado"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                        <p className="text-xs text-white leading-relaxed bg-surface-container p-3 rounded-xl select-text border border-outline-variant/5">
+                          {b.message}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="flex gap-4 pt-4 border-t border-outline-variant/10">
+                  <button 
+                    onClick={() => setShowBroadcastModal(false)}
+                    className="w-full py-3 px-6 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/20 text-on-surface hover:text-white transition-all rounded-xl font-bold uppercase tracking-widest text-xs"
+                  >
+                    Voltar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -862,64 +1500,208 @@ export default function AdminPanel() {
                   <th className="p-6 font-black">Desconto</th>
                   <th className="p-6 font-black">Plano Alvo</th>
                   <th className="p-6 font-black">Referência</th>
+                  <th className="p-6 font-black text-center">Registos / Usos</th>
                   <th className="p-6 font-black">Status</th>
                   <th className="p-6 font-black">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10">
-                {coupons.map(c => (
-                  <tr key={c.id} className="hover:bg-surface-container/30 transition-colors">
-                    <td className="p-6 font-mono font-bold text-primary">{c.code}</td>
-                    <td className="p-6 text-on-surface font-black">
-                      {c.discountType === 'percentage' ? `${c.discountValue}%` : `Kz ${c.discountValue}`}
-                    </td>
-                    <td className="p-6 text-sm text-on-surface-variant">{c.targetPlan === 'all' ? 'Todos' : c.targetPlan}</td>
-                    <td className="p-6 text-sm text-on-surface-variant">{c.partnerRef || '-'}</td>
-                    <td className="p-6">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${c.active ? 'bg-emerald-500/20 text-emerald-500' : 'bg-error/20 text-error'}`}>
-                        {c.active ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </td>
-                    <td className="p-6 flex items-center gap-3">
-                      <button onClick={() => handleToggleCoupon(c.id, c.active)} className="text-sm font-bold hover:underline">
-                        {c.active ? 'Desativar' : 'Ativar'}
-                      </button>
-                      <button onClick={() => handleDeleteCoupon(c.id)} className="text-sm text-error font-bold hover:underline">Apagar</button>
-                    </td>
-                  </tr>
-                ))}
+                {coupons.map(c => {
+                  const usagesCount = users.filter(u => u.usedCoupon === c.code).length;
+                  return (
+                    <tr key={c.id} className="hover:bg-surface-container/30 transition-colors">
+                      <td className="p-6 font-mono font-bold">
+                        <button
+                          onClick={() => {
+                            setSelectedCouponFilter(c.code);
+                            const element = document.getElementById('coupon-referrals-section');
+                            if (element) {
+                              element.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }}
+                          className="bg-primary/10 hover:bg-[#00f5a0]/15 hover:text-[#00f5a0] text-[#00f5a0] px-3.5 py-1.5 rounded-xl text-sm font-black tracking-widest uppercase border border-[#00f5a0]/20 hover:border-[#00f5a0]/40 transition-all"
+                        >
+                          {c.code}
+                        </button>
+                      </td>
+                      <td className="p-6 text-on-surface font-black">
+                        {c.discountType === 'percentage' ? `${c.discountValue}%` : `Kz ${c.discountValue}`}
+                      </td>
+                      <td className="p-6 text-sm text-on-surface-variant">{c.targetPlan === 'all' ? 'Todos' : c.targetPlan}</td>
+                      <td className="p-6 text-sm text-on-surface-variant">{c.partnerRef || '-'}</td>
+                      <td className="p-6 text-center">
+                        <button
+                          onClick={() => {
+                            setSelectedCouponFilter(c.code);
+                            const element = document.getElementById('coupon-referrals-section');
+                            if (element) {
+                              element.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }}
+                          className="bg-surface-container text-white text-xs px-3 py-1.5 rounded-lg border border-outline-variant/20 font-black hover:bg-surface-container-high transition-colors"
+                        >
+                          {usagesCount} {usagesCount === 1 ? 'membro' : 'membros'}
+                        </button>
+                      </td>
+                      <td className="p-6">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${c.active ? 'bg-emerald-500/20 text-emerald-500' : 'bg-error/20 text-error'}`}>
+                          {c.active ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
+                      <td className="p-6 flex items-center gap-3">
+                        <button onClick={() => handleToggleCoupon(c.id, c.active)} className="text-xs shrink-0 font-extrabold bg-[#00f5a0]/10 hover:bg-[#00f5a0]/20 text-[#00f5a0] px-3 py-1.5 rounded-lg border border-[#00f5a0]/20 hover:underline">
+                          {c.active ? 'Desativar' : 'Ativar'}
+                        </button>
+                        <button onClick={() => handleDeleteCoupon(c.id)} className="text-xs shrink-0 font-extrabold bg-error/10 hover:bg-error/20 text-error px-3 py-1.5 rounded-lg border border-error/20 hover:underline">Apagar</button>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {coupons.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-12 text-center text-on-surface-variant">Nenhum cupão criado.</td>
+                    <td colSpan={7} className="p-12 text-center text-on-surface-variant">Nenhum cupão criado.</td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
 
-          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 shadow-xl">
-            <h3 className="text-xl font-bold text-on-surface mb-6 font-headline">Relatório de Indicações</h3>
+          <div id="coupon-referrals-section" className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 shadow-xl space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-on-surface font-headline flex items-center gap-2">
+                  <Ticket size={22} className="text-[#00f5a0]" /> Relatório de Indicações (Histórico de Cadastro)
+                </h3>
+                <p className="text-xs text-on-surface-variant font-medium mt-0.5">
+                  Mostrando <span className="text-white font-black">{
+                    users.filter(u => u.usedCoupon)
+                         .filter(u => !selectedCouponFilter || u.usedCoupon === selectedCouponFilter)
+                         .filter(u => {
+                           if (!couponSearchQuery) return true;
+                           const term = couponSearchQuery.toLowerCase();
+                           return (u.name || '').toLowerCase().includes(term) ||
+                                  (u.email || '').toLowerCase().includes(term) ||
+                                  (u.usedCoupon || '').toLowerCase().includes(term) ||
+                                  (u.partnerRef || '').toLowerCase().includes(term);
+                         }).length
+                  }</span> de <span className="text-white font-black">{users.filter(u => u.usedCoupon).length}</span> indicações registadas no total.
+                </p>
+              </div>
+
+              {(couponSearchQuery || selectedCouponFilter) && (
+                <button
+                  onClick={() => {
+                    setCouponSearchQuery('');
+                    setSelectedCouponFilter('');
+                  }}
+                  className="bg-primary/10 hover:bg-[#00f5a0]/15 hover:text-[#00f5a0] text-[#00f5a0] transition-all px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 border border-primary/20 hover:border-[#00f5a0]/30"
+                >
+                  <X size={14} /> Limpar Filtro
+                </button>
+              )}
+            </div>
+
+            {/* Controls Filter Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Search Box */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40" size={16} />
+                <input
+                  type="text"
+                  placeholder="Pesquisar por nome, e-mail ou cupão..."
+                  value={couponSearchQuery}
+                  onChange={(e) => setCouponSearchQuery(e.target.value)}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-4 py-3.5 text-sm text-on-surface outline-none focus:border-primary transition-all placeholder:text-on-surface-variant/40 font-medium"
+                />
+              </div>
+
+              {/* Coupon Dropdown Filter */}
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none">
+                  <SlidersHorizontal size={16} />
+                </div>
+                <select
+                  value={selectedCouponFilter}
+                  onChange={(e) => setSelectedCouponFilter(e.target.value)}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-10 py-3.5 text-sm text-on-surface outline-none focus:border-primary appearance-none cursor-pointer font-bold"
+                >
+                  <option value="">Filtrar: Todos os Cupões</option>
+                  {coupons.map(cp => (
+                    <option key={cp.id} value={cp.code}>{cp.code} ({cp.active ? 'Ativo' : 'Inativo'})</option>
+                  ))}
+                </select>
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
+                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                </div>
+              </div>
+            </div>
+
             <div className="overflow-hidden border border-outline-variant/10 rounded-2xl">
               <table className="w-full text-left border-collapse">
                 <thead className="bg-surface-container text-on-surface-variant text-[10px] uppercase tracking-widest">
                   <tr>
                     <th className="p-4 font-black">Usuário</th>
                     <th className="p-4 font-black">Cupão Utilizado</th>
-                    <th className="p-4 font-black">Parceiro</th>
+                    <th className="p-4 font-black">Parceiro / Referência</th>
+                    <th className="p-4 font-black">Status da Conta</th>
                     <th className="p-4 font-black">Data Registo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
-                  {users.filter(u => u.usedCoupon).map(u => (
-                    <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
-                      <td className="p-4 font-bold text-sm text-on-surface">{u.name || u.email}</td>
-                      <td className="p-4 text-xs font-mono text-primary font-black">{u.usedCoupon}</td>
-                      <td className="p-4 text-xs text-on-surface-variant">{u.partnerRef || '-'}</td>
-                      <td className="p-4 text-xs text-on-surface-variant">{new Date(u.createdAt).toLocaleDateString()}</td>
+                  {users
+                    .filter(u => u.usedCoupon)
+                    .filter(u => !selectedCouponFilter || u.usedCoupon === selectedCouponFilter)
+                    .filter(u => {
+                      if (!couponSearchQuery) return true;
+                      const term = couponSearchQuery.toLowerCase();
+                      return (u.name || '').toLowerCase().includes(term) ||
+                             (u.email || '').toLowerCase().includes(term) ||
+                             (u.usedCoupon || '').toLowerCase().includes(term) ||
+                             (u.partnerRef || '').toLowerCase().includes(term);
+                    })
+                    .map(u => (
+                      <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
+                        <td className="p-4">
+                          <p className="font-bold text-sm text-on-surface">{u.name || 'Trader Sem Nome'}</p>
+                          <p className="text-[11px] text-on-surface-variant font-mono">{u.email}</p>
+                        </td>
+                        <td className="p-4">
+                          <button
+                            onClick={() => setSelectedCouponFilter(u.usedCoupon)}
+                            className="text-xs font-mono text-primary font-black bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg border border-primary/20 transition-all uppercase"
+                          >
+                            {u.usedCoupon}
+                          </button>
+                        </td>
+                        <td className="p-4 text-xs text-on-surface-variant font-medium">{u.partnerRef || '-'}</td>
+                        <td className="p-4">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                            u.plan_type === 'trial_15' 
+                              ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' 
+                              : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                          }`}>
+                            {u.plan_type?.replace('_', ' ') || 'Trial'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-xs text-on-surface-variant">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}</td>
+                      </tr>
+                    ))}
+                  {users
+                    .filter(u => u.usedCoupon)
+                    .filter(u => !selectedCouponFilter || u.usedCoupon === selectedCouponFilter)
+                    .filter(u => {
+                      if (!couponSearchQuery) return true;
+                      const term = couponSearchQuery.toLowerCase();
+                      return (u.name || '').toLowerCase().includes(term) ||
+                             (u.email || '').toLowerCase().includes(term) ||
+                             (u.usedCoupon || '').toLowerCase().includes(term) ||
+                             (u.partnerRef || '').toLowerCase().includes(term);
+                    }).length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-xs text-on-surface-variant italic">
+                        Nenhum registro encontrado com estes filtros.
+                      </td>
                     </tr>
-                  ))}
-                  {users.filter(u => u.usedCoupon).length === 0 && (
-                    <tr><td colSpan={4} className="p-6 text-center text-xs text-on-surface-variant">Nenhum registro encontrado.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -999,101 +1781,114 @@ export default function AdminPanel() {
           </div>
         </div>
       ) : activeTab === 'maestros' ? (
-        <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
-          <div className="p-6 border-b border-outline-variant/20">
-             <h3 className="text-xl font-bold text-on-surface font-headline">Administradores e Maestros</h3>
-             <p className="text-sm text-on-surface-variant mt-2">Os usuários listados abaixo têm controle total sobre as configurações da plataforma e listagem de usuários.</p>
-          </div>
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-surface-container text-on-surface-variant text-xs uppercase tracking-widest border-b border-outline-variant/20">
-              <tr>
-                <th className="p-6 font-black">Usuário</th>
-                <th className="p-6 font-black">Email</th>
-                <th className="p-6 font-black w-24 text-right">Ação</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/10 text-sm">
-              {users.filter(u => u.role === 'admin').map((u) => (
-                <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
-                  <td className="p-6">
-                    <div className="flex items-center gap-4">
-                      {u.photoURL ? (
-                        <img src={u.photoURL} alt="avatar" className="w-10 h-10 rounded-xl object-cover" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center font-bold font-headline uppercase">
-                          {u.email.charAt(0)}
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-bold text-on-surface text-base">{u.name}</p>
-                        <p className="text-xs text-primary font-bold uppercase tracking-widest mt-1">Maestro</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-6 text-on-surface-variant text-xs">{u.email}</td>
-                  <td className="p-6 text-right">
-                    <button 
-                      onClick={() => handleUpdateUser(u.id, { role: 'user' })}
-                      className="px-4 py-2 bg-error/10 text-error rounded-xl text-[10px] font-black hover:bg-error/20 transition-all uppercase tracking-widest"
-                      disabled={u.email === 'exportacoes.extras@gmail.com'}
-                    >
-                      Remover Maestro
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {users.filter(u => u.role === 'admin').length === 0 && (
+        <div className="space-y-6">
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
+            <div className="p-6 border-b border-outline-variant/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+               <div>
+                  <h3 className="text-xl font-bold text-on-surface font-headline">Administradores e Maestros</h3>
+                  <p className="text-sm text-on-surface-variant mt-2">Os usuários listados abaixo têm controle total sobre as configurações da plataforma e listagem de usuários.</p>
+               </div>
+               <button
+                  onClick={() => {
+                    setBroadcastTab('create');
+                    setShowBroadcastModal(true);
+                  }}
+                  className="w-full sm:w-auto bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#00f5a0]/15 hover:scale-[1.02] active:scale-[0.98] transition-all"
+               >
+                  <Megaphone size={14} /> Avisos / Comunicados
+               </button>
+            </div>
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-surface-container text-on-surface-variant text-xs uppercase tracking-widest border-b border-outline-variant/20">
                 <tr>
-                  <td colSpan={3} className="p-8 text-center text-on-surface-variant">Nenhum administrador encontrado.</td>
+                  <th className="p-6 font-black">Usuário</th>
+                  <th className="p-6 font-black">Email</th>
+                  <th className="p-6 font-black w-24 text-right">Ação</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-          
-          <div className="p-6 border-t border-outline-variant/20 bg-surface-container">
-            <h4 className="font-bold text-sm mb-4">Adicionar Novo Maestro</h4>
-            <div className="flex gap-4">
-              <select id="newAdminSelect" className="flex-1 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2 focus:outline-none focus:border-primary text-sm">
-                 <option value="">Selecione um usuário...</option>
-                 {users.filter(u => u.role !== 'admin' && u.status !== 'deleted').map(u => (
-                   <option key={u.id} value={u.id}>{u.name || u.email}</option>
-                 ))}
-              </select>
-              <button 
-                onClick={() => {
-                  const select = document.getElementById('newAdminSelect') as HTMLSelectElement;
-                  if (select.value) {
-                    handleUpdateUser(select.value, { role: 'admin' });
-                    select.value = '';
-                  }
-                }}
-                className="px-6 py-2 bg-primary text-on-primary font-bold rounded-xl hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20"
-              >
-                Promover a Maestro
-              </button>
-            </div>
-          </div>
-
-          {isSuperAdmin && (
-            <div className="p-6 border-t border-outline-variant/20 bg-error/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <p className="font-bold text-xs text-error uppercase tracking-widest flex items-center gap-2">
-                  <AlertTriangle size={14} className="text-error" /> Zona de Manutenção
-                </p>
-                <p className="text-[11px] text-on-surface-variant">Ações de limpeza global de dados do sistema.</p>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10 text-sm">
+                {users.filter(u => u.role === 'admin').map((u) => (
+                  <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
+                    <td className="p-6">
+                      <div className="flex items-center gap-4">
+                        {u.photoURL ? (
+                          <img src={u.photoURL} alt="avatar" className="w-10 h-10 rounded-xl object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center font-bold font-headline uppercase">
+                            {u.email.charAt(0)}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-bold text-on-surface text-base">{u.name}</p>
+                          <p className="text-xs text-primary font-bold uppercase tracking-widest mt-1">Maestro</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-6 text-on-surface-variant text-xs">{u.email}</td>
+                    <td className="p-6 text-right">
+                      <button 
+                        onClick={() => handleUpdateUser(u.id, { role: 'user' })}
+                        className="px-4 py-2 bg-error/10 text-error rounded-xl text-[10px] font-black hover:bg-error/20 transition-all uppercase tracking-widest"
+                        disabled={u.email === 'exportacoes.extras@gmail.com'}
+                      >
+                        Remover Maestro
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {users.filter(u => u.role === 'admin').length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="p-8 text-center text-on-surface-variant">Nenhum administrador encontrado.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            
+            <div className="p-6 border-t border-outline-variant/20 bg-surface-container">
+              <h4 className="font-bold text-sm mb-4">Adicionar Novo Maestro</h4>
+              <div className="flex gap-4">
+                <select id="newAdminSelect" className="flex-1 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2 focus:outline-none focus:border-primary text-sm">
+                   <option value="">Selecione um usuário...</option>
+                   {users.filter(u => u.role !== 'admin' && u.status !== 'deleted').map(u => (
+                     <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                   ))}
+                </select>
+                <button 
+                  onClick={() => {
+                    const select = document.getElementById('newAdminSelect') as HTMLSelectElement;
+                    if (select.value) {
+                      handleUpdateUser(select.value, { role: 'admin' });
+                      select.value = '';
+                    }
+                  }}
+                  className="px-6 py-2 bg-primary text-on-primary font-bold rounded-xl hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20"
+                >
+                  Promover a Maestro
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  if (window.confirm('ATENÇÃO: ESTOU A ENTRAR NA ZONA DE PERIGO!')) {
-                    setShowDangerZone(true);
-                  }
-                }}
-                className="px-4 py-2 bg-error/10 hover:bg-error/20 text-error rounded-xl text-[11px] font-black uppercase tracking-widest transition-all"
-              >
-                Acessar Zona de Perigo
-              </button>
             </div>
-          )}
+
+            {isSuperAdmin && (
+              <div className="p-6 border-t border-outline-variant/20 bg-error/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <p className="font-bold text-xs text-error uppercase tracking-widest flex items-center gap-2">
+                    <AlertTriangle size={14} className="text-error" /> Zona de Manutenção
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant">Ações de limpeza global de dados do sistema.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (window.confirm('ATENÇÃO: ESTOU A ENTRAR NA ZONA DE PERIGO!')) {
+                      setShowDangerZone(true);
+                    }
+                  }}
+                  className="px-4 py-2 bg-error/10 hover:bg-error/20 text-error rounded-xl text-[11px] font-black uppercase tracking-widest transition-all"
+                >
+                  Acessar Zona de Perigo
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
 

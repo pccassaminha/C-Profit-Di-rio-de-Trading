@@ -34,30 +34,39 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     const cleanCode = codeStr.trim().toUpperCase();
     if (!cleanCode) return;
 
-    if (cleanCode === 'DESCONTODE50%') {
-       setAppliedCoupon({
+    try {
+      // Prioritize database query for both standard or DESCONTODE50% coupons
+      const q = query(collection(db, 'coupons'), where('code', '==', cleanCode));
+      const snap = await getDocs(q);
+      
+      if (!snap.empty) {
+        const couponDoc = snap.docs[0].data();
+        if (!couponDoc.active) {
+          setValidationMsg({ text: 'Cupom inválido ou inativo.', type: 'error' });
+          return;
+        }
+        
+        const cp = { id: snap.docs[0].id, ...couponDoc };
+        setAppliedCoupon(cp);
+        setValidationMsg({ text: `Cupom "${cleanCode}" de ${couponDoc.discountValue}${couponDoc.discountType === 'percentage' ? '%' : ' Kz'} aplicado com sucesso!`, type: 'success' });
+        return;
+      }
+      
+      // Fallback for DESCONTODE50% if not yet in database (e.g., initial seed)
+      if (cleanCode === 'DESCONTODE50%') {
+        setAppliedCoupon({
           id: 'descontode50_static',
           code: 'DESCONTODE50%',
           active: true,
           discountType: 'percentage',
           discountValue: 50,
           targetPlan: 'all'
-       });
-       setValidationMsg({ text: 'Cupom "DESCONTODE50%" de 50% de DESCONTO aplicado com sucesso!', type: 'success' });
-       return;
-    }
-
-    try {
-      const q = query(collection(db, 'coupons'), where('code', '==', cleanCode), where('active', '==', true));
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        setValidationMsg({ text: 'Cupom inválido ou inativo.', type: 'error' });
+        });
+        setValidationMsg({ text: 'Cupom "DESCONTODE50%" de 50% de DESCONTO aplicado com sucesso!', type: 'success' });
         return;
       }
 
-      const cp = { id: snap.docs[0].id, ...snap.docs[0].data() };
-      setAppliedCoupon(cp);
-      setValidationMsg({ text: `Cupom "${cleanCode}" aplicado com sucesso!`, type: 'success' });
+      setValidationMsg({ text: 'Cupom inválido ou inativo.', type: 'error' });
     } catch (err) {
       console.error(err);
       setValidationMsg({ text: 'Erro ao validar cupom.', type: 'error' });
