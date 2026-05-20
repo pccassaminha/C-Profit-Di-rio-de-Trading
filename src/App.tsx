@@ -14,6 +14,7 @@ import Payments from './components/Payments';
 import AdminPanel from './components/AdminPanel';
 import Support from './components/Support';
 import Planner from './components/Planner';
+import UserAffiliate from './components/UserAffiliate';
 import { useTrades } from './hooks/useTrades';
 
 import Auth from './components/Auth';
@@ -33,6 +34,14 @@ export default function App() {
   const [publicPage, setPublicPage] = useState<string>('landing');
   
   const { isExpired, userPlan } = useTrades();
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ref = urlParams.get('ref');
+    if (ref) {
+      localStorage.setItem('referredBy', ref);
+    }
+  }, []);
 
   useEffect(() => {
     const handleNavigation = (e: Event) => {
@@ -125,6 +134,7 @@ export default function App() {
         return <Dashboard />;
       case 'support': return <Support />;
       case 'planner': return <Planner />;
+      case 'affiliates_user': return <UserAffiliate />;
       default: return <Dashboard />;
     }
   };

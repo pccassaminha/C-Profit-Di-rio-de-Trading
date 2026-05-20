@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, getDocs, doc, updateDoc, onSnapshot, query, orderBy, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, updateDoc, onSnapshot, query, orderBy, setDoc, addDoc, deleteDoc, where } from 'firebase/firestore';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, AlertTriangle } from 'lucide-react';
@@ -12,11 +12,14 @@ export default function AdminPanel() {
   // Super Admin check
   const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
 
-  const [activeTab, setActiveTab] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast' | 'maestros'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast' | 'maestros' | 'affiliates'>('users');
   const [editingUser, setEditingUser] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
+  const [adminReferrals, setAdminReferrals] = useState<any[]>([]);
+  const [adminPayouts, setAdminPayouts] = useState<any[]>([]);
+  const [selectedStatList, setSelectedStatList] = useState<'faturado' | 'descontos' | 'parceiros' | null>(null);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [showDangerZone, setShowDangerZone] = useState(false);
   const [settings, setSettings] = useState(initialSettings || {
@@ -96,11 +99,34 @@ export default function AdminPanel() {
       setCoupons(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    // Listen to referrals
+    const unsubReferrals = onSnapshot(query(collection(db, 'referrals'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setAdminReferrals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    // Listen to affiliate payouts
+    const unsubPayouts = onSnapshot(query(collection(db, 'affiliate_payouts'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setAdminPayouts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    // Listen to global settings to keep settings state fully active in real time
+    const unsubGlobalSettings = onSnapshot(doc(db, 'settings', 'global'), (docSnap) => {
+      if (docSnap.exists()) {
+        setSettings(prev => ({ 
+          ...prev, 
+          ...docSnap.data() 
+        }));
+      }
+    });
+
     setLoading(false);
     return () => {
       unsubUsers();
       unsubPayments();
       unsubCoupons();
+      unsubReferrals();
+      unsubPayouts();
+      unsubGlobalSettings();
     };
   }, [isSuperAdmin]);
 
@@ -133,6 +159,51 @@ export default function AdminPanel() {
         expiry_date: expiryDate,
         updatedAt: new Date().toISOString()
       });
+
+      // 3. Referral check (affiliate commission)
+      const userRef = doc(db, 'usuarios', payment.userId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        if (userData.referredBy) {
+          // Check if this user already has any approved referrals or previous approved payments
+          const qApprovedRefs = query(
+            collection(db, 'referrals'),
+            where('referredId', '==', payment.userId),
+            where('status', '==', 'approved')
+          );
+          const approvedRefsSnap = await getDocs(qApprovedRefs);
+          
+          if (approvedRefsSnap.empty) {
+            // Get administrative settings for reward method
+            const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
+            const activeSettings = settingsSnap.exists() ? settingsSnap.data() : {};
+            const activeMode = activeSettings.affiliateMode || 'commission_30';
+            
+            // Calculate reward
+            let rewardVal: any = 0;
+            if (activeMode === 'commission_30') {
+              rewardVal = Math.round(payment.amount * 0.30);
+            } else {
+              rewardVal = '1_month_free_progress';
+            }
+
+            // Create referral doc with pending_approval status, which the maestro approves
+            await addDoc(collection(db, 'referrals'), {
+              referrerId: userData.referredBy,
+              referredId: payment.userId,
+              referredName: userData.nome || 'Novo Trader',
+              referredEmail: userData.email,
+              referredPlan: payment.planId,
+              paymentAmount: payment.amount,
+              rewardType: activeMode,
+              rewardValue: rewardVal,
+              status: 'pending_approval',
+              createdAt: new Date().toISOString()
+            });
+          }
+        }
+      }
     } catch (err) {
       console.error(err);
     }
@@ -253,6 +324,100 @@ export default function AdminPanel() {
     }
   };
 
+  const handleApproveReferral = async (ref: any) => {
+    try {
+      await updateDoc(doc(db, 'referrals', ref.id), {
+        status: 'approved',
+        approvedAt: new Date().toISOString()
+      });
+
+      if (ref.rewardType === 'commission_30') {
+        const referrerRef = doc(db, 'usuarios', ref.referrerId);
+        const referrerDoc = await getDoc(referrerRef);
+        if (referrerDoc.exists()) {
+          const currentBal = referrerDoc.data().affiliateBalance || 0;
+          await updateDoc(referrerRef, {
+            affiliateBalance: currentBal + Number(ref.rewardValue)
+          });
+        }
+      }
+      alert('Recompensa de afiliado aprovada com sucesso!');
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao aprovar recompensa.');
+    }
+  };
+
+  const handleRejectReferral = async (refId: string) => {
+    if (!window.confirm('Tem certeza de que deseja rejeitar esta recompensa de recomendação?')) return;
+    try {
+      await updateDoc(doc(db, 'referrals', refId), {
+        status: 'rejected',
+        updatedAt: new Date().toISOString()
+      });
+      alert('Recomendação rejeitada.');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleApprovePayout = async (payout: any) => {
+    if (!window.confirm('Marcar este saque solicitado como Pago por transferência?')) return;
+    try {
+      await updateDoc(doc(db, 'affiliate_payouts', payout.id), {
+        status: 'approved',
+        updatedAt: new Date().toISOString()
+      });
+      alert('Levantamento pago à conta bancária de destino!');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleRejectPayout = async (payout: any) => {
+    if (!window.confirm('Cancelar este pedido de levantamento de comissões? O saldo será integralmente devolvido ao usuário.')) return;
+    try {
+      await updateDoc(doc(db, 'affiliate_payouts', payout.id), {
+        status: 'rejected',
+        updatedAt: new Date().toISOString()
+      });
+
+      const userRef = doc(db, 'usuarios', payout.userId);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        const currentBal = userDoc.data().affiliateBalance || 0;
+        await updateDoc(userRef, {
+          affiliateBalance: currentBal + Number(payout.amount)
+        });
+      }
+      alert('Levantamento recusado e fundos estornados.');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleConcedeFreeMonth = async (userId: string) => {
+    try {
+      const userRef = doc(db, 'usuarios', userId);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        const currentExpiry = userDoc.data().expiry_date;
+        const baseDate = currentExpiry ? (currentExpiry.toDate ? currentExpiry.toDate() : new Date(currentExpiry)) : new Date();
+        const newExpiry = new Date(baseDate);
+        newExpiry.setDate(newExpiry.getDate() + 30);
+        
+        await updateDoc(userRef, {
+          expiry_date: newExpiry.toISOString(),
+          plan_type: 'mensal_6',
+          updatedAt: new Date().toISOString()
+        });
+        alert('Sucesso! Concedido 1 mês grátis ao trader.');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   if (!isSuperAdmin) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -306,6 +471,12 @@ export default function AdminPanel() {
             className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'maestros' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
             <ShieldAlert size={18} /> Maestros
+          </button>
+          <button 
+            onClick={() => setActiveTab('affiliates')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'affiliates' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 animate-pulse' : 'text-on-surface-variant hover:text-on-surface'}`}
+          >
+            <Landmark size={18} /> Gestão Financeira & Afiliados
           </button>
        </div>
       </div>
@@ -919,6 +1090,462 @@ export default function AdminPanel() {
           )}
         </div>
       ) : null}
+
+      {activeTab === 'affiliates' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          
+          {/* Dashboard Stats Panel */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <button 
+              onClick={() => setSelectedStatList(selectedStatList === 'faturado' ? null : 'faturado')}
+              className={`bg-surface-container-low border text-left rounded-3xl p-6 shadow-xl flex items-center justify-between transition-all hover:scale-[1.01] hover:bg-surface-container-high/30 active:scale-[0.99] cursor-pointer ${selectedStatList === 'faturado' ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-outline-variant/20'}`}
+            >
+              <div>
+                <p className="text-[10px] font-black uppercase text-on-surface-variant tracking-widest flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${selectedStatList === 'faturado' ? 'bg-emerald-500 animate-ping' : 'bg-transparent'}`}></span>
+                  Total Faturado (Assinaturas)
+                </p>
+                <p className="text-3xl font-black text-emerald-400 mt-2">
+                  {payments.filter(p => p.status === 'approved').reduce((acc, p) => acc + (p.amount || 0), 0).toLocaleString()} Kz
+                </p>
+                <p className="text-[11px] text-on-surface-variant/70 mt-1">Soma de todos os planos aprovados (Clique para ver)</p>
+              </div>
+              <span className="material-symbols-outlined text-4xl text-emerald-500/30">payments</span>
+            </button>
+
+            <button 
+              onClick={() => setSelectedStatList(selectedStatList === 'descontos' ? null : 'descontos')}
+              className={`bg-surface-container-low border text-left rounded-3xl p-6 shadow-xl flex items-center justify-between transition-all hover:scale-[1.01] hover:bg-surface-container-high/30 active:scale-[0.99] cursor-pointer ${selectedStatList === 'descontos' ? 'border-amber-500 ring-2 ring-amber-500/20' : 'border-outline-variant/20'}`}
+            >
+              <div>
+                <p className="text-[10px] font-black uppercase text-on-surface-variant tracking-widest flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${selectedStatList === 'descontos' ? 'bg-amber-500 animate-ping' : 'bg-transparent'}`}></span>
+                  Total de Descontos Concedidos
+                </p>
+                <p className="text-3xl font-black text-amber-400 mt-2">
+                  {payments.filter(p => p.status === 'approved' && p.usedCoupon).reduce((acc, p) => {
+                    const c = coupons.find(cp => cp.code === p.usedCoupon);
+                    if (c) {
+                      if (c.discountType === 'fixed') return acc + Number(c.discountValue);
+                      const orig = p.amount / (1 - (c.discountValue / 100));
+                      return acc + Math.round(orig * (c.discountValue / 100));
+                    }
+                    return acc + 5000;
+                  }, 0).toLocaleString()} Kz
+                </p>
+                <p className="text-[11px] text-on-surface-variant/70 mt-1">Descontos aplicados via cupões (Clique para ver)</p>
+              </div>
+              <span className="material-symbols-outlined text-4xl text-amber-500/30">price_check</span>
+            </button>
+
+            <button 
+              onClick={() => setSelectedStatList(selectedStatList === 'parceiros' ? null : 'parceiros')}
+              className={`bg-surface-container-low border text-left rounded-3xl p-6 shadow-xl flex items-center justify-between transition-all hover:scale-[1.01] hover:bg-surface-container-high/30 active:scale-[0.99] cursor-pointer ${selectedStatList === 'parceiros' ? 'border-primary ring-2 ring-primary/20' : 'border-outline-variant/20'}`}
+            >
+              <div>
+                <p className="text-[10px] font-black uppercase text-on-surface-variant tracking-widest flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${selectedStatList === 'parceiros' ? 'bg-primary animate-ping' : 'bg-transparent'}`}></span>
+                  Parceiros / Afiliados Ativos
+                </p>
+                <p className="text-3xl font-black text-primary mt-2">
+                  {users.filter(u => u.referredBy || u.affiliateBalance > 0).length}
+                </p>
+                <p className="text-[11px] text-on-surface-variant/70 mt-1">Traders com comissões/convites (Clique para ver)</p>
+              </div>
+              <span className="material-symbols-outlined text-4xl text-primary/30">handshake</span>
+            </button>
+          </div>
+
+          {/* Dynamic Interactive Ledgers */}
+          {selectedStatList && (
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl animate-in slide-in-from-top duration-300">
+              <div className="flex justify-between items-center mb-6 pb-4 border-b border-outline-variant/15">
+                <div>
+                  <h4 className="text-sm font-black uppercase tracking-wider text-white">
+                    {selectedStatList === 'faturado' && '📄 Extrato de Faturamento (Todos os Planos Ativos)'}
+                    {selectedStatList === 'descontos' && '🎟️ Detalhes dos Cupões & Descontos Utilizados'}
+                    {selectedStatList === 'parceiros' && '🤝 Carteira de Saldos de Parceiros & Afiliados'}
+                  </h4>
+                  <p className="text-[11px] text-on-surface-variant font-medium mt-0.5">
+                    {selectedStatList === 'faturado' && 'Histórico completo de pagamentos aprovados que creditaram a plataforma.'}
+                    {selectedStatList === 'descontos' && 'Lista de transações faturadas onde o cliente ativou um código promocional.'}
+                    {selectedStatList === 'parceiros' && 'Listagem de parceiros registados e balances correntes prontos a levantar.'}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedStatList(null)}
+                  className="px-3 py-1 bg-surface-container text-xs text-on-surface-variant uppercase font-mono font-black border border-outline-variant/20 rounded-lg hover:text-white transition-colors"
+                >
+                  Fechar [X]
+                </button>
+              </div>
+
+              {selectedStatList === 'faturado' && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-surface-container text-[10px] font-black text-on-surface-variant uppercase tracking-widest border-b border-outline-variant/10">
+                      <tr>
+                        <th className="p-4">ID Transação</th>
+                        <th className="p-4">Trader / Email</th>
+                        <th className="p-4">Plano</th>
+                        <th className="p-4">Método</th>
+                        <th className="p-4">Data Aprovado</th>
+                        <th className="p-4 text-right">Valor creditado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/10 text-xs text-white">
+                      {payments.filter(p => p.status === 'approved').map(p => {
+                        const paidUser = users.find(u => u.id === p.userId);
+                        return (
+                          <tr key={p.id} className="hover:bg-surface-container/20 transition-colors">
+                            <td className="p-4 font-mono font-bold text-on-surface-variant">#{getPaymentDisplayId(p.id)}</td>
+                            <td className="p-4">
+                              <p className="font-bold text-on-surface">{paidUser?.name || 'Inscrito'}</p>
+                              <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{paidUser?.email || p.userId}</p>
+                            </td>
+                            <td className="p-4 font-bold uppercase font-mono">{p.planId?.replace('_', ' ')}</td>
+                            <td className="p-4 font-bold uppercase tracking-wider text-[10px]">
+                              {p.paymentMethod === 'express' ? 'Express 📱' : p.paymentMethod === 'iban' ? 'IBAN 🏛️' : 'MCX Ref 💳'}
+                            </td>
+                            <td className="p-4 text-[10px] text-on-surface-variant">{new Date(p.createdAt || Date.now()).toLocaleDateString()}</td>
+                            <td className="p-4 text-right font-black text-emerald-400 font-mono">{p.amount?.toLocaleString()} Kz</td>
+                          </tr>
+                        );
+                      })}
+                      {payments.filter(p => p.status === 'approved').length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-xs text-on-surface-variant/70 italic">Nenhum pagamento aprovado até ao momento.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {selectedStatList === 'descontos' && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-surface-container text-[10px] font-black text-on-surface-variant uppercase tracking-widest border-b border-outline-variant/10">
+                      <tr>
+                        <th className="p-4">Trader</th>
+                        <th className="p-4">Cupão de Desconto</th>
+                        <th className="p-4">Valor Pago</th>
+                        <th className="p-4">Desconto Estimado</th>
+                        <th className="p-4">Data Uso</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/10 text-xs text-white">
+                      {payments.filter(p => p.status === 'approved' && p.usedCoupon).map(p => {
+                        const paidUser = users.find(u => u.id === p.userId);
+                        const c = coupons.find(cp => cp.code === p.usedCoupon);
+                        let estimatedSavings = 0;
+                        if (c) {
+                          if (c.discountType === 'fixed') {
+                            estimatedSavings = Number(c.discountValue);
+                          } else {
+                            const orig = p.amount / (1 - (c.discountValue / 100));
+                            estimatedSavings = Math.round(orig * (c.discountValue / 100));
+                          }
+                        } else {
+                          estimatedSavings = 5000; // estimated default fallback
+                        }
+                        return (
+                          <tr key={p.id} className="hover:bg-surface-container/20 transition-colors">
+                            <td className="p-4">
+                              <p className="font-bold text-on-surface">{paidUser?.name || 'Trader'}</p>
+                              <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{paidUser?.email}</p>
+                            </td>
+                            <td className="p-4 font-mono font-black text-primary">{p.usedCoupon}</td>
+                            <td className="p-4 font-bold text-on-surface font-mono">{p.amount?.toLocaleString()} Kz</td>
+                            <td className="p-4 font-black text-amber-400 font-mono">-{estimatedSavings.toLocaleString()} Kz</td>
+                            <td className="p-4 text-[10px] text-on-surface-variant">{new Date(p.createdAt || Date.now()).toLocaleDateString()}</td>
+                          </tr>
+                        );
+                      })}
+                      {payments.filter(p => p.status === 'approved' && p.usedCoupon).length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-xs text-on-surface-variant/70 italic">Nenhum cupão promocional ativo ainda faturado.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {selectedStatList === 'parceiros' && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-surface-container text-[10px] font-black text-on-surface-variant uppercase tracking-widest border-b border-outline-variant/10">
+                      <tr>
+                        <th className="p-4">Afiliado / Identificador</th>
+                        <th className="p-4">Email de Contato</th>
+                        <th className="p-4">Padrinho ID</th>
+                        <th className="p-4">Data Inscrição</th>
+                        <th className="p-4 text-right">Saldo de Comissões</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/10 text-xs text-white">
+                      {users.filter(u => u.status !== 'deleted' && (u.referredBy || u.affiliateBalance > 0)).map(u => {
+                        return (
+                          <tr key={u.id} className="hover:bg-surface-container/20 transition-colors">
+                            <td className="p-4">
+                              <p className="font-bold text-on-surface">{u.nome || 'Parceiro'}</p>
+                              <p className="text-[10px] bg-surface-container font-mono px-2 py-0.5 rounded text-on-surface-variant font-black w-fit mt-1">ID: {getUserDisplayId(u.id)}</p>
+                            </td>
+                            <td className="p-4 font-medium italic">{u.email}</td>
+                            <td className="p-4 font-mono select-all text-on-surface-variant">{u.referredBy ? `ID Ref: ${u.referredBy.substring(0,6)}...` : '-'}</td>
+                            <td className="p-4 text-[10px] text-on-surface-variant">{new Date(u.createdAt || Date.now()).toLocaleDateString()}</td>
+                            <td className="p-4 text-right font-black text-emerald-400 font-mono">{(u.affiliateBalance || 0).toLocaleString()} Kz</td>
+                          </tr>
+                        );
+                      })}
+                      {users.filter(u => u.status !== 'deleted' && (u.referredBy || u.affiliateBalance > 0)).length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-xs text-on-surface-variant/70 italic">Não existem parceiros comerciais registados actualmente.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Configuration of Active Method */}
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl">
+            <h3 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">rule</span> Ajuste das Diretrizes de Afiliados (Business)
+            </h3>
+            <p className="text-xs text-on-surface-variant max-w-3xl leading-relaxed mb-6">
+              Defina abaixo qual modalidade de recompensa ou comissão será oferecida por padrão a todos os traders que promoverem a plataforma. Pode alternar livremente; o sistema reconfigura a área de afiliados de forma síncrona.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button 
+                onClick={async () => {
+                  await setDoc(doc(db, 'settings', 'global'), { ...settings, affiliateMode: 'free_month' });
+                  alert('Modo Alterado: Convidar 2 Traders = 1 Mês Grátis!');
+                }}
+                className={`p-5 rounded-2xl border text-left flex items-start gap-4 transition-all ${
+                  (settings?.affiliateMode || 'commission_30') === 'free_month' 
+                    ? 'bg-amber-500/5 border-amber-500 text-on-surface shadow-md' 
+                    : 'bg-surface-container-high/40 border-outline-variant/15 text-on-surface hover:bg-surface-container-high'
+                }`}
+              >
+                <span className="material-symbols-outlined text-amber-500 text-3xl">gif_box</span>
+                <div>
+                  <p className="font-bold text-sm">Opção 1: Convidar 2 = 1 Mês Grátis</p>
+                  <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                    Ideal para crescimento orgânico sem custos de caixa. A cada 2 recomendações que ativarem um plano, o afiliado ganha 1 mês grátis.
+                  </p>
+                </div>
+              </button>
+
+              <button 
+                onClick={async () => {
+                  await setDoc(doc(db, 'settings', 'global'), { ...settings, affiliateMode: 'commission_30' });
+                  alert('Modo Alterado: 30% de Comissão por Cada Adesão!');
+                }}
+                className={`p-5 rounded-2xl border text-left flex items-start gap-4 transition-all ${
+                  (settings?.affiliateMode || 'commission_30') === 'commission_30' 
+                    ? 'bg-emerald-500/5 border-emerald-500 text-on-surface shadow-md' 
+                    : 'bg-surface-container-high/40 border-outline-variant/15 text-on-surface hover:bg-surface-container-high'
+                }`}
+              >
+                <span className="material-symbols-outlined text-emerald-500 text-3xl">currency_lira</span>
+                <div>
+                  <p className="font-bold text-sm font-headline uppercase tracking-tight text-white">Opção 2: 30% de Comissões em Dinheiro</p>
+                  <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                    Direcionado a influenciadores e parceiros de marketing. 30% do valor da assinatura paga é creditada ao padrinho após validação.
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Pending Commissions waiting confirmation by Maestro */}
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
+            <div className="p-6 border-b border-outline-variant/15 flex justify-between items-center bg-surface-container">
+              <div>
+                <h3 className="font-bold text-sm text-on-surface uppercase tracking-wider flex items-center gap-2">
+                  <span className="material-symbols-outlined text-amber-500">pending_actions</span> Comissões & Indicações por Confirmar
+                </h3>
+                <p className="text-xs text-on-surface-variant mt-0.5">Transações geradas por primeiros pagamentos de usuários convidados</p>
+              </div>
+              <span className="text-xs font-mono bg-surface-container-high px-3 py-1 rounded-full font-bold text-on-surface-variant">
+                {adminReferrals.filter(r => r.status === 'pending_approval').length} Pendentes
+              </span>
+            </div>
+
+            {adminReferrals.filter(r => r.status === 'pending_approval').length === 0 ? (
+              <div className="p-8 text-center text-xs text-on-surface-variant/70 italic">Nenhuma indicação pendente de validação pelos Maestros.</div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-surface-container text-[10px] uppercase font-black text-on-surface-variant tracking-widest border-b border-outline-variant/15">
+                  <tr>
+                    <th className="p-4">Quem Convidou</th>
+                    <th className="p-4">Novo Membro</th>
+                    <th className="p-4">Plano Escolhido</th>
+                    <th className="p-4">Recompensa</th>
+                    <th className="p-4 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10 text-xs text-on-surface select-none">
+                  {adminReferrals.filter(r => r.status === 'pending_approval').map(ref => {
+                    const referrerUser = users.find(u => u.id === ref.referrerId);
+                    return (
+                      <tr key={ref.id} className="hover:bg-surface-container/20 transition-colors">
+                        <td className="p-4">
+                          <p className="font-bold text-on-surface">{referrerUser?.name || 'Afiliado'}</p>
+                          <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{referrerUser?.email}</p>
+                        </td>
+                        <td className="p-4">
+                          <p className="font-bold text-on-surface">{ref.referredName}</p>
+                          <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{ref.referredEmail}</p>
+                        </td>
+                        <td className="p-4">
+                          <p className="font-semibold uppercase font-mono">{ref.referredPlan?.replace('_', ' ')}</p>
+                          <p className="text-[10px] text-primary font-black mt-0.5">{ref.paymentAmount?.toLocaleString()} Kz</p>
+                        </td>
+                        <td className="p-4">
+                          <span className="bg-primary/10 text-primary border border-primary/20 font-black px-2 py-0.5 rounded uppercase text-[10px]">
+                            {ref.rewardType === 'commission_30' ? `${Number(ref.rewardValue).toLocaleString()} Kz (30%)` : 'Fracção Mês Grátis'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button 
+                              onClick={() => handleRejectReferral(ref.id)}
+                              className="px-3 py-1.5 bg-error/10 text-error hover:bg-error/20 transition-all font-black text-[9px] uppercase tracking-wider rounded-lg"
+                            >
+                              Recusar
+                            </button>
+                            <button 
+                              onClick={() => handleApproveReferral(ref)}
+                              className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all font-black text-[9px] uppercase tracking-wider rounded-lg"
+                            >
+                              Creditar & Aceitar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Affiliate Payout requests waiting payment */}
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
+            <div className="p-6 border-b border-outline-variant/15 flex justify-between items-center bg-surface-container">
+              <div>
+                <h3 className="font-bold text-sm text-on-surface uppercase tracking-wider flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-500">account_balance_wallet</span> Solicitatções de Saques de Afiliados
+                </h3>
+                <p className="text-xs text-on-surface-variant mt-0.5">Pedidos de transferência de fundos provenientes de comissões acumuladas</p>
+              </div>
+              <span className="text-xs font-mono bg-surface-container-high px-3 py-1 rounded-full font-bold text-on-surface-variant">
+                {adminPayouts.filter(p => p.status === 'pending').length} Por Pagar
+              </span>
+            </div>
+
+            {adminPayouts.length === 0 ? (
+              <div className="p-8 text-center text-xs text-on-surface-variant/70 italic">Nenhum pedido de levantamento de comissão.</div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-surface-container text-[10px] uppercase font-black text-on-surface-variant tracking-widest border-b border-outline-variant/15">
+                  <tr>
+                    <th className="p-4">Afiliado</th>
+                    <th className="p-4">Dados de Saque / Titular / IBAN</th>
+                    <th className="p-4">Valor Solicitado</th>
+                    <th className="p-4">Data / Hora</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-right">Procedimento</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10 text-xs text-on-surface">
+                  {adminPayouts.map(payout => (
+                    <tr key={payout.id} className="hover:bg-surface-container/20 transition-colors">
+                      <td className="p-4">
+                        <p className="font-bold text-on-surface">{payout.userName}</p>
+                        <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{payout.userEmail}</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="font-semibold text-on-surface">{payout.fullName}</p>
+                        <p className="text-[10px] text-emerald-400 font-mono mt-0.5 font-bold uppercase select-all bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10 w-fit">{payout.iban}</p>
+                      </td>
+                      <td className="p-4 font-black text-primary font-mono text-base">
+                        {payout.amount?.toLocaleString()} Kz
+                      </td>
+                      <td className="p-4 text-[10px] text-on-surface-variant">
+                        {new Date(payout.createdAt).toLocaleString()}
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                          payout.status === 'approved' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 
+                          payout.status === 'rejected' ? 'bg-error/15 text-error border border-error/30' : 'bg-amber-500/15 text-amber-400 border border-amber-500/30 font-bold'
+                        }`}>
+                          {payout.status === 'approved' ? 'Pago' : payout.status === 'rejected' ? 'Cancelado' : 'Pendente'}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        {payout.status === 'pending' && (
+                          <div className="flex justify-end gap-2">
+                            <button 
+                              onClick={() => handleRejectPayout(payout)}
+                              className="px-3 py-1.5 bg-error/10 text-error hover:bg-error/20 transition-all font-black text-[9px] uppercase tracking-wider rounded-lg"
+                            >
+                              Rejeitar
+                            </button>
+                            <button 
+                              onClick={() => handleApprovePayout(payout)}
+                              className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition-all font-black text-[9px] uppercase tracking-wider rounded-lg border border-emerald-500/40"
+                            >
+                              Pago ✅
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Quick Grant of Free Subscription Promo */}
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl">
+            <h4 className="font-bold text-sm text-on-surface mb-3 uppercase tracking-wider">Premiação Especial: Conceder Plano / Mês Avulso</h4>
+            <p className="text-xs text-on-surface-variant mb-6 leading-relaxed">
+              Desejas premiar um convidado de forma manual ou liberar prêmio avulso? Pode selecionar o afiliado abaixo e creditar 30 dias de acesso completo à plataforma (validando o bónus do convite de 2 utilizadores).
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <select id="freeMonthUserSelect" className="flex-1 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm font-medium">
+                <option value="">Selecione o afiliado para receber plano grátis...</option>
+                {users.filter(u => u.status !== 'deleted').map(u => (
+                  <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>
+                ))}
+              </select>
+              <button 
+                onClick={() => {
+                  const select = document.getElementById('freeMonthUserSelect') as HTMLSelectElement;
+                  if (select.value) {
+                    handleConcedeFreeMonth(select.value);
+                    select.value = '';
+                  } else {
+                    alert('Por favor, selecione um usuário primeiro.');
+                  }
+                }}
+                className="px-6 py-3 bg-amber-500 text-on-primary font-bold rounded-xl text-xs uppercase tracking-widest hover:scale-[1.02] transition-transform shadow-lg shadow-amber-500/20"
+              >
+                Conceder 30 Dias Gratuitos
+              </button>
+            </div>
+          </div>
+
+        </div>
+      )}
 
       {editingUser && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">

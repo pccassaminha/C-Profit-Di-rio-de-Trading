@@ -61,6 +61,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       const isNewUser = !userDoc.exists();
       
       if (isNewUser) {
+        const referredBy = localStorage.getItem('referredBy') || null;
         // Create initial profile for Google user
         await setDoc(userRef, {
           nome: result.user.displayName || 'Usuário Google',
@@ -68,7 +69,9 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
           createdAt: new Date().toISOString(),
           plan_type: 'Iniciante',
           account_limit: 2,
-          role: 'user'
+          role: 'user',
+          referredBy: referredBy,
+          affiliateBalance: 0
         });
       }
       
@@ -134,6 +137,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         if (name) {
           await updateProfile(result.user, { displayName: name });
         }
+        const referredBy = localStorage.getItem('referredBy') || null;
         const newUserData: any = {
           nome: name,
           email: email,
@@ -141,7 +145,9 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
           createdAt: new Date().toISOString(),
           plan_type: 'Iniciante',
           account_limit: 2,
-          role: 'user'
+          role: 'user',
+          referredBy: referredBy,
+          affiliateBalance: 0
         };
 
         if (validCoupon) {
