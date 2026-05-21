@@ -51,8 +51,67 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     date: new Date().toISOString().split('T')[0],
     entryTime: new Date().toTimeString().split(' ')[0].substring(0, 5),
     timeframe: 'M5',
-    dayOfWeek: new Date().toLocaleDateString('pt-BR', { weekday: 'long' })
+    dayOfWeek: new Date().toLocaleDateString('pt-BR', { weekday: 'long' }),
+    isConforme: true
   });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 40;
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tradeTypeFilter, selectedAccountFilter]);
+
+  const filteredTrades = React.useMemo(() => {
+    return trades.filter(trade => {
+      if (tradeTypeFilter !== 'all' && trade.type !== tradeTypeFilter) return false;
+      if (selectedAccountFilter !== 'all' && trade.accountId !== selectedAccountFilter) return false;
+      return true;
+    }).sort((a, b) => {
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      if (dateA !== dateB) {
+        return dateB.localeCompare(dateA);
+      }
+      const timeA = a.entryTime || '00:00';
+      const timeB = b.entryTime || '00:00';
+      return timeB.localeCompare(timeA);
+    });
+  }, [trades, tradeTypeFilter, selectedAccountFilter]);
+
+  const totalTradesCount = filteredTrades.length;
+  const totalPages = Math.ceil(totalTradesCount / itemsPerPage) || 1;
+  const activePage = Math.min(currentPage, totalPages);
+
+  const pageTrades = React.useMemo(() => {
+    const startIdx = (activePage - 1) * itemsPerPage;
+    return filteredTrades.slice(startIdx, startIdx + itemsPerPage);
+  }, [filteredTrades, activePage, itemsPerPage]);
+
+  const paginatedGroupedTrades = React.useMemo(() => {
+    return pageTrades.reduce((acc, trade) => {
+      let dateStr = 'Data Desconhecida';
+      if (trade.date) {
+        if (trade.date.includes('-')) {
+          const [year, month, day] = trade.date.split('-');
+          dateStr = `${day}/${month}/${year}`;
+        } else {
+          dateStr = trade.date.split('.').join('/');
+        }
+      } else if (trade.closeTime?.toDate) {
+        const d = trade.closeTime.toDate();
+        dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+      } else if (trade.closeTime) {
+        const d = new Date(trade.closeTime);
+        dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+      }
+      
+      if (!acc[dateStr]) acc[dateStr] = [];
+      acc[dateStr].push(trade);
+      return acc;
+    }, {} as Record<string, any[]>);
+  }, [pageTrades]);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -230,7 +289,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     try {
       let finalStudyLink = tradeData.studyLink;
 
-      // Handle File Upload if present
+      // Handle File Upload if present (No-op since direct files upload is removed, but keep structure for compatibility)
       if (selectedFile) {
         const fileRef = ref(storage, `trades/${auth.currentUser.uid}/${Date.now()}_${selectedFile.name}`);
         await uploadBytes(fileRef, selectedFile);
@@ -265,7 +324,8 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
         date: tradeData.date,
         entryTime: tradeData.entryTime,
         timeframe: tradeData.timeframe,
-        dayOfWeek: resolvedDayOfWeek
+        dayOfWeek: resolvedDayOfWeek,
+        isConforme: tradeData.isConforme ?? true
       };
 
       if (editingTradeId) {
@@ -303,7 +363,8 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
         returnAmount: '',
         studyLink: '',
         date: new Date().toISOString().split('T')[0],
-        entryTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
+        entryTime: new Date().toTimeString().split(' ')[0].substring(0, 5),
+        isConforme: true
       });
       setEditingTradeId(null);
       setTradeType(null);
@@ -829,12 +890,12 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
           </div>
         ) : (
           <div className="space-y-4">
-            {Object.keys(groupedTrades).length === 0 ? (
+            {Object.keys(paginatedGroupedTrades).length === 0 ? (
               <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-8 text-center text-on-surface-variant">
                 Nenhum trade registrado ainda.
               </div>
             ) : (
-              (Object.entries(groupedTrades) as [string, any[]][]).sort((a, b) => {
+              (Object.entries(paginatedGroupedTrades) as [string, any[]][]).sort((a, b) => {
                 // Sort dates descending
                 const [dayA, monthA, yearA] = a[0].split('/');
                 const [dayB, monthB, yearB] = b[0].split('/');
@@ -899,13 +960,6 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                                 <p className="text-xs text-on-surface-variant">Sessão</p>
                                 <p className="text-sm font-bold text-on-surface">{trade.session}</p>
                               </div>
-                              {/* R:R hidden as per user request to avoid layout deformation */}
-                              {/* 
-                              <div className="hidden md:block text-right">
-                                <p className="text-xs text-on-surface-variant">R:R</p>
-                                <p className="text-sm font-bold text-primary">{trade.rr ? `1:${trade.rr}` : '-'}</p>
-                              </div>
-                              */}
                               <div className="text-right">
                                 <p className="text-xs text-on-surface-variant">P&L</p>
                                 <p className={`font-bold ${trade.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
@@ -931,6 +985,33 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                   </div>
                 );
               })
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row justify-between items-center bg-surface-container-low border border-outline-variant/20 rounded-2xl p-4 gap-4 mt-8">
+                <span className="text-sm text-on-surface-variant font-medium">
+                  Exibindo <strong className="text-on-surface">{pageTrades.length}</strong> de <strong className="text-on-surface">{totalTradesCount}</strong> trades (Página {activePage} de {totalPages})
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={activePage === 1}
+                    className="px-4 py-2 border border-outline-variant/20 rounded-xl text-xs font-bold font-mono transition-colors tracking-wider bg-surface-container hover:bg-surface-container-highest text-on-surface disabled:opacity-40 disabled:cursor-not-allowed uppercase flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">chevron_left</span>
+                    Anterior
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={activePage === totalPages}
+                    className="px-4 py-2 border border-outline-variant/20 rounded-xl text-xs font-bold font-mono transition-colors tracking-wider bg-surface-container hover:bg-surface-container-highest text-on-surface disabled:opacity-40 disabled:cursor-not-allowed uppercase flex items-center gap-1"
+                  >
+                    Próximo
+                    <span className="material-symbols-outlined text-sm">chevron_right</span>
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -1022,7 +1103,8 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                   commission: selectedTrade.commission?.toString() || '',
                   date: selectedTrade.date || new Date().toISOString().split('T')[0],
                   entryTime: selectedTrade.entryTime || new Date().toTimeString().split(' ')[0].substring(0, 5),
-                  timeframe: selectedTrade.timeframe || 'M5'
+                  timeframe: selectedTrade.timeframe || 'M5',
+                  isConforme: selectedTrade.isConforme ?? true
                 });
                 handleViewChange('form');
               }}
@@ -1212,9 +1294,15 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                       );
                     }
 
-                    const isImage = link.match(/\.(jpeg|jpg|gif|png|webp)$/) || 
+                    const isImage = link.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg|tiff|img)/) || 
                                     selectedTrade.studyLink.includes('tradingview.com/x/') ||
-                                    selectedTrade.studyLink.includes('firebasestorage.googleapis.com');
+                                    selectedTrade.studyLink.includes('firebasestorage') ||
+                                    selectedTrade.studyLink.includes('prntscr') ||
+                                    selectedTrade.studyLink.includes('prnt.sc') ||
+                                    selectedTrade.studyLink.includes('imgur.com') ||
+                                    selectedTrade.studyLink.includes('postimg') ||
+                                    selectedTrade.studyLink.includes('gyazo.com') ||
+                                    selectedTrade.studyLink.includes('image');
 
                     if (isImage) {
                       return (
@@ -1339,7 +1427,9 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 studyLink: '',
                 date: new Date().toISOString().split('T')[0],
                 entryTime: new Date().toTimeString().split(' ')[0].substring(0, 5),
-                timeframe: 'M5'
+                timeframe: 'M5',
+                dayOfWeek: new Date().toLocaleDateString('pt-BR', { weekday: 'long' }),
+                isConforme: true
               });
             }}
             className="px-6 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant font-medium hover:bg-surface-container transition-all"
@@ -1609,77 +1699,29 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
           <section className="bg-surface-container-low rounded-xl p-8 shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-primary">image</span>
-                <h3 className="text-lg font-bold font-headline uppercase tracking-wider text-on-surface-variant">Prova Visual</h3>
+                <span className="material-symbols-outlined text-primary">schema</span>
+                <h3 className="text-lg font-bold font-headline uppercase tracking-wider text-on-surface-variant">Setups Técnicos</h3>
               </div>
-              <span className="text-xs font-label text-slate-500">Máx 10MB por ficheiro</span>
+              <span className="text-xs font-label text-slate-500">Selecione os setups que se aplicam a esta operação</span>
             </div>
             
-            <input 
-              type="file"
-              id="trade-image-upload"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setSelectedFile(file);
-                  setPreviewUrl(URL.createObjectURL(file));
-                }
-              }}
-            />
-            
-            {!previewUrl ? (
-              <label 
-                htmlFor="trade-image-upload"
-                className="border-2 border-dashed border-outline-variant/20 rounded-xl p-12 text-center group hover:border-primary/40 transition-colors cursor-pointer bg-surface-container-lowest/50 block"
-              >
-                <span className="material-symbols-outlined text-5xl text-slate-600 group-hover:text-primary transition-colors">cloud_upload</span>
-                <p className="mt-4 text-on-surface-variant font-medium">Carregue o seu print (TradingView, MT5, etc) aqui</p>
-                <p className="text-sm text-slate-600 mt-1">Clique para procurar fotos locais</p>
-              </label>
-            ) : (
-              <div className="relative rounded-xl overflow-hidden border border-outline-variant/20">
-                <img src={previewUrl} alt="Preview" className="w-full h-auto max-h-[400px] object-cover" />
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setSelectedFile(null);
-                    setPreviewUrl(null);
-                  }}
-                  className="absolute top-2 right-2 w-10 h-10 rounded-full bg-error text-white flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
-                >
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-                <div className="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-md p-3 rounded-lg flex items-center justify-between">
-                  <span className="text-white text-xs font-bold truncate max-w-[200px]">{selectedFile?.name}</span>
-                  <span className="text-primary text-[10px] font-black uppercase">Pronto para Upload</span>
-                </div>
-              </div>
-            )}
-          </section>
-        </div>
-        {/* Right Column */}
-        <div className="col-span-12 lg:col-span-4 space-y-8">
-          <section className="bg-surface-container-low rounded-xl p-6 shadow-sm">
-            <h3 className="text-sm font-bold font-headline uppercase tracking-widest text-slate-500 mb-6">Setups Técnicos</h3>
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2.5 mb-6">
               {availableSetups.map(setup => (
                 <button 
                   key={setup}
                   type="button"
                   onClick={() => toggleSetup(setup)}
-                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${
+                  className={`px-4 py-2.5 rounded-lg text-sm font-bold transition-all border ${
                     tradeData.setups.includes(setup) 
-                      ? 'bg-primary-container text-on-primary-container border-primary/20' 
-                      : 'bg-surface-container-highest text-on-surface-variant border-transparent hover:bg-primary/10'
+                      ? 'bg-primary-container text-on-primary-container border-primary shadow-lg shadow-primary/10' 
+                      : 'bg-surface-container-highest text-on-surface-variant border-transparent hover:bg-primary/10 hover:text-primary'
                   }`}
                 >
                   {setup}
                 </button>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3 max-w-xl">
               <input
                 type="text"
                 value={customSetup}
@@ -1691,44 +1733,70 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                   }
                 }}
                 placeholder="Adicionar setup manual..."
-                className="flex-1 bg-surface-container-highest border-none rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary/20 text-on-surface"
+                className="flex-1 bg-surface-container-highest border-none rounded-lg py-3 px-4 text-sm focus:ring-2 focus:ring-primary/20 text-on-surface placeholder:text-slate-600"
               />
               <button
                 type="button"
                 onClick={handleAddCustomSetup}
-                className="bg-primary/10 text-primary hover:bg-primary/20 px-3 py-2 rounded-lg transition-colors flex items-center justify-center"
+                className="bg-primary/10 text-primary hover:bg-primary/20 px-4 py-3 rounded-lg transition-colors flex items-center justify-center font-bold text-sm gap-2"
               >
-                <span className="material-symbols-outlined text-sm">add</span>
+                <span className="material-symbols-outlined text-sm font-black">add</span>
+                Adicionar
               </button>
               <button
                 type="button"
                 onClick={handleDeleteSelectedSetups}
-                className="bg-error/10 text-error hover:bg-error/20 px-3 py-2 rounded-lg transition-colors flex items-center justify-center"
+                className="bg-error/10 text-error hover:bg-error/20 px-4 py-3 rounded-lg transition-colors flex items-center justify-center font-bold text-sm gap-2"
                 title="Excluir o(s) setup(s) selecionado(s)"
               >
                 <span className="material-symbols-outlined text-sm">delete</span>
+                Excluir de Opções
               </button>
             </div>
           </section>
+        </div>
+        {/* Right Column */}
+        <div className="col-span-12 lg:col-span-4 space-y-8">
           <section className="bg-surface-container-low rounded-xl p-6 shadow-sm border border-tertiary-container/10">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-sm font-bold font-headline uppercase tracking-widest text-slate-500">Conformidade com o Plano</h3>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" />
-                <div className="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-error-container"></div>
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer" 
+                  checked={tradeData.isConforme ?? true}
+                  onChange={(e) => setTradeData({...tradeData, isConforme: e.target.checked})}
+                />
+                <div className="w-11 h-6 bg-red-600 rounded-full peer peer-focus:outline-none peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
               </label>
             </div>
-            <div className="space-y-4">
-              <p className="text-[11px] text-tertiary-container/80 font-medium">Aviso: Registo de desvio ativado. Por favor, explique por que quebrou as regras de trading.</p>
-              <textarea 
-                value={tradeData.notes}
-                onChange={(e) => setTradeData({...tradeData, notes: e.target.value})}
-                className="w-full bg-surface-container-highest border-none rounded-lg p-3 text-sm min-h-[100px] focus:ring-1 focus:ring-tertiary-container/50 text-on-surface-variant placeholder:text-slate-600" 
-                placeholder="ex: Entrada antecipada por FOMO, faltou confirmação..."
-              ></textarea>
-            </div>
+            
+            {!(tradeData.isConforme ?? true) ? (
+              <div className="space-y-4 mb-6">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-red-500 animate-pulse">
+                  <span className="material-symbols-outlined text-sm">error</span>
+                  Fora de Conformidade
+                </div>
+                <p className="text-[11px] text-red-400 font-medium">Aviso: Registo de desvio ativado. Por favor, explique por que quebrou as regras de trading.</p>
+                <textarea 
+                  value={tradeData.notes}
+                  onChange={(e) => setTradeData({...tradeData, notes: e.target.value})}
+                  className="w-full bg-surface-container-highest border-none rounded-lg p-3 text-sm min-h-[90px] focus:ring-1 focus:ring-red-500/50 text-on-surface-variant placeholder:text-slate-600" 
+                  placeholder="ex: Entrada antecipada por FOMO, faltou confirmação..."
+                ></textarea>
+              </div>
+            ) : (
+              <div className="mb-6 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                  <span className="material-symbols-outlined text-sm">check_circle</span>
+                  Operação Conforme ao Plano
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">Este trade segue todas as regras pré-estabelecidas no seu plano operacional.</p>
+              </div>
+            )}
+            
             <div className="mt-6 space-y-2">
-              <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Link do Estudo (TradingView, etc)</label>
+              <label className="text-[10px] font-label uppercase tracking-widest text-slate-500 block">Link do Estudo / Imagem</label>
               <input 
                 type="url"
                 value={tradeData.studyLink || ''}

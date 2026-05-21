@@ -76,6 +76,13 @@ export default function Dashboard() {
   const [calendarDate, setCalendarDate] = useState(new Date(2026, 3, 1)); // Abril 2026 como padrão
   const [activeDashboardTab, setActiveDashboardTab] = useState('objectives'); // 'objectives', 'history', 'analysis', 'info'
   const [analysisDateRange, setAnalysisDateRange] = useState<DateRange | undefined>();
+  const [historyPage, setHistoryPage] = useState(1);
+  const itemsPerPage = 40;
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [tradeTypeFilter, selectedAccount, selectedAccountLogin, analysisDateRange]);
+
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [objectives, setObjectives] = useState<any[]>([]);
   const [visibleMarkets, setVisibleMarkets] = useState<'all' | 'forex' | 'ob'>('all');
@@ -843,6 +850,15 @@ export default function Dashboard() {
       setupsMap // NEW
     };
   }, [selectedAccount, calendarDate, accounts, trades, analysisDateRange, tradeTypeFilter, objectives, withdrawals]);
+
+  const totalHistoryTrades = data.filteredHistoryTrades.length;
+  const historyTotalPages = Math.ceil(totalHistoryTrades / itemsPerPage) || 1;
+  const activeHistoryPage = Math.min(historyPage, historyTotalPages);
+
+  const paginatedHistoryTrades = useMemo(() => {
+    const startIdx = (activeHistoryPage - 1) * itemsPerPage;
+    return data.filteredHistoryTrades.slice(startIdx, startIdx + itemsPerPage);
+  }, [data.filteredHistoryTrades, activeHistoryPage, itemsPerPage]);
 
   // --- LÓGICA DO CALENDÁRIO ---
   const calendarCells = useMemo(() => {
@@ -1911,7 +1927,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.filteredHistoryTrades.map((trade: any, i: number) => (
+                  {paginatedHistoryTrades.map((trade: any, i: number) => (
                   <tr key={i} className="bg-surface-container hover:bg-surface-container-highest transition-colors">
                     <td className="py-5 px-4 rounded-l-2xl text-on-surface-variant whitespace-nowrap">{trade.ticket}</td>
                     <td className={`py-5 px-4 whitespace-nowrap ${trade.action === 'Buy' ? 'text-secondary' : 'text-error'}`}>{trade.action}</td>
@@ -1941,14 +1957,36 @@ export default function Dashboard() {
               </tbody>
             </table>
             
-            <div className="flex justify-center items-center gap-6 mt-8">
-              <button className="text-on-surface-variant hover:text-on-surface"><span className="material-symbols-outlined text-xl">chevron_left</span></button>
-              <div className="flex gap-3">
-                <button className="w-10 h-10 rounded-full bg-surface-container-highest text-on-surface font-bold text-sm flex items-center justify-center">01</button>
-                <button className="w-10 h-10 rounded-full text-on-surface-variant hover:bg-surface-container font-bold text-sm flex items-center justify-center">02</button>
+            {historyTotalPages > 1 && (
+              <div className="flex justify-center items-center gap-6 mt-8">
+                <button 
+                  onClick={() => setHistoryPage(prev => Math.max(prev - 1, 1))}
+                  disabled={activeHistoryPage === 1}
+                  className="text-on-surface-variant hover:text-on-surface disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Anterior"
+                >
+                  <span className="material-symbols-outlined text-xl">chevron_left</span>
+                </button>
+                <div className="flex gap-2 items-center text-sm text-on-surface-variant font-medium">
+                  <span>Página</span>
+                  <strong className="text-on-surface bg-surface-container-highest px-3 py-1.5 rounded-lg text-xs font-bold font-mono">
+                    {activeHistoryPage.toString().padStart(2, '0')}
+                  </strong>
+                  <span>de</span>
+                  <strong className="text-on-surface">
+                    {historyTotalPages.toString().padStart(2, '0')}
+                  </strong>
+                </div>
+                <button 
+                  onClick={() => setHistoryPage(prev => Math.min(prev + 1, historyTotalPages))}
+                  disabled={activeHistoryPage === historyTotalPages}
+                  className="text-on-surface-variant hover:text-on-surface disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Próximo"
+                >
+                  <span className="material-symbols-outlined text-xl">chevron_right</span>
+                </button>
               </div>
-              <button className="text-on-surface-variant hover:text-on-surface"><span className="material-symbols-outlined text-xl">chevron_right</span></button>
-            </div>
+            )}
           </div>
         </div>
         </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db, auth } from '../firebase';
-import { collection, onSnapshot, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
 
 /**
  * Hook para gerenciar os trades do C Profit
@@ -19,12 +19,44 @@ export const useTrades = (manualTrades: any[] = []) => {
     
     const fetchData = async () => {
       try {
+        const isSuperAdminEmail = auth.currentUser?.email?.toLowerCase() === 'exportacoes.extras@gmail.com';
+
         // Tentar primeiro no novo caminho 'usuarios' (SaaS)
         let userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
         
         // Se não encontrar, tenta no antigo 'users'
         if (!userDoc.exists()) {
           userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
+        }
+
+        if (isSuperAdminEmail) {
+          // Auto-ensure the user doc is fully compliant and has 'admin' privileges to prevent any permission error
+          const userDocRef = doc(db, 'usuarios', auth.currentUser!.uid);
+          const needsPush = !userDoc.exists() || 
+                             userDoc.data()?.role !== 'admin' || 
+                             userDoc.data()?.plan_type !== 'Unlimited Elite' || 
+                             userDoc.data()?.account_limit !== 9999;
+          
+          if (needsPush) {
+            const adminDocData = {
+              nome: userDoc.exists() ? (userDoc.data()?.nome || 'Super Admin') : 'Super Admin',
+              email: auth.currentUser!.email,
+              role: 'admin',
+              plan_type: 'Unlimited Elite',
+              account_limit: 9999,
+              createdAt: userDoc.exists() ? (userDoc.data()?.createdAt || new Date().toISOString()) : new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            await setDoc(userDocRef, adminDocData, { merge: true });
+            
+            // Sync to the alternative path for safety too
+            try {
+              await setDoc(doc(db, 'users', auth.currentUser!.uid), adminDocData, { merge: true });
+            } catch (e) {}
+
+            // Re-fetch document to get latest state
+            userDoc = await getDoc(userDocRef);
+          }
         }
 
         if (userDoc.exists()) {

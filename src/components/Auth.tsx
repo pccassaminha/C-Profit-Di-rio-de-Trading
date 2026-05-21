@@ -90,18 +90,21 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         const isTrialQualified = !!(finalReferredUid || referredBy);
-        const resolvedPlanType = 'trial_15';
-        const resolvedExpiryDate = expiryDate.toISOString();
+        const isUserEmailAdmin = result.user.email?.toLowerCase() === 'exportacoes.extras@gmail.com';
+        const resolvedPlanType = isUserEmailAdmin ? 'Unlimited Elite' : 'trial_15';
+        const resolvedExpiryDate = isUserEmailAdmin 
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000 * 10).toISOString() 
+          : expiryDate.toISOString();
 
-        // Create initial profile for Google user with 15 days free trial
+        // Create initial profile for Google user with 15 days free trial or Super Admin Unlimited Elite plan
         await setDoc(userRef, {
-          nome: result.user.displayName || 'Usuário Google',
+          nome: result.user.displayName || (isUserEmailAdmin ? 'Super Admin' : 'Usuário Google'),
           email: result.user.email,
           createdAt: new Date().toISOString(),
           plan_type: resolvedPlanType,
           expiry_date: resolvedExpiryDate,
-          account_limit: 2,
-          role: 'user',
+          account_limit: isUserEmailAdmin ? 9999 : 2,
+          role: isUserEmailAdmin ? 'admin' : 'user',
           refCode: result.user.uid.substring(0, 6).toUpperCase(),
           referredBy: finalReferredUid || referredBy,
           affiliateBalance: 0
@@ -126,7 +129,15 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       
       onSuccess();
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === 'auth/popup-blocked') {
+        setError('O pop-up de login do Google foi bloqueado pelo seu navegador ou pelas políticas do frame. Por favor, permita pop-ups para este site nas configurações ou clique em "Abrir em nova aba" no topo direito do AI Studio para logar fora do frame.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('Este domínio não está autorizado no Firebase Authentication para login do Google. Por favor, copie a URL no topo do AI Studio (ex: *.run.app) e adicione-a em "Domínios Autorizados" ("Authorized Domains") na aba "Configurações" da seção "Authentication" no seu Console do Firebase.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('O pop-up de login foi fechado antes de completar a autenticação. Por favor, tente novamente ou use o login por E-mail e Senha.');
+      } else {
+        setError(err.message || 'Ocorreu um erro ao conectar com o Google.');
+      }
       console.error(err);
     } finally {
       setLoading(false);
@@ -217,7 +228,21 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
 
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
-        const userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
+        const userRef = doc(db, 'usuarios', auth.currentUser!.uid);
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+          await setDoc(userRef, {
+            nome: auth.currentUser!.displayName || 'Super Admin',
+            email: auth.currentUser!.email,
+            createdAt: new Date().toISOString(),
+            plan_type: 'Unlimited Elite',
+            expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000 * 10).toISOString(),
+            account_limit: 9999,
+            role: 'admin',
+            refCode: auth.currentUser!.uid.substring(0, 6).toUpperCase(),
+            affiliateBalance: 0
+          }, { merge: true });
+        }
         onSuccess();
       } else {
         const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -247,18 +272,21 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         const isTrialQualified = !!(finalReferredUid || referredBy);
-        const resolvedPlanType = 'trial_15';
-        const resolvedExpiryDate = expiryDate.toISOString();
+        const isUserEmailAdmin = email.toLowerCase() === 'exportacoes.extras@gmail.com';
+        const resolvedPlanType = isUserEmailAdmin ? 'Unlimited Elite' : 'trial_15';
+        const resolvedExpiryDate = isUserEmailAdmin 
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000 * 10).toISOString() 
+          : expiryDate.toISOString();
 
         const newUserData: any = {
-          nome: name,
+          nome: name || (isUserEmailAdmin ? 'Super Admin' : 'Novo Trader'),
           email: email,
           phoneNumber: phoneNumber,
           createdAt: new Date().toISOString(),
           plan_type: resolvedPlanType,
           expiry_date: resolvedExpiryDate,
-          account_limit: 2,
-          role: 'user',
+          account_limit: isUserEmailAdmin ? 9999 : 2,
+          role: isUserEmailAdmin ? 'admin' : 'user',
           refCode: result.user.uid.substring(0, 6).toUpperCase(),
           referredBy: finalReferredUid || referredBy,
           affiliateBalance: 0

@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // ===============================================================
-    // Global Deny
+    // Global Deny Catch-All
     // ===============================================================
     match /{document=**} {
       allow read, write: if false;
@@ -32,20 +32,30 @@ service cloud.firestore {
       );
     }
 
-    function canReadData() {
-      return isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-    }
-
     // ===============================================================
     // Collection Rules
     // ===============================================================
 
     // User Profiles / Billing
     match /user_profiles/{profileId} {
-      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isStaticSuperAdmin());
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isAuthenticated() && (
+        profileId == request.auth.uid || 
+        (resource != null && resource.data.userId == request.auth.uid) || 
+        isAdmin()
+      );
+      allow list: if isAuthenticated() && (
+        (resource != null && resource.data.userId == request.auth.uid) || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid || 
+        profileId == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        (resource != null && resource.data.userId == request.auth.uid) || 
+        profileId == request.auth.uid || 
+        isAdmin()
+      );
       allow delete: if isStaticSuperAdmin();
     }
 
@@ -57,20 +67,24 @@ service cloud.firestore {
 
     // Referrals (Indicações / Afiliados)
     match /referrals/{referralId} {
-      allow get, list: if isAuthenticated() && (resource.data.referrerId == request.auth.uid || isAdmin());
-      allow create, update, delete: if isAdmin();
+      allow get: if isAuthenticated() && (resource.data.referrerId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && (resource.data.referrerId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && (request.resource.data.referredId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
     }
 
     // Affiliate Payouts (Levantamentos do Saldo de Afiliado)
     match /affiliate_payouts/{payoutId} {
-      allow get, list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 
     // Payments
     match /payments/{paymentId} {
-      allow get, list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
@@ -116,7 +130,7 @@ service cloud.firestore {
 
     match /usuarios/{userId} {
       allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
+      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
@@ -132,30 +146,34 @@ service cloud.firestore {
 
     // Legacy Accounts
     match /accounts/{accountId} {
-      allow get, list: if canReadData();
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if canReadData();
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Legacy Trades
     match /trades/{tradeId} {
-      allow get, list: if canReadData();
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if canReadData();
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Withdrawals
     match /withdrawals/{withdrawalId} {
-      allow get, list: if canReadData();
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if canReadData();
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Psychology Notes
     match /psychology_notes/{noteId} {
-      allow get, list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Coupons
@@ -166,9 +184,10 @@ service cloud.firestore {
 
     // Planning
     match /planning/{entryId} {
-      allow get, list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
   }
 }
