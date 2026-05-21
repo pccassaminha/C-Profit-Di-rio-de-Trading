@@ -300,6 +300,11 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         await setDoc(doc(db, 'usuarios', result.user.uid), newUserData);
+        try {
+          await setDoc(doc(db, 'users', result.user.uid), newUserData);
+        } catch (e) {
+          console.warn('Could not sync root users path', e);
+        }
 
         // Register referral if referred
         if (isTrialQualified) {

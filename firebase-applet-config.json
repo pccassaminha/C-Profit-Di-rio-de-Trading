@@ -1,11 +1,9 @@
 {
-  "projectId": "c-trade-diario",
-  "appId": "1:699030568101:web:8e4871564f410eb466a14c",
-  "apiKey": "AIzaSyDBEOdBHS3mxxE1Vhw2pSh0BjGaK6M8GBw",
-  "authDomain": "c-trade-diario.firebaseapp.com",
-  "databaseURL": "https://c-trade-diario-default-rtdb.europe-west1.firebasedatabase.app",
-  "storageBucket": "c-trade-diario.firebasestorage.app",
-  "messagingSenderId": "699030568101",
-  "measurementId": "G-L1YGRSF0GE",
+  "projectId": "project-f535588c-1440-4a89-b01",
+  "appId": "1:406707918161:web:c19ac0c0fb09f7034a2f70",
+  "apiKey": "AIzaSyC1PBekfai8HxAzGawiJhdBG4oqnxPjWNs",
+  "authDomain": "project-f535588c-1440-4a89-b01.firebaseapp.com",
+  "storageBucket": "project-f535588c-1440-4a89-b01.firebasestorage.app",
+  "messagingSenderId": "406707918161",
   "firestoreDatabaseId": "(default)"
 }

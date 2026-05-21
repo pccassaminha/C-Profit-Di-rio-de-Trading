@@ -3,13 +3,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // ===============================================================
-    // Global Deny Catch-All
-    // ===============================================================
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // ===============================================================
     // Helper Functions
     // ===============================================================
     function isAuthenticated() {
@@ -21,15 +14,17 @@ service cloud.firestore {
     }
 
     function isStaticSuperAdmin() {
-      return isAuthenticated() && 
-        'email' in request.auth.token && 
-        request.auth.token.email == 'exportacoes.extras@gmail.com';
+      return isAuthenticated() && (
+        request.auth.uid == 'tvkhCLhPdCOxudk8zF4zo1q2MOj1' || 
+        request.auth.uid == '83UDUADzOpgU0cB7Yr4y6EQIz5W2' ||
+        request.auth.token.email == 'exportacoes.extras@gmail.com'
+      );
     }
 
     function isAdmin() {
       return isStaticSuperAdmin() || (
         isAuthenticated() && 
-        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && 
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('role', 'user') == 'admin'
       );
     }
@@ -38,209 +33,8 @@ service cloud.firestore {
     // Collection Rules
     // ===============================================================
 
-    // User Profiles / Billing
-    match /user_profiles/{profileId} {
-      allow get: if isOwner(profileId);
-      allow get: if isAuthenticated() && resource != null && resource.data.userId == request.auth.uid;
-      allow get: if isAdmin();
-      
-      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isAdmin();
-      
-      allow create: if isOwner(profileId);
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow create: if isAdmin();
-      
-      allow update: if isOwner(profileId);
-      allow update: if isAuthenticated() && resource != null && resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
-      
-      allow delete: if isStaticSuperAdmin();
-    }
-
-    // Settings
-    match /settings/global {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    // Referrals (Indicações / Afiliados)
-    match /referrals/{referralId} {
-      allow get: if isAuthenticated() && resource.data.referrerId == request.auth.uid;
-      allow get: if isAdmin();
-      
-      allow list: if isAuthenticated() && resource.data.referrerId == request.auth.uid;
-      allow list: if isAdmin();
-      
-      allow create: if isAuthenticated() && (
-        request.resource.data.referrerId == request.auth.uid ||
-        request.resource.data.referredId == request.auth.uid
-      );
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
-    }
-
-    // Affiliate Payouts (Levantamentos do Saldo de Afiliado)
-    match /affiliate_payouts/{payoutId} {
-      allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow get: if isAdmin();
-      
-      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isAdmin();
-      
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAdmin();
-    }
-
-    // Payments
-    match /payments/{paymentId} {
-      allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow get: if isAdmin();
-      
-      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isAdmin();
-      
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAdmin();
-    }
-
-    // Community
-    match /community_posts/{postId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'commentsCount']));
-      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-
-      match /comments/{commentId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-        allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-        allow delete: if isAuthenticated() && (
-          resource.data.userId == request.auth.uid || 
-          get(/databases/$(database)/documents/community_posts/$(postId)).data.userId == request.auth.uid || 
-          isAdmin()
-        );
-      }
-
-      match /likes/{userId} {
-        allow read: if isAuthenticated();
-        allow write: if isOwner(userId);
-      }
-    }
-
-    // Broadcasts (Avisos)
-    match /broadcasts/{broadcastId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    // User Profile - Both paths for compatibility
-    match /users/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
-    }
-
-    match /usuarios/{userId} {
-      allow get: if isOwner(userId);
-      allow get: if isAdmin();
-      allow list: if isAuthenticated();
-      
-      allow create: if isOwner(userId);
-      allow create: if isAdmin();
-      
-      allow update: if isOwner(userId);
-      allow update: if isAdmin();
-      
-      allow delete: if isAdmin();
-
-      // SaaS Subcollections
-      match /trades/{tradeId} {
-        allow read, write: if isOwner(userId) || isAdmin();
-      }
-      match /accounts/{accountId} {
-        allow read, write: if isOwner(userId) || isAdmin();
-      }
-    }
-
-    // Legacy Accounts
-    match /accounts/{accountId} {
-      allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow get: if isAdmin();
-      
-      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isAdmin();
-      
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow delete: if isAdmin();
-    }
-
-    // Legacy Trades
-    match /trades/{tradeId} {
-      allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow get: if isAdmin();
-      
-      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isAdmin();
-      
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow delete: if isAdmin();
-    }
-
-    // Withdrawals
-    match /withdrawals/{withdrawalId} {
-      allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow get: if isAdmin();
-      
-      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isAdmin();
-      
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow delete: if isAdmin();
-    }
-
-    // Psychology Notes
-    match /psychology_notes/{noteId} {
-      allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow get: if isAdmin();
-      
-      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isAdmin();
-      
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow delete: if isAdmin();
-    }
-
-    // Coupons
-    match /coupons/{couponId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // Planning
-    match /planning/{entryId} {
-      allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow get: if isAdmin();
-      
-      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isAdmin();
-      
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow delete: if isAdmin();
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
     }
   }
 }
-

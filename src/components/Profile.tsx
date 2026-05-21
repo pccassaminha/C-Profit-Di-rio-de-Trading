@@ -48,6 +48,13 @@ export default function Profile() {
           const data = userDoc.data();
           if (data.phoneNumber) setPhoneNumber(data.phoneNumber);
           if (data.photoURL) setPhotoURL(data.photoURL);
+          if (data.nome) {
+            const parts = data.nome.split(' ');
+            setFirstName(parts[0] || '');
+            if (parts.length > 1) {
+              setLastName(parts.slice(1).join(' '));
+            }
+          }
         }
       }
     };

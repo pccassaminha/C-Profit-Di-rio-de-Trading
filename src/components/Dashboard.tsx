@@ -314,11 +314,18 @@ export default function Dashboard() {
 
   const handleSaveAccount = async () => {
     if (!auth.currentUser) return;
-    if (!newAccount.accountNumber || !newAccount.broker || !newAccount.initialBalance || !newAccount.startDate) {
+    
+    const missing = [];
+    if (!newAccount.accountNumber?.trim()) missing.push('Número da Conta');
+    if (!newAccount.broker?.trim()) missing.push('Corretora');
+    if (!newAccount.initialBalance?.toString().trim()) missing.push('Saldo Inicial');
+    if (!newAccount.startDate?.trim()) missing.push('Data de Início');
+
+    if (missing.length > 0) {
       setModalConfig({
         isOpen: true,
         title: "Atenção",
-        message: "Por favor, preencha os campos obrigatórios (Número, Corretora, Saldo Inicial e Data de Início).",
+        message: `Por favor, preencha os campos obrigatórios em falta: ${missing.join(', ')}.`,
         isError: true,
         onConfirm: closeModal
       });
@@ -330,11 +337,15 @@ export default function Dashboard() {
       const uid = auth.currentUser.uid;
       const integrationToken = Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
       
+      // Parse initial balance safely
+      const cleanBalance = newAccount.initialBalance.toString().replace(/,/g, '.').replace(/[^\d.-]/g, '');
+      const parsedBalance = Number(cleanBalance) || 0;
+
       // Save to subcollection (SaaS path)
       await addDoc(collection(db, 'usuarios', uid, 'accounts'), {
-        accountNumber: newAccount.accountNumber,
-        broker: newAccount.broker,
-        initialBalance: Number(newAccount.initialBalance),
+        accountNumber: newAccount.accountNumber.trim(),
+        broker: newAccount.broker.trim(),
+        initialBalance: parsedBalance,
         accountType: newAccount.accountType,
         phase: newAccount.phase,
         startDate: newAccount.startDate,
@@ -2153,7 +2164,8 @@ export default function Dashboard() {
                     <option value="BRL">BRL</option>
                   </select>
                   <input 
-                    type="number" 
+                    type="text"
+                    inputMode="decimal"
                     value={newAccount.initialBalance}
                     onChange={(e) => setNewAccount({...newAccount, initialBalance: e.target.value})}
                     className="w-2/3 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
