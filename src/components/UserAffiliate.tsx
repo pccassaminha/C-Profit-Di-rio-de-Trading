@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 import { 
   Copy, 
   Check, 
@@ -69,6 +70,8 @@ export default function UserAffiliate() {
       if (docSnap.exists()) {
         setProfile(docSnap.data() as UserProfile);
       }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `usuarios/${currentUser.uid}`);
     });
 
     // Load user's referrals
@@ -78,6 +81,8 @@ export default function UserAffiliate() {
     );
     const unsubReferrals = onSnapshot(qReferrals, (snapshot) => {
       setReferrals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReferralRecord)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'referrals');
     });
 
     // Load user's payouts
@@ -87,6 +92,8 @@ export default function UserAffiliate() {
     );
     const unsubPayouts = onSnapshot(qPayouts, (snapshot) => {
       setPayouts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'affiliate_payouts');
     });
 
     // Load global settings
@@ -94,6 +101,8 @@ export default function UserAffiliate() {
       if (docSnap.exists()) {
         setGlobalSettings(docSnap.data());
       }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'settings/global');
     });
 
     return () => {

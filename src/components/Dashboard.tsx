@@ -6,6 +6,7 @@ import { collection, addDoc, onSnapshot, query, where, serverTimestamp } from 'f
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
+import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 import Modal from './Modal';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -233,28 +234,35 @@ export default function Dashboard() {
   useEffect(() => {
     if (!auth.currentUser) return;
 
+    const uid = auth.currentUser.uid;
     const unsubscribes: (() => void)[] = [];
 
     // Path 1: root accounts (old)
-    const qOld = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
+    const qOld = query(collection(db, 'accounts'), where('userId', '==', uid));
     const unsubOld = onSnapshot(qOld, (snapshot) => {
       const accountsOld = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       updateAccounts(accountsOld, 'old');
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'accounts');
     });
     unsubscribes.push(unsubOld);
 
     // Path 2: usuarios/{uid}/accounts (new SaaS)
-    const qNew = query(collection(db, 'usuarios', auth.currentUser.uid, 'accounts'));
+    const qNew = query(collection(db, 'usuarios', uid, 'accounts'));
     const unsubNew = onSnapshot(qNew, (snapshot) => {
       const accountsNew = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       updateAccounts(accountsNew, 'new');
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, `usuarios/${uid}/accounts`);
     });
     unsubscribes.push(unsubNew);
 
     // Withdrawals
-    const qWithdrawals = query(collection(db, 'withdrawals'), where('userId', '==', auth.currentUser.uid));
+    const qWithdrawals = query(collection(db, 'withdrawals'), where('userId', '==', uid));
     const unsubWithdrawals = onSnapshot(qWithdrawals, (snapshot) => {
       setWithdrawals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'withdrawals');
     });
     unsubscribes.push(unsubWithdrawals);
 
@@ -269,7 +277,7 @@ export default function Dashboard() {
     };
 
     return () => unsubscribes.forEach(unsub => unsub());
-  }, []);
+  }, [auth.currentUser]);
 
   const hasObAccount = accounts.some(a => a.tradeType === 'ob');
   const hasForexAccount = accounts.some(a => a.tradeType !== 'ob');
