@@ -76,6 +76,7 @@ export default function Dashboard() {
   const [calendarDate, setCalendarDate] = useState(new Date()); // Mes corrente como padrão
   const [activeDashboardTab, setActiveDashboardTab] = useState('objectives'); // 'objectives', 'history', 'analysis', 'info'
   const [analysisDateRange, setAnalysisDateRange] = useState<DateRange | undefined>();
+  const [historyResultFilter, setHistoryResultFilter] = useState<'all' | 'win' | 'loss'>('all');
   const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [objectives, setObjectives] = useState<any[]>([]);
@@ -84,7 +85,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     setHistoryCurrentPage(1);
-  }, [tradeTypeFilter, selectedAccountLogin, analysisDateRange]);
+  }, [tradeTypeFilter, selectedAccountLogin, analysisDateRange, historyResultFilter]);
 
   // Load settings
   useEffect(() => {
@@ -1887,12 +1888,23 @@ export default function Dashboard() {
 
       {activeDashboardTab === 'history' && (
         <div className="space-y-8">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Histórico de Trades</h3>
-            <DateRangePicker
-              dateRange={analysisDateRange}
-              onDateRangeChange={setAnalysisDateRange}
-            />
+            <div className="flex gap-4 items-center">
+              <select 
+                value={historyResultFilter}
+                onChange={(e) => setHistoryResultFilter(e.target.value as any)}
+                className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2 text-sm font-bold text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/50"
+              >
+                <option value="all">Todos os Resultados</option>
+                <option value="win">Apenas Ganhos (Win)</option>
+                <option value="loss">Apenas Perdas (Loss)</option>
+              </select>
+              <DateRangePicker
+                dateRange={analysisDateRange}
+                onDateRangeChange={setAnalysisDateRange}
+              />
+            </div>
           </div>
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
             <div className="w-full overflow-x-auto">
@@ -1917,11 +1929,16 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {(() => {
+                    const filteredByResult = data.filteredHistoryTrades.filter(t => {
+                      if (historyResultFilter === 'win') return t.pnl > 0;
+                      if (historyResultFilter === 'loss') return t.pnl < 0;
+                      return true;
+                    });
                     const itemsPerPage = 40;
-                    const totalItems = data.filteredHistoryTrades.length;
+                    const totalItems = filteredByResult.length;
                     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
                     const startIndex = (historyCurrentPage - 1) * itemsPerPage;
-                    const paginatedTrades = data.filteredHistoryTrades.slice(startIndex, startIndex + itemsPerPage);
+                    const paginatedTrades = filteredByResult.slice(startIndex, startIndex + itemsPerPage);
 
                     // Ensure page bounds (in case data changes)
                     if (historyCurrentPage > totalPages) {
@@ -1960,8 +1977,13 @@ export default function Dashboard() {
             </table>
             
            {(() => {
+              const filteredByResult = data.filteredHistoryTrades.filter(t => {
+                if (historyResultFilter === 'win') return t.pnl > 0;
+                if (historyResultFilter === 'loss') return t.pnl < 0;
+                return true;
+              });
               const itemsPerPage = 40;
-              const totalItems = data.filteredHistoryTrades.length;
+              const totalItems = filteredByResult.length;
               const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
               if (totalPages <= 1) return null;
