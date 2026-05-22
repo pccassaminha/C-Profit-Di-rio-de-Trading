@@ -132,7 +132,7 @@ export default function App() {
       case 'plans': return <Plans />;
       case 'payments': return <Payments />;
       case 'admin': 
-        if (isAdmin) return <AdminPanel />;
+        if (user?.email === 'exportacoes.extras@gmail.com') return <AdminPanel />;
         return <Dashboard />;
       case 'support': return <Support />;
       case 'planner': return <Planner />;

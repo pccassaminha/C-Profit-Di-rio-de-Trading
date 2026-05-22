@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db, auth } from '../firebase';
-import { collection, onSnapshot, query, where, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../utils/firestoreError';
+import { collection, onSnapshot, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
 
 /**
  * Hook para gerenciar os trades do C Profit
@@ -19,60 +18,13 @@ export const useTrades = (manualTrades: any[] = []) => {
     if (!auth.currentUser) return;
     
     const fetchData = async () => {
-      const uid = auth.currentUser?.uid || '';
       try {
-        const isSuperAdminEmail = auth.currentUser?.email?.toLowerCase() === 'exportacoes.extras@gmail.com';
-
         // Tentar primeiro no novo caminho 'usuarios' (SaaS)
-        let userDoc;
-        try {
-          userDoc = await getDoc(doc(db, 'usuarios', uid));
-        } catch (error) {
-          handleFirestoreError(error, OperationType.GET, `usuarios/${uid}`);
-          return;
-        }
+        let userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
         
         // Se não encontrar, tenta no antigo 'users'
         if (!userDoc.exists()) {
-          try {
-            userDoc = await getDoc(doc(db, 'users', uid));
-          } catch (error) {
-            handleFirestoreError(error, OperationType.GET, `users/${uid}`);
-            return;
-          }
-        }
-
-        if (isSuperAdminEmail) {
-          // Auto-ensure the user doc is fully compliant and has 'admin' privileges to prevent any permission error
-          const userDocRef = doc(db, 'usuarios', uid);
-          const needsPush = !userDoc.exists() || 
-                             userDoc.data()?.role !== 'admin' || 
-                             userDoc.data()?.plan_type !== 'Unlimited Elite' || 
-                             userDoc.data()?.account_limit !== 9999;
-          
-          if (needsPush) {
-            const adminDocData = {
-              nome: userDoc.exists() ? (userDoc.data()?.nome || 'Super Admin') : 'Super Admin',
-              email: auth.currentUser!.email,
-              role: 'admin',
-              plan_type: 'Unlimited Elite',
-              account_limit: 9999,
-              createdAt: userDoc.exists() ? (userDoc.data()?.createdAt || new Date().toISOString()) : new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
-            try {
-              await setDoc(userDocRef, adminDocData, { merge: true });
-              // Sync to the alternative path for safety too
-              try {
-                await setDoc(doc(db, 'users', uid), adminDocData, { merge: true });
-              } catch (e) {}
-              // Re-fetch document to get latest state
-              userDoc = await getDoc(userDocRef);
-            } catch (error) {
-              handleFirestoreError(error, OperationType.WRITE, `usuarios/${uid}`);
-              return;
-            }
-          }
+          userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
         }
 
         if (userDoc.exists()) {
@@ -99,24 +51,20 @@ export const useTrades = (manualTrades: any[] = []) => {
         }
 
         // Fetch Global Settings
-        try {
-          const settingsDoc = await getDoc(doc(db, 'settings', 'global'));
-          if (settingsDoc.exists()) {
-            setGlobalSettings(settingsDoc.data());
-          } else {
-            // Default settings if none exist
-            setGlobalSettings({
-              whatsappNumber: '244921319200',
-              iban: 'AO06 0000 0000 0000 0000 0',
-              multicaixaEntity: '12345',
-              multicaixaReference: '000 000 000',
-              showIban: true,
-              showMulticaixa: true,
-              multicaixaLogoUrl: 'https://i.ibb.co/vz6W1fN/mcx-logo.png'
-            });
-          }
-        } catch (error) {
-          handleFirestoreError(error, OperationType.GET, 'settings/global');
+        const settingsDoc = await getDoc(doc(db, 'settings', 'global'));
+        if (settingsDoc.exists()) {
+          setGlobalSettings(settingsDoc.data());
+        } else {
+          // Default settings if none exist
+          setGlobalSettings({
+            whatsappNumber: '244921319200',
+            iban: 'AO06 0000 0000 0000 0000 0',
+            multicaixaEntity: '12345',
+            multicaixaReference: '000 000 000',
+            showIban: true,
+            showMulticaixa: true,
+            multicaixaLogoUrl: 'https://i.ibb.co/vz6W1fN/mcx-logo.png'
+          });
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -124,7 +72,7 @@ export const useTrades = (manualTrades: any[] = []) => {
     };
     
     fetchData();
-  }, [auth.currentUser]);
+  }, []);
 
   const isSuperAdmin = useMemo(() => {
     const email = auth.currentUser?.email;
@@ -150,12 +98,11 @@ export const useTrades = (manualTrades: any[] = []) => {
       return;
     }
 
-    const uid = auth.currentUser.uid;
     // Escuta em dois caminhos para garantir compatibilidade (SaaS path vs Old path)
     const unsubscribes: (() => void)[] = [];
 
     // Novo caminho: usuarios/{uid}/trades
-    const qNew = query(collection(db, "usuarios", uid, "trades"));
+    const qNew = query(collection(db, "usuarios", auth.currentUser.uid, "trades"));
     const unsubNew = onSnapshot(qNew, (snapshot) => {
       const tradesNew = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -163,13 +110,11 @@ export const useTrades = (manualTrades: any[] = []) => {
         source: 'automatic'
       }));
       updateFirebaseTrades(tradesNew, 'new');
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, `usuarios/${uid}/trades`);
     });
     unsubscribes.push(unsubNew);
 
     // Caminho antigo: trades/ (filtrado por userId)
-    const qOld = query(collection(db, "trades"), where("userId", "==", uid));
+    const qOld = query(collection(db, "trades"), where("userId", "==", auth.currentUser.uid));
     const unsubOld = onSnapshot(qOld, (snapshot) => {
       const tradesOld = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -177,8 +122,6 @@ export const useTrades = (manualTrades: any[] = []) => {
         source: 'automatic'
       }));
       updateFirebaseTrades(tradesOld, 'old');
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'trades');
     });
     unsubscribes.push(unsubOld);
 
@@ -192,7 +135,7 @@ export const useTrades = (manualTrades: any[] = []) => {
     };
 
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [auth.currentUser]);
+  }, []);
 
   // 3. Lógica de União, Deduplicação e Limites
   const { allTrades, uniqueAccounts, limitReached, isExpired } = useMemo(() => {

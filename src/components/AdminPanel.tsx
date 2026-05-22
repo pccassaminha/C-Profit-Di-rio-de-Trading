@@ -318,26 +318,14 @@ export default function AdminPanel() {
     };
   }, [isSuperAdmin]);
 
-  const handleUpdateUser = async (userId: string, data: any, successMessage?: string) => {
+  const handleUpdateUser = async (userId: string, data: any) => {
     try {
       await updateDoc(doc(db, 'usuarios', userId), {
         ...data,
         updatedAt: new Date().toISOString()
       });
-      
-      try {
-        await updateDoc(doc(db, 'users', userId), {
-          ...data,
-          updatedAt: new Date().toISOString()
-        });
-      } catch (e) {}
-
-      if (successMessage) {
-        alert(successMessage);
-      }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      alert(`Erro ao atualizar utilizador: ${err.message || err}`);
     }
   };
 
@@ -372,43 +360,56 @@ export default function AdminPanel() {
       if (userSnap.exists()) {
         const userData = userSnap.data();
         if (userData.referredBy) {
-          // Check if this user already has any approved paid referrals (so this is the first month)
+          // Check if this user already has any approved referrals or previous approved payments
           const qApprovedRefs = query(
             collection(db, 'referrals'),
             where('referredId', '==', payment.userId),
-            where('paymentAmount', '>', 0),
             where('status', '==', 'approved')
           );
           const approvedRefsSnap = await getDocs(qApprovedRefs);
           
           if (approvedRefsSnap.empty) {
-            // Count how many registration referrals (trial_15 and approved) this referrer has accomplished
-            const qReferrerInvites = query(
+            // Get administrative settings for reward method
+            const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
+            const activeSettings = settingsSnap.exists() ? settingsSnap.data() : {};
+            const activeMode = activeSettings.affiliateMode || 'commission_30';
+            
+            // Let's count how many approved referrals this referrer has already accomplished
+            const qReferrerApproved = query(
               collection(db, 'referrals'),
               where('referrerId', '==', userData.referredBy),
-              where('referredPlan', '==', 'trial_15'),
               where('status', '==', 'approved')
             );
-            const referrerInvitesSnap = await getDocs(qReferrerInvites);
-            const refCount = referrerInvitesSnap.size;
+            const referrerApprovedSnap = await getDocs(qReferrerApproved);
+            const refCount = referrerApprovedSnap.size;
 
-            const isEliteAffiliate = refCount >= 50;
+            const isLevel5 = refCount >= 50; // Level 5 is unlocked at 50+ approved referrals
 
-            if (isEliteAffiliate) {
-              // Create referral doc with pending_approval status, which the maestro approves (30% cash commission)
-              await addDoc(collection(db, 'referrals'), {
-                referrerId: userData.referredBy,
-                referredId: payment.userId,
-                referredName: userData.nome || 'Novo Trader',
-                referredEmail: userData.email,
-                referredPlan: payment.planId,
-                paymentAmount: payment.amount,
-                rewardType: 'commission_30',
-                rewardValue: Math.round(payment.amount * 0.30), // 30% of subscription value in cash
-                status: 'pending_approval',
-                createdAt: new Date().toISOString()
-              });
+            // Calculate reward: Level 1-4 is strictly free month progression, Level 5 is cash commission
+            let rewardType = 'free_month';
+            let rewardVal: any = 0;
+
+            if (isLevel5) {
+              rewardType = 'commission_30';
+              rewardVal = Math.round(payment.amount * 0.30); // 30% of subscription value in cash
+            } else {
+              rewardType = 'free_month';
+              rewardVal = '1_month_free_progress'; // Progress towards free months
             }
+
+            // Create referral doc with pending_approval status, which the maestro approves
+            await addDoc(collection(db, 'referrals'), {
+              referrerId: userData.referredBy,
+              referredId: payment.userId,
+              referredName: userData.nome || 'Novo Trader',
+              referredEmail: userData.email,
+              referredPlan: payment.planId,
+              paymentAmount: payment.amount,
+              rewardType: rewardType,
+              rewardValue: rewardVal,
+              status: 'pending_approval',
+              createdAt: new Date().toISOString()
+            });
           }
         }
       }
@@ -893,7 +894,7 @@ export default function AdminPanel() {
                               Editar Plano & Expiração
                             </button>
                             <button 
-                              onClick={() => handleUpdateUser(u.id, { expiry_date: new Date(Date.now() - 86400000).toISOString() }, 'Acesso desativado com sucesso.')}
+                              onClick={() => handleUpdateUser(u.id, { expiry_date: new Date(Date.now() - 86400000).toISOString() })}
                               className="text-error hover:text-error/80 hover:underline text-[10px] font-black uppercase tracking-wider text-right shrink-0"
                             >
                               Desativar Acesso
@@ -1826,11 +1827,7 @@ export default function AdminPanel() {
                     <td className="p-6 text-on-surface-variant text-xs">{u.email}</td>
                     <td className="p-6 text-right">
                       <button 
-                        onClick={() => handleUpdateUser(u.id, { 
-                          role: 'user',
-                          plan_type: 'trial_15',
-                          account_limit: 2
-                        }, 'Maestro revogado com sucesso.')}
+                        onClick={() => handleUpdateUser(u.id, { role: 'user' })}
                         className="px-4 py-2 bg-error/10 text-error rounded-xl text-[10px] font-black hover:bg-error/20 transition-all uppercase tracking-widest"
                         disabled={u.email === 'exportacoes.extras@gmail.com'}
                       >
@@ -1860,14 +1857,7 @@ export default function AdminPanel() {
                   onClick={() => {
                     const select = document.getElementById('newAdminSelect') as HTMLSelectElement;
                     if (select.value) {
-                      const tenYearsFuture = new Date();
-                      tenYearsFuture.setFullYear(tenYearsFuture.getFullYear() + 10);
-                      handleUpdateUser(select.value, { 
-                        role: 'admin',
-                        plan_type: 'Unlimited Elite',
-                        account_limit: 9999,
-                        expiry_date: tenYearsFuture.toISOString()
-                      }, 'Maestro promovido com sucesso e concedido permissão total ilimitada!');
+                      handleUpdateUser(select.value, { role: 'admin' });
                       select.value = '';
                     }
                   }}
@@ -2125,36 +2115,52 @@ export default function AdminPanel() {
           {/* Configuration of Active Method */}
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl">
             <h3 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">rule</span> Diretrizes Ativas de Afiliados (Modelo Técnico Híbrido)
+              <span className="material-symbols-outlined text-primary">rule</span> Ajuste das Diretrizes de Afiliados (Business)
             </h3>
-            <p className="text-xs text-on-surface-variant max-w-3xl leading-relaxed mb-6 font-medium">
-              O diário C Profit utiliza um sistema híbrido totalmente automatizado para premiar seus parceiros com base no engajamento:
+            <p className="text-xs text-on-surface-variant max-w-3xl leading-relaxed mb-6">
+              Defina abaixo qual modalidade de recompensa ou comissão será oferecida por padrão a todos os traders que promoverem a plataforma. Pode alternar livremente; o sistema reconfigura a área de afiliados de forma síncrona.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-on-surface">
-                <div className="flex items-start gap-4">
-                  <span className="material-symbols-outlined text-amber-500 text-3xl">gif_box</span>
-                  <div>
-                    <p className="font-bold text-sm">Nível Iniciante ao Diamante (1 a 49 Convites)</p>
-                    <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                      Os utilizadores com menos de 50 convites ganham <strong className="text-white">1 mensalidade grátis a cada 10 novos usuários</strong> que criam conta com seus links exclusivos.
-                    </p>
-                  </div>
+              <button 
+                onClick={async () => {
+                  await setDoc(doc(db, 'settings', 'global'), { ...settings, affiliateMode: 'free_month' });
+                  alert('Modo Alterado: Convidar 5 Traders = 1 Mês Grátis!');
+                }}
+                className={`p-5 rounded-2xl border text-left flex items-start gap-4 transition-all ${
+                  (settings?.affiliateMode || 'commission_30') === 'free_month' 
+                    ? 'bg-amber-500/5 border-amber-500 text-on-surface shadow-md' 
+                    : 'bg-surface-container-high/40 border-outline-variant/15 text-on-surface hover:bg-surface-container-high'
+                }`}
+              >
+                <span className="material-symbols-outlined text-amber-500 text-3xl">gif_box</span>
+                <div>
+                  <p className="font-bold text-sm">Opção 1: Convidar 5 = 1 Mês Grátis (Modo Parceria)</p>
+                  <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                    Ideal para crescimento orgânico acelerado. A cada 5 recomendações registadas, o afiliado ganha 1 mês grátis (as recomendações recebem 15 dias de teste grátis).
+                  </p>
                 </div>
-              </div>
+              </button>
 
-              <div className="p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-on-surface">
-                <div className="flex items-start gap-4">
-                  <span className="material-symbols-outlined text-emerald-500 text-3xl">currency_lira</span>
-                  <div>
-                    <p className="font-bold text-sm text-white">Nível Maestro Elite (50+ Convites)</p>
-                    <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                      Utilizadores que convidaram 50 ou mais novos cadastrados passam a ganhar <strong className="text-[#00f5a0]">30% de comissão em dinheiro</strong> sobre os pagamentos de assinatura (exclusivo para a primeira mensalidade de cada novos usuários convidados).
-                    </p>
-                  </div>
+              <button 
+                onClick={async () => {
+                  await setDoc(doc(db, 'settings', 'global'), { ...settings, affiliateMode: 'commission_30' });
+                  alert('Modo Alterado: 30% de Comissão por Cada Adesão!');
+                }}
+                className={`p-5 rounded-2xl border text-left flex items-start gap-4 transition-all ${
+                  (settings?.affiliateMode || 'commission_30') === 'commission_30' 
+                    ? 'bg-emerald-500/5 border-emerald-500 text-on-surface shadow-md' 
+                    : 'bg-surface-container-high/40 border-outline-variant/15 text-on-surface hover:bg-surface-container-high'
+                }`}
+              >
+                <span className="material-symbols-outlined text-emerald-500 text-3xl">currency_lira</span>
+                <div>
+                  <p className="font-bold text-sm font-headline uppercase tracking-tight text-white">Opção 2: 30% de Comissões em Dinheiro</p>
+                  <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                    Direcionado a influenciadores e parceiros de marketing. 30% do valor da assinatura paga é creditada ao padrinho após validação.
+                  </p>
                 </div>
-              </div>
+              </button>
             </div>
           </div>
 
@@ -2399,7 +2405,7 @@ export default function AdminPanel() {
                          updateData.expiry_date = time.toISOString();
                       }
                       
-                      handleUpdateUser(editingUser.id, updateData, 'Alterações do usuário salvas com sucesso!');
+                      handleUpdateUser(editingUser.id, updateData);
                       setEditingUser(null);
                    }}
                    className="flex-1 py-3 bg-primary text-on-primary hover:bg-primary-fixed-dim transition-colors rounded-xl font-bold uppercase tracking-widest text-xs"

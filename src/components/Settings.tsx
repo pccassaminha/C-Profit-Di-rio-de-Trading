@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 import Modal from './Modal';
 import { db, auth } from '../firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs, addDoc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs, addDoc } from 'firebase/firestore';
 import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -122,35 +122,15 @@ export default function Settings() {
     const loadProfile = async () => {
       try {
         const profileDoc = await getDocs(query(collection(db, 'user_profiles'), where('userId', '==', auth.currentUser?.uid)));
-        
-        // Fallback info from main "usuarios" path if profile doc is empty of phone
-        let mainUserPhone = '';
-        let mainUserName = auth.currentUser?.displayName || '';
-        let mainUserEmail = auth.currentUser?.email || '';
-        
-        try {
-          const uDoc = await getDoc(doc(db, 'usuarios', auth.currentUser?.uid || ''));
-          if (uDoc.exists()) {
-            const uData = uDoc.data();
-            if (uData.phoneNumber) mainUserPhone = uData.phoneNumber;
-            if (uData.billingPhone) mainUserPhone = uData.billingPhone;
-            if (uData.nome) mainUserName = uData.nome;
-            if (uData.email) mainUserEmail = uData.email;
-          }
-        } catch (uErr) {
-          console.warn("Could not retrieve fallback from 'usuarios' for settings:", uErr);
-        }
-
         if (!profileDoc.empty) {
           const data = profileDoc.docs[0].data();
-          setBillingName(data.billingName || mainUserName);
-          setBillingEmail(data.billingEmail || mainUserEmail);
-          setBillingPhone(data.billingPhone || mainUserPhone);
+          setBillingName(data.billingName || auth.currentUser?.displayName || '');
+          setBillingEmail(data.billingEmail || auth.currentUser?.email || '');
+          setBillingPhone(data.billingPhone || '');
           setRegistrationId(data.registrationId || getNumericId(auth.currentUser?.uid || ''));
         } else {
-          setBillingName(mainUserName);
-          setBillingEmail(mainUserEmail);
-          setBillingPhone(mainUserPhone);
+          setBillingName(auth.currentUser?.displayName || '');
+          setBillingEmail(auth.currentUser?.email || '');
           setRegistrationId(getNumericId(auth.currentUser?.uid || ''));
         }
       } catch (error) {
@@ -203,8 +183,7 @@ export default function Settings() {
     localStorage.setItem('app_objectives', JSON.stringify(objectives));
     localStorage.setItem('app_sessions', JSON.stringify(sessions));
 
-     // Save Billing Profile
-    let billingError = null;
+    // Save Billing Profile
     if (auth.currentUser) {
       try {
         const profileQuery = query(collection(db, 'user_profiles'), where('userId', '==', auth.currentUser.uid));
@@ -225,59 +204,21 @@ export default function Settings() {
           const profileDocId = profileSnapshot.docs[0].id;
           await updateDoc(doc(db, 'user_profiles', profileDocId), profileData);
         }
-
-        // Parallel update to 'usuarios' and 'users' profiles for global accessibility
-        try {
-          const uDocRef = doc(db, 'usuarios', auth.currentUser.uid);
-          await setDoc(uDocRef, {
-            nome: billingName,
-            phoneNumber: billingPhone,
-            billingPhone: billingPhone,
-            billingName: billingName,
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
-        } catch (uErr) {
-          console.warn("Could not synchronize contact to SaaS root user doc:", uErr);
-        }
-
-        try {
-          const uAltDocRef = doc(db, 'users', auth.currentUser.uid);
-          await setDoc(uAltDocRef, {
-            nome: billingName,
-            phoneNumber: billingPhone,
-            billingPhone: billingPhone,
-            billingName: billingName,
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
-        } catch (uErr) {}
-
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error saving profile:", error);
-        billingError = error;
       }
     }
 
-    if (billingError) {
-      setModalConfig({
-        isOpen: true,
-        title: "Erro de Permissão",
-        message: `Não foi possível guardar as alterações de contacto: ${billingError.message || billingError}. Certifique-se de que tem as permissões adequadas ou contacte o suporte técnico.`,
-        isError: true,
-        confirmText: "OK",
-        onConfirm: closeModal
-      });
-    } else {
-      setModalConfig({
-        isOpen: true,
-        title: "Sucesso",
-        message: "Configurações salvas com sucesso!",
-        confirmText: "OK",
-        onConfirm: () => {
-          closeModal();
-          window.location.reload();
-        }
-      });
-    }
+    setModalConfig({
+      isOpen: true,
+      title: "Sucesso",
+      message: "Configurações salvas com sucesso!",
+      confirmText: "OK",
+      onConfirm: () => {
+        closeModal();
+        window.location.reload();
+      }
+    });
     setIsSaving(false);
   };
 

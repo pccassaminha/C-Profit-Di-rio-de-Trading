@@ -3,7 +3,6 @@ import { useCurrency } from '../contexts/CurrencyContext';
 import { auth, db } from '../firebase';
 import { useTrades } from '../hooks/useTrades';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 
 export default function Topbar({ 
   toggleSidebar, 
@@ -20,7 +19,6 @@ export default function Topbar({
   const { userPlan } = useTrades();
   const currentUser = auth.currentUser;
   const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
-  const isAdmin = isSuperAdmin || userPlan?.role === 'admin';
   const userName = currentUser?.displayName || 'Usuário';
   const initial = userName.charAt(0).toUpperCase();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -48,8 +46,6 @@ export default function Topbar({
 
   // Subscribe to real-time broadcasts
   useEffect(() => {
-    if (!currentUser) return;
-
     const bQ = query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(bQ, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -58,11 +54,11 @@ export default function Topbar({
       }));
       setBroadcasts(docs);
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'broadcasts');
+      console.error('Error fetching broadcasts:', error);
     });
 
     return () => unsubscribe();
-  }, [currentUser]);
+  }, []);
 
   // Handle clicks outside dropdowns to close them
   useEffect(() => {
@@ -230,7 +226,7 @@ export default function Topbar({
                 <span className="material-symbols-outlined text-[18px]">help</span>
                 Suporte
               </button>
-              {isAdmin && (
+              {isSuperAdmin && (
                 <button 
                   onClick={() => handleNavigate('admin')}
                   className="w-full text-left px-4 py-3 text-sm text-primary hover:bg-surface-container transition-colors flex items-center gap-3 border-t border-outline-variant/10"

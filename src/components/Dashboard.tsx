@@ -6,7 +6,6 @@ import { collection, addDoc, onSnapshot, query, where, serverTimestamp } from 'f
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
-import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 import Modal from './Modal';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -77,13 +76,6 @@ export default function Dashboard() {
   const [calendarDate, setCalendarDate] = useState(new Date(2026, 3, 1)); // Abril 2026 como padrão
   const [activeDashboardTab, setActiveDashboardTab] = useState('objectives'); // 'objectives', 'history', 'analysis', 'info'
   const [analysisDateRange, setAnalysisDateRange] = useState<DateRange | undefined>();
-  const [historyPage, setHistoryPage] = useState(1);
-  const itemsPerPage = 40;
-
-  useEffect(() => {
-    setHistoryPage(1);
-  }, [tradeTypeFilter, selectedAccount, selectedAccountLogin, analysisDateRange]);
-
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [objectives, setObjectives] = useState<any[]>([]);
   const [visibleMarkets, setVisibleMarkets] = useState<'all' | 'forex' | 'ob'>('all');
@@ -234,35 +226,28 @@ export default function Dashboard() {
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    const uid = auth.currentUser.uid;
     const unsubscribes: (() => void)[] = [];
 
     // Path 1: root accounts (old)
-    const qOld = query(collection(db, 'accounts'), where('userId', '==', uid));
+    const qOld = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
     const unsubOld = onSnapshot(qOld, (snapshot) => {
       const accountsOld = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       updateAccounts(accountsOld, 'old');
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'accounts');
     });
     unsubscribes.push(unsubOld);
 
     // Path 2: usuarios/{uid}/accounts (new SaaS)
-    const qNew = query(collection(db, 'usuarios', uid, 'accounts'));
+    const qNew = query(collection(db, 'usuarios', auth.currentUser.uid, 'accounts'));
     const unsubNew = onSnapshot(qNew, (snapshot) => {
       const accountsNew = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       updateAccounts(accountsNew, 'new');
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, `usuarios/${uid}/accounts`);
     });
     unsubscribes.push(unsubNew);
 
     // Withdrawals
-    const qWithdrawals = query(collection(db, 'withdrawals'), where('userId', '==', uid));
+    const qWithdrawals = query(collection(db, 'withdrawals'), where('userId', '==', auth.currentUser.uid));
     const unsubWithdrawals = onSnapshot(qWithdrawals, (snapshot) => {
       setWithdrawals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'withdrawals');
     });
     unsubscribes.push(unsubWithdrawals);
 
@@ -277,7 +262,7 @@ export default function Dashboard() {
     };
 
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [auth.currentUser]);
+  }, []);
 
   const hasObAccount = accounts.some(a => a.tradeType === 'ob');
   const hasForexAccount = accounts.some(a => a.tradeType !== 'ob');
@@ -314,18 +299,11 @@ export default function Dashboard() {
 
   const handleSaveAccount = async () => {
     if (!auth.currentUser) return;
-    
-    const missing = [];
-    if (!newAccount.accountNumber?.trim()) missing.push('Número da Conta');
-    if (!newAccount.broker?.trim()) missing.push('Corretora');
-    if (!newAccount.initialBalance?.toString().trim()) missing.push('Saldo Inicial');
-    if (!newAccount.startDate?.trim()) missing.push('Data de Início');
-
-    if (missing.length > 0) {
+    if (!newAccount.accountNumber || !newAccount.broker || !newAccount.initialBalance || !newAccount.startDate) {
       setModalConfig({
         isOpen: true,
         title: "Atenção",
-        message: `Por favor, preencha os campos obrigatórios em falta: ${missing.join(', ')}.`,
+        message: "Por favor, preencha os campos obrigatórios (Número, Corretora, Saldo Inicial e Data de Início).",
         isError: true,
         onConfirm: closeModal
       });
@@ -337,15 +315,11 @@ export default function Dashboard() {
       const uid = auth.currentUser.uid;
       const integrationToken = Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
       
-      // Parse initial balance safely
-      const cleanBalance = newAccount.initialBalance.toString().replace(/,/g, '.').replace(/[^\d.-]/g, '');
-      const parsedBalance = Number(cleanBalance) || 0;
-
       // Save to subcollection (SaaS path)
       await addDoc(collection(db, 'usuarios', uid, 'accounts'), {
-        accountNumber: newAccount.accountNumber.trim(),
-        broker: newAccount.broker.trim(),
-        initialBalance: parsedBalance,
+        accountNumber: newAccount.accountNumber,
+        broker: newAccount.broker,
+        initialBalance: Number(newAccount.initialBalance),
         accountType: newAccount.accountType,
         phase: newAccount.phase,
         startDate: newAccount.startDate,
@@ -869,15 +843,6 @@ export default function Dashboard() {
       setupsMap // NEW
     };
   }, [selectedAccount, calendarDate, accounts, trades, analysisDateRange, tradeTypeFilter, objectives, withdrawals]);
-
-  const totalHistoryTrades = data.filteredHistoryTrades.length;
-  const historyTotalPages = Math.ceil(totalHistoryTrades / itemsPerPage) || 1;
-  const activeHistoryPage = Math.min(historyPage, historyTotalPages);
-
-  const paginatedHistoryTrades = useMemo(() => {
-    const startIdx = (activeHistoryPage - 1) * itemsPerPage;
-    return data.filteredHistoryTrades.slice(startIdx, startIdx + itemsPerPage);
-  }, [data.filteredHistoryTrades, activeHistoryPage, itemsPerPage]);
 
   // --- LÓGICA DO CALENDÁRIO ---
   const calendarCells = useMemo(() => {
@@ -1946,7 +1911,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedHistoryTrades.map((trade: any, i: number) => (
+                  {data.filteredHistoryTrades.map((trade: any, i: number) => (
                   <tr key={i} className="bg-surface-container hover:bg-surface-container-highest transition-colors">
                     <td className="py-5 px-4 rounded-l-2xl text-on-surface-variant whitespace-nowrap">{trade.ticket}</td>
                     <td className={`py-5 px-4 whitespace-nowrap ${trade.action === 'Buy' ? 'text-secondary' : 'text-error'}`}>{trade.action}</td>
@@ -1976,36 +1941,14 @@ export default function Dashboard() {
               </tbody>
             </table>
             
-            {historyTotalPages > 1 && (
-              <div className="flex justify-center items-center gap-6 mt-8">
-                <button 
-                  onClick={() => setHistoryPage(prev => Math.max(prev - 1, 1))}
-                  disabled={activeHistoryPage === 1}
-                  className="text-on-surface-variant hover:text-on-surface disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  title="Anterior"
-                >
-                  <span className="material-symbols-outlined text-xl">chevron_left</span>
-                </button>
-                <div className="flex gap-2 items-center text-sm text-on-surface-variant font-medium">
-                  <span>Página</span>
-                  <strong className="text-on-surface bg-surface-container-highest px-3 py-1.5 rounded-lg text-xs font-bold font-mono">
-                    {activeHistoryPage.toString().padStart(2, '0')}
-                  </strong>
-                  <span>de</span>
-                  <strong className="text-on-surface">
-                    {historyTotalPages.toString().padStart(2, '0')}
-                  </strong>
-                </div>
-                <button 
-                  onClick={() => setHistoryPage(prev => Math.min(prev + 1, historyTotalPages))}
-                  disabled={activeHistoryPage === historyTotalPages}
-                  className="text-on-surface-variant hover:text-on-surface disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  title="Próximo"
-                >
-                  <span className="material-symbols-outlined text-xl">chevron_right</span>
-                </button>
+            <div className="flex justify-center items-center gap-6 mt-8">
+              <button className="text-on-surface-variant hover:text-on-surface"><span className="material-symbols-outlined text-xl">chevron_left</span></button>
+              <div className="flex gap-3">
+                <button className="w-10 h-10 rounded-full bg-surface-container-highest text-on-surface font-bold text-sm flex items-center justify-center">01</button>
+                <button className="w-10 h-10 rounded-full text-on-surface-variant hover:bg-surface-container font-bold text-sm flex items-center justify-center">02</button>
               </div>
-            )}
+              <button className="text-on-surface-variant hover:text-on-surface"><span className="material-symbols-outlined text-xl">chevron_right</span></button>
+            </div>
           </div>
         </div>
         </div>
@@ -2164,8 +2107,7 @@ export default function Dashboard() {
                     <option value="BRL">BRL</option>
                   </select>
                   <input 
-                    type="text"
-                    inputMode="decimal"
+                    type="number" 
                     value={newAccount.initialBalance}
                     onChange={(e) => setNewAccount({...newAccount, initialBalance: e.target.value})}
                     className="w-2/3 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 

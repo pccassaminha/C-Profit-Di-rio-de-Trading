@@ -4,7 +4,6 @@ import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp,
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
 import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 
 interface Post {
   id: string;
@@ -54,8 +53,6 @@ export default function Community() {
   const isAdmin = userPlan?.role === 'admin';
 
   useEffect(() => {
-    if (!auth.currentUser) return;
-
     const q = query(
       collection(db, 'community_posts'),
       where('type', '==', activeFeed),
@@ -69,22 +66,18 @@ export default function Community() {
         userLiked: false // We'll check this per user if needed
       } as Post));
       setPosts(postsData);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'community_posts');
     });
 
     const bQ = query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'));
     const unsubB = onSnapshot(bQ, (snapshot) => {
       setBroadcasts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'broadcasts');
     });
 
     return () => {
       unsubscribe();
       unsubB();
     };
-  }, [activeFeed, auth.currentUser]);
+  }, [activeFeed]);
 
   // Effect to check likes per post
   useEffect(() => {
@@ -199,8 +192,6 @@ export default function Community() {
     const q = query(collection(db, 'community_posts', postId, 'comments'), orderBy('createdAt', 'asc'));
     onSnapshot(q, (snapshot) => {
       setComments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, `community_posts/${postId}/comments`);
     });
   };
 
