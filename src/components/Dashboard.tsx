@@ -16,16 +16,16 @@ function CalendarCell({ date, muted, trades, pnl, isWin, isLoss, active }: any) 
   const { formatCurrency } = useCurrency();
   return (
     <div className={`min-h-[120px] p-3 border-r border-b border-outline-variant/20 relative ${active ? 'bg-surface-container border-l-2 border-l-secondary' : ''}`}>
-      <span className={`absolute top-3 right-3 text-xs font-medium ${muted ? 'text-outline-variant/50' : 'text-on-surface-variant'}`}>{date}</span>
+      <span className={`absolute top-3 right-3 text-sm font-bold ${muted ? 'text-outline-variant/50' : 'text-on-surface-variant'}`}>{date}</span>
       {trades > 0 && (
         <div className="mt-8 space-y-1.5">
-          <div className="flex justify-between text-[10px]">
-            <span className="text-on-surface-variant">Trades:</span>
-            <span className="text-on-surface font-bold">{trades}</span>
+          <div className="flex justify-between text-xs space-x-1">
+            <span className="text-on-surface-variant font-medium">Trades:</span>
+            <span className="text-on-surface font-black">{trades}</span>
           </div>
-          <div className={`flex justify-between text-[10px] px-1.5 py-1 rounded ${isWin ? 'bg-secondary/10 text-secondary' : isLoss ? 'bg-error/10 text-error' : 'bg-outline-variant/20 text-on-surface-variant'}`}>
+          <div className={`flex justify-between text-xs font-medium px-2 py-1.5 rounded ${isWin ? 'bg-secondary/10 text-secondary' : isLoss ? 'bg-error/10 text-error' : 'bg-outline-variant/20 text-on-surface-variant'}`}>
             <span>P&L:</span>
-            <span className="font-bold">{pnl > 0 ? '+' : ''}{formatCurrency(pnl)}</span>
+            <span className="font-black">{pnl > 0 ? '+' : ''}{formatCurrency(pnl)}</span>
           </div>
         </div>
       )}
@@ -73,7 +73,7 @@ export default function Dashboard() {
   const [tradeTypeFilter, setTradeTypeFilter] = useState<'all' | 'forex' | 'ob'>(() => {
     return (localStorage.getItem('dashboard_tradeTypeFilter') as any) || 'all';
   });
-  const [calendarDate, setCalendarDate] = useState(new Date(2026, 3, 1)); // Abril 2026 como padrão
+  const [calendarDate, setCalendarDate] = useState(new Date()); // Mes corrente como padrão
   const [activeDashboardTab, setActiveDashboardTab] = useState('objectives'); // 'objectives', 'history', 'analysis', 'info'
   const [analysisDateRange, setAnalysisDateRange] = useState<DateRange | undefined>();
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
