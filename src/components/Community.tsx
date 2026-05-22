@@ -3,7 +3,7 @@ import { db, auth, storage } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, increment, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
-import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone } from 'lucide-react';
+import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle } from 'lucide-react';
 
 interface Post {
   id: string;
@@ -25,6 +25,15 @@ export default function Community() {
   const [activeFeed, setActiveFeed] = useState<'forex' | 'ob'>('forex');
   const [showFilter, setShowFilter] = useState(true);
   const [viewingPost, setViewingPost] = useState<Post | null>(null);
+  const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const unsub = onSnapshot(query(collection(db, 'users', auth.currentUser.uid, 'blocks')), snap => {
+      setBlockedUsers(snap.docs.map(d => d.id));
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const savedDefaultFeed = localStorage.getItem('app_default_community_feed') as 'forex' | 'ob';
@@ -252,6 +261,55 @@ export default function Community() {
     }
   };
 
+  const handleBlockUser = async (userId: string) => {
+    if (!auth.currentUser || !window.confirm('Tem certeza que deseja bloquear este usuário? Você não verá mais suas publicações ou mensagens.')) return;
+    try {
+      await setDoc(doc(db, 'users', auth.currentUser.uid, 'blocks', userId), {
+        blockedAt: serverTimestamp()
+      });
+      alert('Usuário bloqueado com sucesso.');
+      setActiveDropdown(null);
+    } catch (err) {
+      console.error('Error blocking user:', err);
+    }
+  };
+
+  const handleSendMessageToUser = async (otherUserId: string) => {
+    if (!auth.currentUser) return;
+    // Check if chat already exists
+    try {
+      const q = query(
+        collection(db, 'chats'),
+        where('type', '==', 'direct'),
+        where('participants', 'array-contains', auth.currentUser.uid)
+      );
+      // Let's just create or redirect. But we can't easily fetch and filter locally unless we do a getDocs
+      // Quick way for UI: just switch tab.
+      // Better: we can set a state in CommunityChat to initiate chat. We can use localStorage or a simple way.
+      // For now, let's just create a chat explicitly.
+      const snapshot = await import('firebase/firestore').then(firestore => firestore.getDocs(q));
+      const existingChat = snapshot.docs.find(d => d.data().participants.includes(otherUserId));
+
+      if (!existingChat) {
+        await addDoc(collection(db, 'chats'), {
+          type: 'direct',
+          participants: [auth.currentUser.uid, otherUserId],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          unreadCount: {
+            [auth.currentUser.uid]: 0,
+            [otherUserId]: 0
+          }
+        });
+      }
+      setActiveDropdown(null);
+      // Dispatch event to open global chat
+      window.dispatchEvent(new CustomEvent('openGlobalChat'));
+    } catch (err) {
+      console.error('Error creating chat:', err);
+    }
+  };
+
   const handleShare = (post: Post) => {
     const shareText = `Análise de ${post.userName} no C Profit:\n${post.legend}\nConfira no Terminal C Profit!`;
     if (navigator.share) {
@@ -302,6 +360,26 @@ export default function Community() {
         <p className="text-on-surface-variant text-sm md:text-base font-medium opacity-70">A sua rede social de trading elite.</p>
       </div>
 
+      {/* Main Tabs (Feed vs Chat) */}
+      {showFilter && (
+        <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-2xl md:rounded-full w-full max-w-md mx-auto p-1">
+          <button 
+            onClick={() => setActiveFeed('forex')}
+            className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl md:rounded-full text-sm font-black transition-all ${activeFeed === 'forex' ? 'bg-primary text-on-primary shadow-lg' : 'text-on-surface-variant hover:text-on-surface'}`}
+          >
+            <Globe size={18} />
+            Forex & Índices
+          </button>
+          <button 
+            onClick={() => setActiveFeed('ob')}
+            className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl md:rounded-full text-sm font-black transition-all ${activeFeed === 'ob' ? 'bg-primary text-on-primary shadow-lg' : 'text-on-surface-variant hover:text-on-surface'}`}
+          >
+            <Smartphone size={18} />
+            Opções Binárias
+          </button>
+        </div>
+      )}
+
       {/* Composer Box (Facebook Style) */}
       <div className="bg-surface-container-low border border-outline-variant/10 rounded-[32px] p-4 md:p-6 shadow-xl shadow-black/5">
         <div className="flex items-center gap-4 mb-4">
@@ -350,26 +428,6 @@ export default function Community() {
         </div>
       </div>
 
-      {/* Feed Selector */}
-      {showFilter && (
-        <div className="flex p-1.5 bg-surface-container-low border border-outline-variant/10 rounded-2xl md:rounded-full w-full max-w-md mx-auto">
-          <button 
-            onClick={() => setActiveFeed('forex')}
-            className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl md:rounded-full text-sm font-black transition-all ${activeFeed === 'forex' ? 'bg-primary text-on-primary shadow-lg' : 'text-on-surface-variant hover:text-on-surface'}`}
-          >
-            <Globe size={18} />
-            Forex & Índices
-          </button>
-          <button 
-            onClick={() => setActiveFeed('ob')}
-            className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl md:rounded-full text-sm font-black transition-all ${activeFeed === 'ob' ? 'bg-primary text-on-primary shadow-lg' : 'text-on-surface-variant hover:text-on-surface'}`}
-          >
-            <Smartphone size={18} />
-            Opções Binárias
-          </button>
-        </div>
-      )}
-
       {/* Broadcasts (Avisos da Administração) */}
       {broadcasts.length > 0 && (
         <div className="space-y-4">
@@ -391,7 +449,7 @@ export default function Community() {
 
       {/* Posts Feed */}
       <div className="space-y-8">
-        {posts.map(post => (
+        {posts.filter(p => !blockedUsers.includes(p.userId)).map(post => (
           <div key={post.id} className="bg-surface-container-low border border-outline-variant/10 rounded-[40px] overflow-hidden shadow-2xl group animate-in slide-in-from-bottom duration-500">
             {/* Post Header */}
             <div className="p-6 flex items-center justify-between">
@@ -410,28 +468,48 @@ export default function Community() {
                 </div>
               </div>
               
-              {(isAdmin || post.userId === auth.currentUser?.uid) && (
-                <div className="relative">
-                  <button 
-                    onClick={() => setActiveDropdown(activeDropdown === post.id ? null : post.id)}
-                    className="p-2 rounded-xl hover:bg-surface-container text-on-surface-variant transition-all"
-                  >
-                    <MoreVertical size={20} />
-                  </button>
-                  {activeDropdown === post.id && (
-                    <div className="absolute top-10 right-0 w-48 bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-xl overflow-hidden py-2 z-10 animate-in fade-in slide-in-from-top-2">
-                       {post.userId === auth.currentUser?.uid && (
+              <div className="relative">
+                <button 
+                  onClick={() => setActiveDropdown(activeDropdown === post.id ? null : post.id)}
+                  className="p-2 rounded-xl hover:bg-surface-container text-on-surface-variant transition-all"
+                >
+                  <MoreVertical size={20} />
+                </button>
+                {activeDropdown === post.id && (
+                  <div className="absolute top-10 right-0 w-48 bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-xl overflow-hidden py-2 z-10 animate-in fade-in slide-in-from-top-2">
+                     {post.userId === auth.currentUser?.uid && (
+                      <button 
+                        onClick={() => {
+                          handleOpenEditModal(post);
+                          setActiveDropdown(null);
+                        }}
+                        className="w-full text-left px-4 py-3 text-sm text-on-surface hover:bg-surface-container transition-colors flex items-center gap-3"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                        Editar
+                      </button>
+                     )}
+                     
+                     {post.userId !== auth.currentUser?.uid && (
+                      <>
                         <button 
-                          onClick={() => {
-                            handleOpenEditModal(post);
-                            setActiveDropdown(null);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm text-on-surface hover:bg-surface-container transition-colors flex items-center gap-3"
+                          onClick={() => handleSendMessageToUser(post.userId)}
+                          className="w-full text-left px-4 py-3 text-sm text-secondary hover:bg-accent/10 transition-colors flex items-center gap-3"
                         >
-                          <span className="material-symbols-outlined text-[18px]">edit</span>
-                          Editar
+                          <Send size={18} />
+                          Mensagem
                         </button>
-                       )}
+                        <button 
+                          onClick={() => handleBlockUser(post.userId)}
+                          className="w-full text-left px-4 py-3 text-sm text-error hover:bg-error/10 transition-colors flex items-center gap-3 border-t border-outline-variant/10"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">block</span>
+                          Bloquear
+                        </button>
+                      </>
+                     )}
+
+                     {(isAdmin || post.userId === auth.currentUser?.uid) && (
                        <button 
                         onClick={() => handleDeletePost(post.id)}
                         className="w-full text-left px-4 py-3 text-sm text-error hover:bg-error/10 transition-colors flex items-center gap-3 border-t border-outline-variant/10"
@@ -439,10 +517,10 @@ export default function Community() {
                          <Trash2 size={18} />
                          Eliminar
                        </button>
-                    </div>
-                  )}
-                </div>
-              )}
+                     )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Post Content */}

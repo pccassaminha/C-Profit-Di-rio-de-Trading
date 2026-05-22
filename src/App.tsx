@@ -15,6 +15,7 @@ import AdminPanel from './components/AdminPanel';
 import Support from './components/Support';
 import Planner from './components/Planner';
 import UserAffiliate from './components/UserAffiliate';
+import GlobalChatWidget from './components/GlobalChatWidget';
 import { useTrades } from './hooks/useTrades';
 
 import Auth from './components/Auth';
@@ -169,6 +170,8 @@ export default function App() {
           {renderContent()}
         </main>
       </div>
+
+      {activeTab === 'community' && <GlobalChatWidget isSidebarOpen={isSidebarOpen} />}
 
       {showCouponBanner && (
         <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-[#0d1425] border-2 border-[#00f5a0]/40 rounded-3xl p-5 shadow-[0_10px_50px_rgba(0,245,160,0.2)] animate-in slide-in-from-bottom duration-500 text-white">

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { auth, db } from '../firebase';
 import { useTrades } from '../hooks/useTrades';
-import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, where } from 'firebase/firestore';
 
 export default function Topbar({ 
   toggleSidebar, 
@@ -25,6 +25,7 @@ export default function Topbar({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [broadcasts, setBroadcasts] = useState<any[]>([]);
   const [seenIds, setSeenIds] = useState<string[]>([]);
+  const [chatUnreads, setChatUnreads] = useState<any[]>([]);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLDivElement>(null);
@@ -59,6 +60,33 @@ export default function Topbar({
 
     return () => unsubscribe();
   }, []);
+
+  // Subscribe to real-time chat unreads
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'chats'),
+      where('participants', 'array-contains', currentUser.uid)
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      const unreads: any[] = [];
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const count = data.unreadCount?.[currentUser.uid];
+        if (count && count > 0) {
+          unreads.push({
+            id: doc.id,
+            count,
+            type: data.type,
+            name: data.type === 'group' ? data.name : 'Mensagem Direta',
+            senderName: data.lastSenderName || 'Alguém',
+          });
+        }
+      });
+      setChatUnreads(unreads);
+    });
+    return () => unsub();
+  }, [currentUser]);
 
   // Handle clicks outside dropdowns to close them
   useEffect(() => {
@@ -104,7 +132,8 @@ export default function Topbar({
     }
   };
 
-  const unreadCount = broadcasts.filter(b => !seenIds.includes(b.id)).length;
+  const totalUnreadChats = chatUnreads.reduce((sum, chat) => sum + chat.count, 0);
+  const unreadCount = broadcasts.filter(b => !seenIds.includes(b.id)).length + totalUnreadChats;
 
   return (
     <header className="flex justify-between items-center px-6 w-full h-20 sticky top-0 z-40 bg-background border-b border-outline-variant/20">
@@ -150,9 +179,35 @@ export default function Topbar({
                 )}
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2 max-h-[350px]">
-                {broadcasts.length === 0 ? (
+                {chatUnreads.map(c => (
+                  <div 
+                    key={c.id} 
+                    onClick={() => {
+                        setNotificationsOpen(false);
+                        if (onNavigate) {
+                           onNavigate('community');
+                           // small delay so it navigates then opens
+                           setTimeout(() => {
+                              window.dispatchEvent(new CustomEvent('openGlobalChat'));
+                           }, 300);
+                        }
+                    }}
+                    className="p-3.5 rounded-xl border transition-colors bg-primary/5 border-primary/20 shadow-sm cursor-pointer hover:bg-primary/10"
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="material-symbols-outlined text-primary text-[18px]">chat</span>
+                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
+                        Nova Mensagem
+                      </span>
+                    </div>
+                    <p className="text-xs text-on-surface font-medium leading-relaxed">
+                      Você tem <strong className="font-black text-primary">{c.count}</strong> mensagem(ns) não lida(s) de <strong className="font-bold">{c.type === 'group' ? c.name : c.senderName}</strong>. Clique aqui para ir para a comunidade.
+                    </p>
+                  </div>
+                ))}
+                {broadcasts.length === 0 && chatUnreads.length === 0 ? (
                   <div className="text-center py-8 px-4 text-on-surface-variant text-xs italic">
-                    Nenhum comunicado oficial por enquanto.
+                    Nenhuma notificação por enquanto.
                   </div>
                 ) : (
                   broadcasts.map((b) => {
