@@ -76,10 +76,15 @@ export default function Dashboard() {
   const [calendarDate, setCalendarDate] = useState(new Date()); // Mes corrente como padrão
   const [activeDashboardTab, setActiveDashboardTab] = useState('objectives'); // 'objectives', 'history', 'analysis', 'info'
   const [analysisDateRange, setAnalysisDateRange] = useState<DateRange | undefined>();
+  const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [objectives, setObjectives] = useState<any[]>([]);
   const [visibleMarkets, setVisibleMarkets] = useState<'all' | 'forex' | 'ob'>('all');
   const [defaultTradeType, setDefaultTradeType] = useState<'ask' | 'forex' | 'ob'>('ask');
+
+  useEffect(() => {
+    setHistoryCurrentPage(1);
+  }, [tradeTypeFilter, selectedAccountLogin, analysisDateRange]);
 
   // Load settings
   useEffect(() => {
@@ -1911,7 +1916,19 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.filteredHistoryTrades.map((trade: any, i: number) => (
+                  {(() => {
+                    const itemsPerPage = 40;
+                    const totalItems = data.filteredHistoryTrades.length;
+                    const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+                    const startIndex = (historyCurrentPage - 1) * itemsPerPage;
+                    const paginatedTrades = data.filteredHistoryTrades.slice(startIndex, startIndex + itemsPerPage);
+
+                    // Ensure page bounds (in case data changes)
+                    if (historyCurrentPage > totalPages) {
+                      setTimeout(() => setHistoryCurrentPage(totalPages), 0);
+                    }
+
+                    return paginatedTrades.map((trade: any, i: number) => (
                   <tr key={i} className="bg-surface-container hover:bg-surface-container-highest transition-colors">
                     <td className="py-5 px-4 rounded-l-2xl text-on-surface-variant whitespace-nowrap">{trade.ticket}</td>
                     <td className={`py-5 px-4 whitespace-nowrap ${trade.action === 'Buy' ? 'text-secondary' : 'text-error'}`}>{trade.action}</td>
@@ -1937,18 +1954,67 @@ export default function Dashboard() {
                       })()}
                     </td>
                   </tr>
-                ))}
+                ));
+               })()}
               </tbody>
             </table>
             
-            <div className="flex justify-center items-center gap-6 mt-8">
-              <button className="text-on-surface-variant hover:text-on-surface"><span className="material-symbols-outlined text-xl">chevron_left</span></button>
-              <div className="flex gap-3">
-                <button className="w-10 h-10 rounded-full bg-surface-container-highest text-on-surface font-bold text-sm flex items-center justify-center">01</button>
-                <button className="w-10 h-10 rounded-full text-on-surface-variant hover:bg-surface-container font-bold text-sm flex items-center justify-center">02</button>
-              </div>
-              <button className="text-on-surface-variant hover:text-on-surface"><span className="material-symbols-outlined text-xl">chevron_right</span></button>
-            </div>
+           {(() => {
+              const itemsPerPage = 40;
+              const totalItems = data.filteredHistoryTrades.length;
+              const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+
+              if (totalPages <= 1) return null;
+
+              const handlePrev = () => {
+                if (historyCurrentPage > 1) setHistoryCurrentPage(p => p - 1);
+              };
+              const handleNext = () => {
+                if (historyCurrentPage < totalPages) setHistoryCurrentPage(p => p + 1);
+              };
+
+              return (
+                <div className="flex justify-center items-center gap-6 mt-8">
+                  <button onClick={handlePrev} disabled={historyCurrentPage === 1} className="text-on-surface-variant hover:text-on-surface disabled:opacity-50 disabled:hover:text-on-surface-variant transition-opacity">
+                    <span className="material-symbols-outlined text-xl">chevron_left</span>
+                  </button>
+                  <div className="flex gap-2 sm:gap-3 overflow-x-auto max-w-[60vw] pb-2 custom-scrollbar">
+                    {Array.from({ length: totalPages }).map((_, idx) => {
+                      const p = idx + 1;
+                      if (totalPages > 10) {
+                        if (p === 1 || p === totalPages || (p >= historyCurrentPage - 2 && p <= historyCurrentPage + 2)) {
+                          return (
+                            <button 
+                              key={p}
+                              onClick={() => setHistoryCurrentPage(p)}
+                              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full font-bold text-xs sm:text-sm flex flex-shrink-0 items-center justify-center min-w-[36px] sm:min-w-[40px] transition-colors ${historyCurrentPage === p ? 'bg-surface-container-highest text-on-surface' : 'text-on-surface-variant hover:bg-surface-container'}`}
+                            >
+                              {p.toString().padStart(2, '0')}
+                            </button>
+                          );
+                        } else if (p === historyCurrentPage - 3 || p === historyCurrentPage + 3) {
+                          return <span key={p} className="text-on-surface-variant flex items-center px-1">...</span>;
+                        }
+                        return null;
+                      }
+                      
+                      return (
+                        <button 
+                          key={p}
+                          onClick={() => setHistoryCurrentPage(p)}
+                          className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full font-bold text-xs sm:text-sm flex flex-shrink-0 items-center justify-center min-w-[36px] sm:min-w-[40px] transition-colors ${historyCurrentPage === p ? 'bg-surface-container-highest text-on-surface' : 'text-on-surface-variant hover:bg-surface-container'}`}
+                        >
+                          {p.toString().padStart(2, '0')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button onClick={handleNext} disabled={historyCurrentPage === totalPages} className="text-on-surface-variant hover:text-on-surface disabled:opacity-50 disabled:hover:text-on-surface-variant transition-opacity">
+                    <span className="material-symbols-outlined text-xl">chevron_right</span>
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
         </div>
