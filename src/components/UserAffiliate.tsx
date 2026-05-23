@@ -197,18 +197,31 @@ export default function UserAffiliate() {
   const getTier = (count: number) => {
     if (count >= 50) {
       return {
-        level: 5,
-        name: 'Nível 5 (Maestro Elite)',
+        level: 6,
+        name: 'Nível 6 (Maestro Elite)',
         commission: 30,
         payoutType: 'Dinheiro Real (Payout IBAN Directo)',
         color: 'text-[#00f5a0]',
         bgColor: 'border-[#00f5a0]/40 bg-[#00f5a0]/5',
-        badge: '👑 N5',
+        badge: '👑 N6',
         gradient: 'from-[#00f5a0]/20 to-[#00f5a0]/5',
         nextTarget: null,
-        description: 'Parabéns! Payout bancário real de 30% em dinheiro líquido para qualquer plano de inscrição contratado sob sua indicação!'
+        description: 'Parabéns! Payout bancário real de 30% em dinheiro líquido para a primeira assinatura paga por qualquer usuário indicado por si!'
       };
     } else if (count >= 40) {
+      return {
+        level: 5,
+        name: 'Nível 5 (Platina)',
+        commission: 0,
+        payoutType: 'Mês Grátis (Bónus 4 Meses)',
+        color: 'text-purple-400',
+        bgColor: 'border-purple-500/20 bg-purple-500/5',
+        badge: '✦ N5',
+        gradient: 'from-purple-500/10 to-transparent',
+        nextTarget: { targetCount: 50, name: 'Nível 6 (Maestro Elite)', needed: 50 - count },
+        description: 'Excelente! Alcançou o Nível 5 e garantiu 4 Meses Gratuitos de assinatura ativa na plataforma!'
+      };
+    } else if (count >= 30) {
       return {
         level: 4,
         name: 'Nível 4 (Diamante)',
@@ -218,10 +231,10 @@ export default function UserAffiliate() {
         bgColor: 'border-cyan-500/20 bg-cyan-500/5',
         badge: '♦ N4',
         gradient: 'from-cyan-500/10 to-transparent',
-        nextTarget: { targetCount: 50, name: 'Nível 5 (Maestro Elite)', needed: 50 - count },
+        nextTarget: { targetCount: 40, name: 'Nível 5 (Platina)', needed: 40 - count },
         description: 'Excelente! Alcançou o Nível 4 e garantiu 3 Meses Gratuitos de assinatura ativa na plataforma!'
       };
-    } else if (count >= 25) {
+    } else if (count >= 20) {
       return {
         level: 3,
         name: 'Nível 3 (Ouro)',
@@ -231,7 +244,7 @@ export default function UserAffiliate() {
         bgColor: 'border-yellow-500/20 bg-yellow-500/5',
         badge: '★ N3',
         gradient: 'from-yellow-500/10 to-transparent',
-        nextTarget: { targetCount: 40, name: 'Nível 4 (Diamante)', needed: 40 - count },
+        nextTarget: { targetCount: 30, name: 'Nível 4 (Diamante)', needed: 30 - count },
         description: 'Óptimo trabalho! Garantiu de bónus 2 Meses Completamente Gratuitos de assinatura!'
       };
     } else if (count >= 10) {
@@ -244,7 +257,7 @@ export default function UserAffiliate() {
         bgColor: 'border-slate-500/20 bg-slate-500/5',
         badge: '✦ N2',
         gradient: 'from-slate-500/10 to-transparent',
-        nextTarget: { targetCount: 25, name: 'Nível 3 (Ouro)', needed: 25 - count },
+        nextTarget: { targetCount: 20, name: 'Nível 3 (Ouro)', needed: 20 - count },
         description: 'Parabéns! Alcançou o Nível 2 e garantiu 1 Mês Inteiro Gratuito de assinatura na plataforma!'
       };
     } else {
@@ -258,7 +271,7 @@ export default function UserAffiliate() {
         badge: '● N1',
         gradient: 'from-orange-500/10 to-transparent',
         nextTarget: { targetCount: 10, name: 'Nível 2 (Prata)', needed: 10 - count },
-        description: 'Partilhe com a sua rede de traders. Ao atingir 10 convites aprovados, desbloqueia meses de assinatura inteiramente grátis!'
+        description: 'A cada 10 convites, ganha 1 mês grátis! Alcance 50 convites para ganhar 30% da receita da primeira mensalidade dos convidados.'
       };
     }
   };
@@ -524,7 +537,7 @@ export default function UserAffiliate() {
               <div>
                 <h5 className="font-bold text-xs text-white uppercase tracking-wider">Regra de Levantamento em Dinheiro Real</h5>
                 <p className="text-[11px] text-on-surface-variant leading-relaxed mt-0.5">
-                  Os afiliados do <strong className="text-[#00f5a0]">Nível 5 (50+ convites ativos)</strong> possuem payout direto. Suas recompensas de <strong className="text-white">30% sobre todo faturamento angariador</strong> serão pagas 100% em dinheiro líquido no seu IBAN cadastrado!
+                  Os afiliados do <strong className="text-[#00f5a0]">Nível 6 (50+ convites ativos)</strong> possuem payout direto. Suas recompensas de <strong className="text-white">30% sobre a primeira assinatura paga por cada usuário indicado</strong> serão pagas 100% em dinheiro líquido no seu IBAN cadastrado!
                 </p>
               </div>
             </div>

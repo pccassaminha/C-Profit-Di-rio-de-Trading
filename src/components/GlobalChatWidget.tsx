@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { Send, Users, UserPlus, Settings, Info, Lock, Key, Edit2, Trash2, X, ShieldCheck, MessageSquare } from 'lucide-react';
+import { Send, Users, UserPlus, Settings, Info, Lock, Key, Edit2, Trash2, X, ShieldCheck, MessageSquare, Maximize2, Minimize2 } from 'lucide-react';
 
 interface Chat {
   id: string;
@@ -21,6 +21,7 @@ interface Chat {
 
 export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -284,15 +285,24 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
       {/* Chat Window */}
       {isOpen && (
         <div 
-          className="fixed bottom-24 right-6 z-[60] bg-surface border border-outline-variant/20 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row w-[calc(100vw-3rem)] max-w-3xl h-[600px] max-h-[80vh] transition-all"
+          className={`fixed z-[60] bg-surface border border-outline-variant/20 shadow-2xl overflow-hidden flex flex-col md:flex-row transition-all ${
+            isFullScreen 
+              ? 'inset-0 w-full h-full rounded-none' 
+              : 'bottom-24 right-6 w-[calc(100vw-3rem)] max-w-3xl h-[600px] max-h-[80vh] rounded-3xl'
+          }`}
         >
           {/* Sidebar - Chat List */}
           <div className={`${activeChat ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r border-outline-variant/20 bg-surface-container-lowest flex-col`}>
             <div className="p-4 border-b border-outline-variant/10 flex justify-between items-center shrink-0">
-              <h2 className="text-lg font-black font-headline uppercase tracking-widest text-on-surface">Chat</h2>
-              <button onClick={() => setIsGroupModalOpen(true)} className="p-2 hover:bg-surface-container rounded-full text-primary transition-colors bg-primary/10" title="Criar Sala">
-                <Users size={18} />
-              </button>
+              <h2 className="text-lg font-black font-headline uppercase tracking-widest text-on-surface">Conversas</h2>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 hover:bg-surface-container rounded-full text-on-surface-variant transition-colors" title="Alternar Tamanho">
+                  {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </button>
+                <button onClick={() => setIsGroupModalOpen(true)} className="p-2 hover:bg-surface-container rounded-full text-primary transition-colors bg-primary/10" title="Criar Sala">
+                  <Users size={18} />
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               {chats.map(chat => {

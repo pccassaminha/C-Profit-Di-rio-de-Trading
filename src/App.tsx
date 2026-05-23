@@ -26,7 +26,14 @@ import Ajuda from './components/Ajuda';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [journalView, setJournalView] = useState<'list' | 'form' | 'detail'>('list');
+  const [journalView, setJournalView] = useState<'list' | 'form' | 'detail'>(() => {
+    const saved = localStorage.getItem('journalView');
+    return (saved as 'list' | 'form' | 'detail') || 'list';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('journalView', journalView);
+  }, [journalView]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [copiedCoupon, setCopiedCoupon] = useState(false);

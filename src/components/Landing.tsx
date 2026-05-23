@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { LineChart, ShieldCheck, Zap, TrendingUp, Wallet, ArrowRight, CheckCircle2, Globe, BarChart3, Lock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { LineChart, ShieldCheck, Zap, TrendingUp, Wallet, ArrowRight, CheckCircle2, Globe, BarChart3, Lock, X } from 'lucide-react';
 import Plans from './Plans';
 
 interface LandingProps {
@@ -12,6 +12,31 @@ interface LandingProps {
 export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: LandingProps) {
   const [activePreviewTab, setActivePreviewTab] = useState<'dashboard' | 'diario' | 'psicologia' | 'planeador'>('dashboard');
   const [couponCopied, setCouponCopied] = useState(false);
+  const [showPromoPopup, setShowPromoPopup] = useState(false);
+  const [popupCopied, setPopupCopied] = useState(false);
+
+  useEffect(() => {
+    const hasSeen = sessionStorage.getItem('promo_popup_seen');
+    if (!hasSeen) {
+      const timer = setTimeout(() => {
+        setShowPromoPopup(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const closePromoPopup = () => {
+    setShowPromoPopup(false);
+    sessionStorage.setItem('promo_popup_seen', 'true');
+  };
+
+  const copyPopupCoupon = () => {
+    navigator.clipboard.writeText('DESCONTODE50%');
+    setPopupCopied(true);
+    setTimeout(() => {
+      setPopupCopied(false);
+    }, 3000);
+  };
 
   const copyCouponCode = () => {
     navigator.clipboard.writeText('DESCONTODE50%');
@@ -578,12 +603,12 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
               </div>
 
               <span className="text-[10px] bg-[#00f5a0]/10 text-[#00f5a0] border border-[#00f5a0]/20 font-black px-3 py-1 rounded-full uppercase tracking-widest">
-                Regra Especial Nível 5 Elite
+                Regra Especial Nível 6 Elite
               </span>
 
               <h3 className="text-2xl font-bold font-headline text-white mt-1">Como funciona o Payout Bancário?</h3>
               <p className="text-xs text-on-surface-variant leading-relaxed font-medium font-body bg-white/5 p-4 rounded-xl border border-outline-variant/10">
-                À medida que recomenda novos traders, o seu Nível de Afiliado sobe. Os <strong className="text-white">Níveis 1 a 4</strong> desbloqueiam <strong className="text-[#00f5a0]">meses grátis adicionais</strong> de ferramenta. Ao alcançar o <strong className="text-[#00f5a0]">Nível 5 (após convidar 50 pessoas ou mais)</strong>, o seu plano torna-se Elite e desbloqueia ganhos financeiros líquidos:
+                À medida que recomenda novos traders, o seu Nível de Afiliado sobe. A cada <strong className="text-white">10 convidados</strong>, você ganha <strong className="text-[#00f5a0]">1 mês grátis adicional</strong>. Ao alcançar o <strong className="text-[#00f5a0]">Nível 6 (após convidar 50 pessoas)</strong>, o seu plano torna-se Elite e desbloqueia ganhos financeiros líquidos:
               </p>
 
               <div className="p-5 bg-[#00f5a0]/5 border border-[#00f5a0]/20 rounded-2xl flex items-start gap-4">
@@ -593,7 +618,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                 <div>
                   <h4 className="font-bold text-sm text-white">Ganhos Reais em Dinheiro Vivo</h4>
                   <p className="text-[11px] text-on-surface-variant leading-relaxed mt-1">
-                    Como Afiliado Nível 5, receberá <strong className="text-[#00f5a0]">30% do valor de inscrição/pagamento de cada usuário</strong> indicado por si. Sem barreiras, com faturamento pago diretamente via transferência bancária para o seu IBAN angolano!
+                    Como Afiliado Nível 6, receberá <strong className="text-[#00f5a0]">30% da primeira assinatura paga de cada usuário</strong> indicado por si. Sem barreiras, pago via transferência para o seu IBAN angolano!
                   </p>
                 </div>
               </div>
@@ -628,7 +653,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
               <h3 className="text-lg font-bold font-headline text-white flex items-center gap-2">
                 🏆 Níveis de Afiliado &amp; Plano de Carreira
               </h3>
-              <p className="text-xs text-on-surface-variant font-body">Suba na carreira recomendando traders. Nível 1 a 4 garante bónus de tempo de uso; Nível 5 garante renda real:</p>
+              <p className="text-xs text-on-surface-variant font-body">Suba na carreira recomendando traders. Nível 1 a 5 garante bónus de tempo de uso; Nível 6 garante renda real:</p>
 
               <div className="space-y-3 pt-2">
                 {/* Level 1 */}
@@ -641,7 +666,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[11px] font-mono font-black text-on-surface bg-surface-container px-2.5 py-1 rounded-lg">Mês Progresso</span>
+                    <span className="text-[11px] font-mono font-black text-on-surface bg-surface-container px-2.5 py-1 rounded-lg">Progresso</span>
                   </div>
                 </div>
 
@@ -651,11 +676,11 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                     <div className="w-9 h-9 bg-slate-400/10 text-slate-300 rounded-xl flex items-center justify-center font-bold text-xs">N2</div>
                     <div>
                       <h4 className="font-bold text-xs text-white">Nível 2 (Prata)</h4>
-                      <p className="text-[10px] text-on-surface-variant">Requisito: 10 a 24 pessoas convidadas</p>
+                      <p className="text-[10px] text-on-surface-variant">Requisito: 10 a 19 pessoas convidadas</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[11px] font-mono font-black text-[#00f5a0] bg-[#00f5a0]/5 border border-[#00f5a0]/10 px-2.5 py-1 rounded-lg">Bónus 1 Mês Grátis</span>
+                    <span className="text-[11px] font-mono font-black text-[#00f5a0] bg-[#00f5a0]/5 border border-[#00f5a0]/10 px-2.5 py-1 rounded-lg">1 Mês Grátis</span>
                   </div>
                 </div>
 
@@ -665,39 +690,53 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                     <div className="w-9 h-9 bg-yellow-500/10 text-yellow-400 rounded-xl flex items-center justify-center font-bold text-xs">N3</div>
                     <div>
                       <h4 className="font-bold text-xs text-white">Nível 3 (Ouro)</h4>
-                      <p className="text-[10px] text-on-surface-variant">Requisito: 25 a 39 pessoas convidadas</p>
+                      <p className="text-[10px] text-on-surface-variant">Requisito: 20 a 29 pessoas convidadas</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[11px] font-mono font-black text-[#00f5a0] bg-[#00f5a0]/5 border border-[#00f5a0]/10 px-2.5 py-1 rounded-lg">Bónus 2 Meses Grátis</span>
+                    <span className="text-[11px] font-mono font-black text-[#00f5a0] bg-[#00f5a0]/5 border border-[#00f5a0]/10 px-2.5 py-1 rounded-lg">2 Meses Grátis</span>
                   </div>
                 </div>
 
                 {/* Level 4 */}
-                <div className="bg-surface-container/50 border border-[#00f5a0]/15 rounded-2xl p-4 flex justify-between items-center gap-4 hover:border-[#00f5a0]/40 transition-all">
+                <div className="bg-surface-container/50 border border-cyan-500/15 rounded-2xl p-4 flex justify-between items-center gap-4 hover:border-cyan-500/40 transition-all">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-[#00f5a0]/10 text-[#00f5a0] rounded-xl flex items-center justify-center font-bold text-xs">N4</div>
+                    <div className="w-9 h-9 bg-cyan-500/10 text-cyan-400 rounded-xl flex items-center justify-center font-bold text-xs">N4</div>
                     <div>
                       <h4 className="font-bold text-xs text-white">Nível 4 (Diamante)</h4>
-                      <p className="text-[10px] text-on-surface-variant">Requisito: 40 a 49 pessoas convidadas</p>
+                      <p className="text-[10px] text-on-surface-variant">Requisito: 30 a 39 pessoas convidadas</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[11px] font-mono font-black text-[#00f5a0] bg-[#00f5a0]/5 px-2.5 py-1 rounded-lg border border-[#00f5a0]/20">Bónus 3 Meses Grátis</span>
+                    <span className="text-[11px] font-mono font-black text-cyan-400 bg-cyan-500/5 px-2.5 py-1 rounded-lg border border-cyan-500/20">3 Meses Grátis</span>
                   </div>
                 </div>
 
                 {/* Level 5 */}
+                <div className="bg-surface-container/50 border border-purple-500/15 rounded-2xl p-4 flex justify-between items-center gap-4 hover:border-purple-500/40 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-purple-500/10 text-purple-400 rounded-xl flex items-center justify-center font-bold text-xs">N5</div>
+                    <div>
+                      <h4 className="font-bold text-xs text-white">Nível 5 (Platina)</h4>
+                      <p className="text-[10px] text-on-surface-variant">Requisito: 40 a 49 pessoas convidadas</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-mono font-black text-purple-400 bg-purple-500/5 px-2.5 py-1 rounded-lg border border-purple-500/20">4 Meses Grátis</span>
+                  </div>
+                </div>
+
+                {/* Level 6 */}
                 <div className="bg-[#00f5a0]/5 border border-[#00f5a0]/40 rounded-2xl p-4 flex justify-between items-center gap-4 shadow-md shadow-[#00f5a0]/5 hover:bg-[#00f5a0]/10 transition-all">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-[#00f5a0] text-background rounded-xl flex items-center justify-center font-extrabold text-xs">👑 N5</div>
+                    <div className="w-9 h-9 bg-[#00f5a0] text-background rounded-xl flex items-center justify-center font-extrabold text-xs">👑 N6</div>
                     <div>
-                      <h4 className="font-bold text-xs text-white">Nível 5 (Maestro Elite)</h4>
+                      <h4 className="font-bold text-xs text-white">Nível 6 (Maestro Elite)</h4>
                       <p className="text-[10px] text-[#00f5a0] font-bold uppercase tracking-wider">Requisito: 50+ convites ativos</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[11px] font-mono font-black text-background bg-[#00f5a0] px-3 py-1.5 rounded-lg inline-block shadow-lg shadow-[#00f5a0]/20">30% Payout real $</span>
+                    <span className="text-[11px] font-mono font-black text-background bg-[#00f5a0] px-3 py-1.5 rounded-lg inline-block shadow-lg shadow-[#00f5a0]/20">30% Payout / Subs</span>
                   </div>
                 </div>
               </div>
@@ -742,32 +781,6 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
         <Plans hideHeader onAuthRequired={onRegisterClick} />
       </section>
 
-      {/* Brands */}
-      <section id="sobre" className="px-[5%] py-[80px] text-center border-y border-outline bg-surface-container-lowest">
-        <p className="text-[12px] font-medium tracking-[0.1em] uppercase text-on-surface-variant/70 mb-[36px]">Desenvolvido pelo Grupo Cassaminha</p>
-        <div className="flex items-center justify-center gap-[48px] flex-wrap">
-          <a href="#" onClick={(e) => {e.preventDefault(); window.scrollTo(0,0)}} className="flex items-center gap-[10px] opacity-50 hover:opacity-100 transition-opacity cursor-pointer no-underline">
-            <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Profit Logo" className="h-[32px] w-[32px] object-contain rounded-[8px]" />
-            <span className="font-headline text-[15px] font-bold text-on-surface">Profit</span>
-          </a>
-          <a href="https://validac.shop/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[10px] opacity-50 hover:opacity-100 transition-opacity cursor-pointer no-underline">
-            <img src="https://i.postimg.cc/Prh7BMBw/Chat-GPT-Image-14-de-mai-de-2026-11-53-41.png" alt="Valida C Logo" className="h-[32px] w-[32px] object-contain rounded-[8px]" />
-            <span className="font-headline text-[15px] font-bold text-on-surface">Valida C</span>
-          </a>
-          <a href="https://www.cstoreao.shop/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[10px] opacity-50 hover:opacity-100 transition-opacity cursor-pointer no-underline">
-            <img src="https://i.postimg.cc/3wsKF20v/Chat-GPT-Image-13-de-mai-de-2026-12-40-58.png" alt="C Store Angola Logo" className="h-[40px] w-auto object-contain rounded-[8px]" />
-            <span className="font-headline text-[15px] font-bold text-on-surface">C Store Angola</span>
-          </a>
-          <a href="https://www.cstoreao.shop/page" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[10px] opacity-50 hover:opacity-100 transition-opacity cursor-pointer no-underline">
-            <img src="https://i.postimg.cc/Prh7BMBw/Chat-GPT-Image-14-de-mai-de-2026-11-53-41.png" alt="C Gestão Empresarial Logo" className="h-[32px] w-[32px] object-contain rounded-[8px]" />
-            <span className="font-headline text-[15px] font-bold text-on-surface">C Gestão Empresarial</span>
-          </a>
-        </div>
-        <p className="mt-[28px] text-[14px] text-on-surface-variant/70 max-w-[460px] mx-auto leading-[1.7]">
-          O terminal oficial para traders que buscam a maestria através dos dados. Desenvolvido por traders, para traders.
-        </p>
-      </section>
-
       {/* Footer */}
       <footer className="px-[5%] pt-[64px] pb-[32px] border-t border-outline">
         <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-[64px] mb-[64px]">
@@ -803,7 +816,133 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
             Sistemas Operacionais
           </div>
         </div>
+
+        {/* Ecosystem Brands — Discreet sub-footer element */}
+        <div id="sobre" className="mt-12 pt-8 border-t border-outline/10 text-center space-y-4">
+          <p className="text-[10px] font-black tracking-[0.15em] uppercase text-on-surface-variant/30">
+            Desenvolvido pelo Grupo Cassaminha — Nosso Ecossistema
+          </p>
+          <div className="flex items-center justify-center gap-[32px] flex-wrap opacity-35 hover:opacity-75 transition-opacity duration-300">
+            <a href="#" onClick={(e) => {e.preventDefault(); window.scrollTo(0,0)}} className="flex items-center gap-[6px] hover:text-[#00f5a0] transition-colors cursor-pointer no-underline text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
+              <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Profit" className="h-[18px] w-[18px] object-contain rounded" />
+              <span>Profit</span>
+            </a>
+            <a href="https://validac.shop/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[6px] hover:text-[#00f5a0] transition-colors cursor-pointer no-underline text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
+              <img src="https://i.postimg.cc/Prh7BMBw/Chat-GPT-Image-14-de-mai-de-2026-11-53-41.png" alt="Valida C" className="h-[18px] w-[18px] object-contain rounded" />
+              <span>Valida C</span>
+            </a>
+            <a href="https://www.cstoreao.shop/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[6px] hover:text-[#00f5a0] transition-colors cursor-pointer no-underline text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
+              <img src="https://i.postimg.cc/3wsKF20v/Chat-GPT-Image-13-de-mai-de-2026-12-40-58.png" alt="C Store Angola" className="h-[20px] w-auto object-contain rounded animate-pulse" />
+              <span>C Store</span>
+            </a>
+            <a href="https://www.cstoreao.shop/page" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[6px] hover:text-[#00f5a0] transition-colors cursor-pointer no-underline text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
+              <img src="https://i.postimg.cc/Prh7BMBw/Chat-GPT-Image-14-de-mai-de-2026-11-53-41.png" alt="C Gestão" className="h-[18px] w-[18px] object-contain rounded animate-pulse" />
+              <span>C Gestão</span>
+            </a>
+          </div>
+          <p className="text-[10px] text-on-surface-variant/25 max-w-[460px] mx-auto leading-[1.6]">
+            O terminal oficial para traders que buscam a maestria através dos dados. Desenvolvido por traders, para traders.
+          </p>
+        </div>
       </footer>
+
+      {/* Modern, high-conversion floating discount promotion modal */}
+      <AnimatePresence>
+        {showPromoPopup && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closePromoPopup}
+              className="absolute inset-0 bg-black/85 backdrop-blur-[12px]"
+            />
+
+            {/* Centered Modal Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="relative w-full max-w-lg bg-gradient-to-br from-surface-container-high via-surface-container-lowest to-background border border-[#00f5a0]/30 rounded-[32px] p-8 md:p-10 shadow-[0_20px_50px_rgba(0,245,160,0.15)] overflow-hidden z-10"
+            >
+              {/* Subtle visual glow accent block */}
+              <div className="absolute -top-[120px] -right-[120px] w-[240px] h-[240px] bg-[#00f5a0]/10 rounded-full blur-[60px] pointer-events-none"></div>
+
+              {/* Close Button UI */}
+              <button
+                onClick={closePromoPopup}
+                className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/5 text-on-surface-variant hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/10"
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+
+              {/* Header Content */}
+              <div className="text-center md:text-left">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#00f5a0]/30 bg-[#00f5a0]/10 text-[10px] font-black uppercase tracking-wider text-[#00f5a0] mb-5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00f5a0] animate-pulse"></span>
+                  🎁 DESCONTO DE BOAS-VINDAS
+                </div>
+                
+                <h3 className="font-headline text-[28px] md:text-[34px] font-black leading-tight tracking-tight text-white">
+                  Obtenha <span className="text-[#00f5a0]">50% OFF</span> na Primeira Subscrição!
+                </h3>
+                
+                <p className="text-sm text-on-surface-variant leading-relaxed mt-4 max-w-md">
+                  Aproveite este bónus exclusivo na sua primeira subscrição mensal para desbloquear todas as ferramentas premium do terminal e elevar a sua consistência operacional.
+                </p>
+              </div>
+
+              {/* Coupon Copier Container */}
+              <div className="mt-8 p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col sm:flex-row items-center gap-3">
+                <div className="flex-1 flex items-center justify-between w-full px-4 py-3 bg-black/60 border border-outline-variant/10 rounded-xl font-mono text-sm font-black text-white selection:bg-[#00f5a0]/30 select-all">
+                  <span className="text-[#00f5a0]">DESCONTODE50%</span>
+                  <span className="text-[10px] text-white/30 uppercase tracking-widest ml-2 font-normal">CUPÃO</span>
+                </div>
+                
+                <button
+                  onClick={copyPopupCoupon}
+                  className={`w-full sm:w-auto px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 transform active:scale-95 cursor-pointer flex items-center justify-center gap-2 ${
+                    popupCopied 
+                      ? 'bg-[#00f5a0] text-background shadow-[0_0_20px_rgba(0,245,160,0.4)]' 
+                      : 'bg-white text-background hover:bg-neutral-200'
+                  }`}
+                >
+                  {popupCopied ? '✓ COPIADO!' : '📋 COPIAR'}
+                </button>
+              </div>
+
+              {/* Action buttons footer */}
+              <div className="mt-8 flex flex-col sm:flex-row items-center gap-3">
+                <button
+                  onClick={() => {
+                    closePromoPopup();
+                    onRegisterClick();
+                  }}
+                  className="w-full py-4 rounded-xl bg-[#00f5a0] text-background text-xs font-black uppercase tracking-wider hover:opacity-90 transition-all text-center cursor-pointer shadow-[0_10px_30px_rgba(0,245,160,0.2)]"
+                >
+                  REGISTAR &amp; APLICAR DESCONTO
+                </button>
+                <button
+                  onClick={closePromoPopup}
+                  className="w-full py-4 rounded-xl bg-transparent hover:bg-white/5 text-on-surface-variant hover:text-white text-xs font-bold uppercase tracking-wider transition-all text-center cursor-pointer"
+                >
+                  Talvez mais tarde
+                </button>
+              </div>
+
+              {/* Prompt notification indicator */}
+              {popupCopied && (
+                <p className="text-[11px] text-[#00f5a0] text-center font-bold tracking-wider mt-4 animate-pulse">
+                  ✨ Copiado com sucesso! Insira-o no campo de cupão ao assinar.
+                </p>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

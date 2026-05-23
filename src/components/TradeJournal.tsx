@@ -13,7 +13,14 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
   const { formatCurrency } = useCurrency();
   const [view, setView] = useState<'list' | 'form' | 'detail'>(currentView);
   const [tradeType, setTradeType] = useState<'forex' | 'ob' | null>(null);
-  const [listMode, setListMode] = useState<'list' | 'calendar'>('list');
+  const [listMode, setListMode] = useState<'list' | 'calendar'>(() => {
+    const saved = localStorage.getItem('journalListMode');
+    return (saved as 'list' | 'calendar') || 'list';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('journalListMode', listMode);
+  }, [listMode]);
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(new Date());
   const [accounts, setAccounts] = useState<any[]>([]);
