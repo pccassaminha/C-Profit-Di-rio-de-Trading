@@ -15,19 +15,43 @@ export const useTrades = (manualTrades: any[] = []) => {
 
   // 1. Buscar plano e configurações
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser) {
+      setLoading(false);
+      return;
+    }
     
     const fetchData = async () => {
+      const defaultPlan = { 
+        plan_type: 'Iniciante', 
+        account_limit: 2,
+        role: auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user'
+      };
+      
+      const defaultSettings = {
+        whatsappNumber: '244921319200',
+        iban: 'AO06 0000 0000 0000 0000 0',
+        multicaixaEntity: '12345',
+        multicaixaReference: '000 000 000',
+        showIban: true,
+        showMulticaixa: true,
+        multicaixaLogoUrl: 'https://i.ibb.co/vz6W1fN/mcx-logo.png'
+      };
+
       try {
-        // Tentar primeiro no novo caminho 'usuarios' (SaaS)
-        let userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
-        
-        // Se não encontrar, tenta no antigo 'users'
-        if (!userDoc.exists()) {
-          userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
+        let userDoc = null;
+        try {
+          // Tentar primeiro no novo caminho 'usuarios' (SaaS)
+          userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
+          
+          // Se não encontrar, tenta no antigo 'users'
+          if (!userDoc.exists()) {
+            userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
+          }
+        } catch (innerErr) {
+          console.warn("Operating in offline/cached mode for user document:", innerErr);
         }
 
-        if (userDoc.exists()) {
+        if (userDoc && userDoc.exists()) {
           const data = userDoc.data();
           let limit = data.account_limit || 2;
           if (data.plan_type === 'mensal_6' || data.plan_type === 'mensal_2') limit = 12; // 6 OB + 6 Forex
@@ -43,31 +67,26 @@ export const useTrades = (manualTrades: any[] = []) => {
             role: data.role || (auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user')
           });
         } else {
-          setUserPlan({ 
-            plan_type: 'Iniciante', 
-            account_limit: 2,
-            role: auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user'
-          });
+          setUserPlan(defaultPlan);
         }
 
         // Fetch Global Settings
-        const settingsDoc = await getDoc(doc(db, 'settings', 'global'));
-        if (settingsDoc.exists()) {
+        let settingsDoc = null;
+        try {
+          settingsDoc = await getDoc(doc(db, 'settings', 'global'));
+        } catch (innerErr) {
+          console.warn("Operating in offline/cached mode for global settings:", innerErr);
+        }
+
+        if (settingsDoc && settingsDoc.exists()) {
           setGlobalSettings(settingsDoc.data());
         } else {
-          // Default settings if none exist
-          setGlobalSettings({
-            whatsappNumber: '244921319200',
-            iban: 'AO06 0000 0000 0000 0000 0',
-            multicaixaEntity: '12345',
-            multicaixaReference: '000 000 000',
-            showIban: true,
-            showMulticaixa: true,
-            multicaixaLogoUrl: 'https://i.ibb.co/vz6W1fN/mcx-logo.png'
-          });
+          setGlobalSettings(defaultSettings);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
+        setUserPlan(defaultPlan);
+        setGlobalSettings(defaultSettings);
       }
     };
     
@@ -110,6 +129,9 @@ export const useTrades = (manualTrades: any[] = []) => {
         source: 'automatic'
       }));
       updateFirebaseTrades(tradesNew, 'new');
+    }, (error) => {
+      console.warn("onSnapshot qNew connection offline/unavailable:", error);
+      setLoading(false);
     });
     unsubscribes.push(unsubNew);
 
@@ -122,6 +144,9 @@ export const useTrades = (manualTrades: any[] = []) => {
         source: 'automatic'
       }));
       updateFirebaseTrades(tradesOld, 'old');
+    }, (error) => {
+      console.warn("onSnapshot qOld connection offline/unavailable:", error);
+      setLoading(false);
     });
     unsubscribes.push(unsubOld);
 

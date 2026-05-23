@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, storage } from '../firebase';
 import { updateProfile, verifyBeforeUpdateEmail, updatePassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { Eye, EyeOff, MessageSquare, ThumbsUp, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
 import Modal from './Modal';
 
 export default function Profile() {
@@ -13,6 +14,8 @@ export default function Profile() {
   const [password, setPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [photoURL, setPhotoURL] = useState(user?.photoURL || '');
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [myPosts, setMyPosts] = useState<any[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,10 +50,32 @@ export default function Profile() {
           const data = userDoc.data();
           if (data.phoneNumber) setPhoneNumber(data.phoneNumber);
           if (data.photoURL) setPhotoURL(data.photoURL);
+          if (data.isPrivate !== undefined) setIsPrivate(data.isPrivate);
         }
       }
     };
     fetchUserData();
+
+    if (user) {
+      const q = query(
+        collection(db, 'community_posts'),
+        where('userId', '==', user.uid)
+      );
+      const unsub = onSnapshot(q, (snapshot) => {
+        const postsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        // Sort by createdAt descending safely in JS
+        postsList.sort((a: any, b: any) => {
+          const timeA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()) : 0;
+          const timeB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()) : 0;
+          return timeB - timeA;
+        });
+        setMyPosts(postsList);
+      });
+      return () => unsub();
+    }
   }, [user]);
 
   const closeModal = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
@@ -154,6 +179,7 @@ export default function Profile() {
         phoneNumber,
         photoURL,
         userId: user.uid,
+        isPrivate,
         updatedAt: new Date().toISOString()
       };
 
@@ -307,6 +333,33 @@ export default function Profile() {
               </button>
             </div>
           </div>
+
+          {/* Privacy Profile Lock Option */}
+          <div className="space-y-4 md:col-span-2 pt-6 border-t border-outline-variant/10">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="text-primary" size={20} />
+              <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Configuração de Privacidade do Perfil</h4>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-surface-container/30 p-5 rounded-[24px] border border-outline-variant/10 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-extrabold text-on-surface flex items-center gap-2">
+                  {isPrivate ? <EyeOff className="text-error" size={16} /> : <Eye className="text-secondary" size={16} />}
+                  Bloquear Perfil Público (Tornar Perfil Privado)
+                </p>
+                <p className="text-xs text-on-surface-variant leading-relaxed max-w-xl">
+                  Se ativado, outros usuários não poderão abrir seu perfil ao clicar no seu nome, restringindo acesso às suas estatísticas, contagem de publicações e histórico pessoal na comunidade.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPrivate(!isPrivate)}
+                className={`w-14 h-8 rounded-full transition-colors relative flex items-center p-1 shrink-0 cursor-pointer outline-none ${isPrivate ? 'bg-primary' : 'bg-[#e5e7eb]/10 border border-outline-variant/20'}`}
+              >
+                <span className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isPrivate ? 'translate-x-6' : 'translate-x-0'}`} />
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="pt-6 border-t border-outline-variant/20 flex justify-between items-center">
@@ -319,6 +372,84 @@ export default function Profile() {
             {isSaving ? 'Salvando...' : 'Salvar Alterações'}
           </button>
         </div>
+      </div>
+
+      {/* Own Community Activity Section */}
+      <div className="bg-surface-container-low border border-outline-variant/20 rounded-[32px] p-6 md:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-outline-variant/10">
+          <div>
+            <h3 className="text-lg font-black font-headline uppercase tracking-widest text-[#00f5a0] flex items-center gap-2">
+              <MessageSquare size={20} />
+              Sua Atividade na Comunidade C Profit
+            </h3>
+            <p className="text-xs text-on-surface-variant mt-1">Estatísticas e histórico de publicações do seu perfil de trader</p>
+          </div>
+          <div className="bg-primary/10 border border-primary/20 px-4 py-2 rounded-2xl text-center shrink-0">
+            <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Contribuições</p>
+            <p className="text-2xl font-black text-on-surface leading-none mt-1">{myPosts.length}</p>
+          </div>
+        </div>
+
+        {myPosts.length === 0 ? (
+          <div className="py-12 text-center text-on-surface-variant text-sm bg-surface-container/20 border border-dashed border-outline-variant/15 rounded-3xl">
+            Você ainda não realizou nenhuma publicação na comunidade.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {myPosts.map(post => (
+              <div key={post.id} className="bg-surface-container/40 border border-outline-variant/10 rounded-3xl p-5 flex flex-col justify-between hover:border-primary/20 transition-colors group relative overflow-hidden">
+                <div>
+                  <div className="flex justify-between items-start gap-3">
+                    <span className={`text-[10.5px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg ${post.type === 'forex' ? 'bg-primary/15 text-primary border border-primary/25' : 'bg-secondary/15 text-secondary border border-secondary/25'}`}>
+                      {post.type === 'forex' ? 'Forex Market' : 'Opções Binárias'}
+                    </span>
+                    <button 
+                      onClick={async () => {
+                        if (confirm('Deseja excluir esta publicação permanentemente?')) {
+                          try {
+                            await deleteDoc(doc(db, 'community_posts', post.id));
+                          } catch (err) {
+                            console.error('Erro ao deletar:', err);
+                          }
+                        }
+                      }}
+                      className="text-on-surface-variant opacity-60 hover:opacity-100 hover:text-error transition-all p-1.5 hover:bg-error/10 rounded-xl"
+                      title="Excluir Publicação"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  
+                  <p className="text-sm font-semibold text-on-surface leading-relaxed mt-4 line-clamp-3">
+                    {post.legend}
+                  </p>
+
+                  {post.imageUrl && (
+                    <div className="mt-4 rounded-2xl overflow-hidden max-h-[160px] border border-outline-variant/10">
+                      <img src={post.imageUrl} alt="Post visualization" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-5 pt-4 border-t border-outline-variant/10 flex justify-between items-center text-xs text-on-surface-variant font-medium">
+                  <span className="opacity-65">
+                    {post.createdAt ? new Date(post.createdAt.toDate ? post.createdAt.toDate() : post.createdAt).toLocaleDateString() : 'Recente'}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <ThumbsUp size={13} className="text-[#00f5a0]" />
+                      <strong>{post.likesCount || 0}</strong>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MessageSquare size={13} className="text-secondary" />
+                      <strong>{post.commentsCount || 0}</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <Modal {...modalConfig} />

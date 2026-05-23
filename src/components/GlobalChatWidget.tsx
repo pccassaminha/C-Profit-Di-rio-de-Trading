@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { Send, Users, UserPlus, Settings, Info, Lock, Key, Edit2, Trash2, X, ShieldCheck, MessageSquare, Maximize2, Minimize2 } from 'lucide-react';
 
 interface Chat {
@@ -296,9 +296,6 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
             <div className="p-4 border-b border-outline-variant/10 flex justify-between items-center shrink-0">
               <h2 className="text-lg font-black font-headline uppercase tracking-widest text-on-surface">Conversas</h2>
               <div className="flex items-center gap-2">
-                <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 hover:bg-surface-container rounded-full text-on-surface-variant transition-colors" title="Alternar Tamanho">
-                  {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                </button>
                 <button onClick={() => setIsGroupModalOpen(true)} className="p-2 hover:bg-surface-container rounded-full text-primary transition-colors bg-primary/10" title="Criar Sala">
                   <Users size={18} />
                 </button>
@@ -353,9 +350,14 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                     </div>
                   </div>
                   
-                  <button onClick={handleOpenSettings} className="p-2 hover:bg-surface-container rounded-full text-on-surface-variant transition-colors" title="Definições/Participantes">
-                    <Settings size={18} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 hover:bg-surface-container rounded-full text-on-surface-variant transition-colors" title="Alternar Tamanho">
+                      {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                    </button>
+                    <button onClick={handleOpenSettings} className="p-2 hover:bg-surface-container rounded-full text-on-surface-variant transition-colors" title="Definições/Participantes">
+                      <Settings size={18} />
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-surface-container-low/30">
@@ -396,7 +398,12 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                 </form>
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-on-surface-variant opacity-60 p-6 text-center">
+              <div className="flex-1 flex flex-col items-center justify-center text-on-surface-variant opacity-60 p-6 text-center relative">
+                <div className="absolute top-4 right-4 md:flex hidden z-10">
+                  <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 hover:bg-surface-container rounded-full text-on-surface-variant hover:text-on-surface transition-colors" title="Alternar Tamanho">
+                    {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                  </button>
+                </div>
                 <MessageSquare size={48} className="mb-4 opacity-50" />
                 <p className="font-bold">Selecione uma conversa</p>
                 <p className="text-xs mt-1">Ou crie uma nova sala para interagir com outros traders.</p>

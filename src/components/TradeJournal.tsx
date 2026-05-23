@@ -684,7 +684,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
   for (let i = firstDayOfMonth - 1; i >= 0; i--) {
     calendarCells.push(
       <div key={`prev-${i}`} className="min-h-[120px] p-3 border-r border-b border-outline-variant/20 relative bg-surface-container-low">
-        <span className="absolute top-3 right-3 text-xs font-medium text-outline-variant/50">{daysInPrevMonth - i}</span>
+        <span className="absolute top-3 right-3 text-sm font-semibold text-outline-variant/50">{daysInPrevMonth - i}</span>
       </div>
     );
   }
@@ -713,20 +713,20 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
         }}
         className={`min-h-[120px] p-3 border-r border-b border-outline-variant/20 relative transition-colors ${active ? 'bg-surface-container border-l-2 border-l-secondary' : 'bg-surface-container-low'} ${dayTrades.length > 0 ? 'cursor-pointer hover:bg-surface-container-highest' : ''}`}
       >
-        <span className="absolute top-3 right-3 text-xs font-medium text-on-surface-variant">{day}</span>
+        <span className="absolute top-3 right-3 text-sm md:text-base font-bold text-on-surface-variant">{day}</span>
         {dayTrades.length > 0 && (
           <div className="mt-8 space-y-1.5">
-            <div className="flex justify-between text-[10px]">
+            <div className="flex justify-between text-xs md:text-sm">
               <span className="text-on-surface-variant">Trades:</span>
-              <span className="text-on-surface font-bold">{dayTrades.length}</span>
+              <span className="text-on-surface font-extrabold">{dayTrades.length}</span>
             </div>
-            <div className="flex justify-between text-[10px]">
+            <div className="flex justify-between text-xs md:text-sm">
               <span className="text-on-surface-variant">P&L:</span>
-              <span className={`font-bold ${isWin ? 'text-secondary' : isLoss ? 'text-error' : 'text-on-surface'}`}>
+              <span className={`font-extrabold ${isWin ? 'text-secondary' : isLoss ? 'text-error' : 'text-on-surface'}`}>
                 {isWin ? '+' : ''}{formatCurrency(dayPnl)}
               </span>
             </div>
-            <div className={`h-1 w-full rounded-full mt-2 ${isWin ? 'bg-secondary' : isLoss ? 'bg-error' : 'bg-outline-variant'}`} />
+            <div className={`h-1.5 w-full rounded-full mt-2 ${isWin ? 'bg-secondary' : isLoss ? 'bg-error' : 'bg-outline-variant'}`} />
           </div>
         )}
       </div>
@@ -739,7 +739,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
   for (let i = 1; i <= remainingCells; i++) {
     calendarCells.push(
       <div key={`next-${i}`} className="min-h-[120px] p-3 border-r border-b border-outline-variant/20 relative bg-surface-container-low">
-        <span className="absolute top-3 right-3 text-xs font-medium text-outline-variant/50">{i}</span>
+        <span className="absolute top-3 right-3 text-sm font-semibold text-outline-variant/50">{i}</span>
       </div>
     );
   }
@@ -828,7 +828,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
               <div className="min-w-[700px]">
                 <div className="grid grid-cols-7 text-center border-b border-outline-variant/20 bg-surface-container">
                   {['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO'].map(day => (
-                    <div key={day} className="py-4 text-xs font-bold text-on-surface-variant border-r border-outline-variant/20 last:border-0">{day}</div>
+                    <div key={day} className="py-4 text-sm md:text-base font-extrabold text-on-surface-variant border-r border-outline-variant/20 last:border-0">{day}</div>
                   ))}
                 </div>
                 <div className="grid grid-cols-7">

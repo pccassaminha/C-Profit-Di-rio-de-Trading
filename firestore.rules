@@ -111,11 +111,25 @@ service cloud.firestore {
 
     // User Profile - Both paths for compatibility
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow get: if isAuthenticated();
+      allow list: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+
+      match /friends/{friendId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+      match /distancing/{distanceId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+      match /blocks/{blockId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
     }
 
     match /usuarios/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
+      allow get: if isAuthenticated();
       allow list: if isAdmin();
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isOwner(userId) || isAdmin();
