@@ -28,10 +28,10 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
   const navItems = [
     { id: 'dashboard', icon: 'dashboard', label: 'Performance' },
     { id: 'journal', icon: 'receipt_long', label: 'Diário de Trades' },
+    { id: 'planner', icon: 'calendar_today', label: 'Planejamento' },
     { id: 'payments', icon: 'payments', label: 'Pagamentos' },
     { id: 'withdrawals', icon: 'account_balance_wallet', label: 'Levantamentos' },
     { id: 'community', icon: 'groups', label: 'Comunidade' },
-    { id: 'planner', icon: 'calendar_today', label: 'Planejamento' },
     { id: 'affiliates_user', icon: 'handshake', label: 'Área de Afiliado' },
   ];
 

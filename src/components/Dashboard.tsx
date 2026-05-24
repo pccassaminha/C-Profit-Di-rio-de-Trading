@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DateRangePicker } from './DateRangePicker';
 import { DateRange } from 'react-day-picker';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
@@ -76,6 +76,21 @@ export default function Dashboard() {
   const [calendarDate, setCalendarDate] = useState(new Date()); // Mes corrente como padrão
   const [activeDashboardTab, setActiveDashboardTab] = useState('objectives'); // 'objectives', 'history', 'analysis', 'info'
   const [analysisDateRange, setAnalysisDateRange] = useState<DateRange | undefined>();
+  const [activeAnalysisModal, setActiveAnalysisModal] = useState<string | null>(null);
+  const [isAnalysisModalExpanded, setIsAnalysisModalExpanded] = useState(false);
+  const [analysisModalChartType, setAnalysisModalChartType] = useState<'pie' | 'bar'>('pie');
+  
+  const openAnalysisModal = (id: string) => {
+    setActiveAnalysisModal(id);
+    setIsAnalysisModalExpanded(false);
+    setAnalysisModalChartType('pie');
+  };
+  
+  const closeAnalysisModal = () => {
+    setActiveAnalysisModal(null);
+    setIsAnalysisModalExpanded(false);
+  };
+  const toggleAnalysisModalExpanded = () => setIsAnalysisModalExpanded(prev => !prev);
   const [historyResultFilter, setHistoryResultFilter] = useState<'all' | 'win' | 'loss'>('all');
   const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
@@ -539,6 +554,7 @@ export default function Dashboard() {
     const analysisPsychologyMap: Record<string, number> = {};
     const analysisPairsMap: Record<string, { pnl: number, wins: number, total: number }> = {};
     const analysisTimeframeMap: Record<string, { pnl: number, wins: number, total: number }> = {};
+    const analysisSessionsMap: Record<string, { pnl: number, wins: number, total: number }> = {};
     const daysOfWeekMap: Record<string, { pnl: number, wins: number, total: number }> = {};
     const analysisDaysOfWeekMap: Record<string, { pnl: number, wins: number, total: number }> = {};
     let analysisTotalTrades = 0;
@@ -667,6 +683,13 @@ export default function Dashboard() {
           analysisTimeframeMap[trade.timeframe].total += 1;
           analysisTimeframeMap[trade.timeframe].pnl += trade.pnl;
           if (trade.pnl > 0) analysisTimeframeMap[trade.timeframe].wins += 1;
+        }
+
+        if (trade.session) {
+          if (!analysisSessionsMap[trade.session]) analysisSessionsMap[trade.session] = { pnl: 0, wins: 0, total: 0 };
+          analysisSessionsMap[trade.session].total += 1;
+          analysisSessionsMap[trade.session].pnl += trade.pnl;
+          if (trade.pnl > 0) analysisSessionsMap[trade.session].wins += 1;
         }
 
         if (trade.setups && Array.isArray(trade.setups)) {
@@ -801,22 +824,22 @@ export default function Dashboard() {
 
     const analysisBestSetups = Object.entries(analysisSetupsMap)
       .map(([name, stats]) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
-      .sort((a, b) => b.pnl - a.pnl)
-      .slice(0, 3);
+      .sort((a, b) => b.pnl - a.pnl);
 
     const analysisBestPairs = Object.entries(analysisPairsMap)
       .map(([name, stats]) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
-      .sort((a, b) => b.pnl - a.pnl)
-      .slice(0, 3);
+      .sort((a, b) => b.pnl - a.pnl);
+
+    const analysisBestSessions = Object.entries(analysisSessionsMap)
+      .map(([name, stats]) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
+      .sort((a, b) => b.pnl - a.pnl);
 
     const analysisPredominantPsychology = Object.entries(analysisPsychologyMap)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
+      .sort((a, b) => b[1] - a[1]);
 
     const analysisBestTimeframes = Object.entries(analysisTimeframeMap)
       .map(([name, stats]) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
-      .sort((a, b) => b.pnl - a.pnl)
-      .slice(0, 3);
+      .sort((a, b) => b.pnl - a.pnl);
 
     const bestDaysOfWeek = Object.entries(daysOfWeekMap)
       .map(([name, stats]) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
@@ -825,8 +848,7 @@ export default function Dashboard() {
 
     const analysisBestDaysOfWeek = Object.entries(analysisDaysOfWeekMap)
       .map(([name, stats]) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
-      .sort((a, b) => b.pnl - a.pnl)
-      .slice(0, 3);
+      .sort((a, b) => b.pnl - a.pnl);
 
     const todayDate = new Date();
     const todayStr = `${todayDate.getFullYear()}-${(todayDate.getMonth() + 1).toString().padStart(2, '0')}-${todayDate.getDate().toString().padStart(2, '0')}`;
@@ -866,6 +888,7 @@ export default function Dashboard() {
       bestDaysOfWeek,
       analysisBestSetups,
       analysisBestPairs,
+      analysisBestSessions,
       analysisPredominantPsychology,
       analysisBestTimeframes,
       analysisBestDaysOfWeek,
@@ -1531,20 +1554,31 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     </div>
                     <div className="w-full xl:w-1/2 space-y-4">
-                      {data.analysisBestSetups.map((setup, idx) => (
+                      {data.analysisBestSetups.slice(0, 3).map((setup, idx) => (
                         <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
                           <div>
-                            <p className="font-bold text-on-surface flex items-center gap-2">
-                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: ['#c3f5ff', '#ffb4ab', '#b4f2c0', '#f2b4e5'][idx % 4] }}></span>
-                              {setup.name}
+                            <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
+                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#c3f5ff', '#ffb4ab', '#b4f2c0', '#f2b4e5'][idx % 4] }}></span>
+                              <span className="truncate">{setup.name}</span>
                             </p>
                             <p className="text-xs text-on-surface-variant">Win Rate: {setup.winRate.toFixed(1)}% ({setup.wins}/{setup.total})</p>
                           </div>
-                          <p className={`font-bold ${setup.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                          <p className={`font-bold shrink-0 ${setup.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
                             {setup.pnl >= 0 ? '+' : ''}{formatCurrency(setup.pnl)}
                           </p>
                         </div>
                       ))}
+                      {data.analysisBestSetups.length > 3 && (
+                        <button 
+                          onClick={() => openAnalysisModal('setups')} 
+                          className="w-full py-2 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            open_in_new
+                          </span>
+                          Ver Todos
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1584,24 +1618,99 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     </div>
                     <div className="w-full xl:w-1/2 space-y-4">
-                      {data.analysisBestPairs.map((pair, idx) => (
+                      {data.analysisBestPairs.slice(0, 3).map((pair, idx) => (
                         <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
                           <div>
                             <p className="font-bold text-on-surface flex items-center gap-2">
-                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: ['#b4f2c0', '#c3f5ff', '#ffb4ab', '#f2b4e5'][idx % 4] }}></span>
-                              {pair.name}
+                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#b4f2c0', '#c3f5ff', '#ffb4ab', '#f2b4e5'][idx % 4] }}></span>
+                              <span className="truncate">{pair.name}</span>
                             </p>
                             <p className="text-xs text-on-surface-variant">Win Rate: {pair.winRate.toFixed(1)}% ({pair.wins}/{pair.total})</p>
                           </div>
-                          <p className={`font-bold ${pair.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                          <p className={`font-bold shrink-0 ${pair.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
                             {pair.pnl >= 0 ? '+' : ''}{formatCurrency(pair.pnl)}
                           </p>
                         </div>
                       ))}
+                      {data.analysisBestPairs.length > 3 && (
+                        <button 
+                          onClick={() => openAnalysisModal('pairs')} 
+                          className="w-full py-2 flex items-center justify-center gap-2 text-secondary font-bold text-sm bg-secondary/10 rounded-xl hover:bg-secondary/20 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            open_in_new
+                          </span>
+                          Ver Todos
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
                   <p className="text-on-surface-variant text-sm">Nenhum par registrado no período.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Best Sessions */}
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
+              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#ffb4ab]">schedule</span>
+                Sessões
+              </h4>
+              <div className="space-y-4">
+                {data.analysisBestSessions.length > 0 ? (
+                  <div className="flex flex-col xl:flex-row items-center gap-6">
+                    <div className="w-full xl:w-1/2 h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={data.analysisBestSessions}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="wins"
+                            nameKey="name"
+                          >
+                            {data.analysisBestSessions.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5', '#fdd38b'][index % 5]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ backgroundColor: '#1e1e24', border: 'none', borderRadius: '8px', color: '#e2e2e9' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="w-full xl:w-1/2 space-y-4">
+                      {data.analysisBestSessions.slice(0, 3).map((session, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
+                          <div>
+                            <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
+                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5', '#fdd38b'][idx % 5] }}></span>
+                              <span className="truncate">{session.name}</span>
+                            </p>
+                            <p className="text-xs text-on-surface-variant">Win Rate: {session.winRate.toFixed(1)}% ({session.wins}/{session.total})</p>
+                          </div>
+                          <p className={`font-bold shrink-0 ${session.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                            {session.pnl >= 0 ? '+' : ''}{formatCurrency(session.pnl)}
+                          </p>
+                        </div>
+                      ))}
+                      {data.analysisBestSessions.length > 3 && (
+                        <button 
+                          onClick={() => openAnalysisModal('sessions')} 
+                          className="w-full py-2 flex items-center justify-center gap-2 text-[#ffb4ab] font-bold text-sm bg-[#ffb4ab]/10 rounded-xl hover:bg-[#ffb4ab]/20 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            open_in_new
+                          </span>
+                          Ver Todos
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-on-surface-variant text-sm">Nenhuma sessão registrada no período.</p>
                 )}
               </div>
             </div>
@@ -1637,21 +1746,32 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     </div>
                     <div className="w-full xl:w-1/2 space-y-4">
-                      {data.analysisPredominantPsychology.map(([state, count], idx) => (
+                      {data.analysisPredominantPsychology.slice(0, 3).map(([state, count], idx) => (
                         <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
                           <div className="flex items-center gap-3">
-                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: ['#f2b4e5', '#c3f5ff', '#b4f2c0', '#ffb4ab'][idx % 4] }}></span>
-                            <span className="text-2xl">
+                            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#f2b4e5', '#c3f5ff', '#b4f2c0', '#ffb4ab'][idx % 4] }}></span>
+                            <span className="text-2xl shrink-0">
                               {state === 'Calmo' && '🧘'}
                               {state === 'Entusiasmado' && '⚡'}
                               {state === 'Ansioso' && '😰'}
                               {state === 'Cansado' && '😴'}
                             </span>
-                            <p className="font-bold text-on-surface uppercase text-sm">{state}</p>
+                            <p className="font-bold text-on-surface uppercase text-sm truncate">{state}</p>
                           </div>
-                          <p className="font-bold text-on-surface-variant">{count} trades</p>
+                          <p className="font-bold text-on-surface-variant shrink-0">{count} trades</p>
                         </div>
                       ))}
+                      {data.analysisPredominantPsychology.length > 3 && (
+                        <button 
+                          onClick={() => openAnalysisModal('psychology')} 
+                          className="w-full py-2 flex items-center justify-center gap-2 text-tertiary font-bold text-sm bg-tertiary/10 rounded-xl hover:bg-tertiary/20 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            open_in_new
+                          </span>
+                          Ver Todos
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1691,37 +1811,36 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     </div>
                     <div className="w-full xl:w-1/2 space-y-4">
-                      {data.analysisBestDaysOfWeek.map((day, idx) => (
+                      {data.analysisBestDaysOfWeek.slice(0, 3).map((day, idx) => (
                         <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
                           <div>
                             <p className="font-bold text-on-surface flex items-center gap-2">
-                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: ['#c3f5ff', '#ffb4ab', '#b4f2c0', '#f2b4e5'][idx % 4] }}></span>
-                              {day.name}
+                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#c3f5ff', '#ffb4ab', '#b4f2c0', '#f2b4e5'][idx % 4] }}></span>
+                              <span className="truncate">{day.name}</span>
                             </p>
                             <p className="text-xs text-on-surface-variant">{day.wins} {day.wins === 1 ? 'ganho' : 'ganhos'} em {day.total} {day.total === 1 ? 'trade' : 'trades'}</p>
                           </div>
-                          <p className={`font-bold ${day.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                          <p className={`font-bold shrink-0 ${day.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
                             {day.pnl >= 0 ? '+' : ''}{formatCurrency(day.pnl)}
                           </p>
                         </div>
                       ))}
+                      {data.analysisBestDaysOfWeek.length > 3 && (
+                        <button 
+                          onClick={() => openAnalysisModal('days')} 
+                          className="w-full py-2 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            open_in_new
+                          </span>
+                          Ver Todos
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
                   <p className="text-on-surface-variant text-sm">Nenhum dia registrado no período.</p>
                 )}
-              </div>
-            </div>
-
-            {/* Trade Volumes */}
-            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">bar_chart</span>
-                Volumes de Trade
-              </h4>
-              <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
-                <p className="text-on-surface font-bold text-4xl mb-2">{data.analysisTotalTrades}</p>
-                <p className="text-on-surface-variant text-sm">Trades Realizados</p>
               </div>
             </div>
 
@@ -1781,20 +1900,31 @@ export default function Dashboard() {
                         </ResponsiveContainer>
                       </div>
                       <div className="w-full xl:w-1/2 space-y-4">
-                        {data.analysisBestTimeframes.map((tf, idx) => (
+                        {data.analysisBestTimeframes.slice(0, 3).map((tf, idx) => (
                           <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
                             <div>
                               <p className="font-bold text-on-surface flex items-center gap-2">
-                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: ['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5'][idx % 4] }}></span>
-                                {tf.name}
+                                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5'][idx % 4] }}></span>
+                                <span className="truncate">{tf.name}</span>
                               </p>
                               <p className="text-xs text-on-surface-variant">Win Rate: {tf.winRate.toFixed(1)}% ({tf.wins}/{tf.total})</p>
                             </div>
-                            <p className={`font-bold ${tf.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                            <p className={`font-bold shrink-0 ${tf.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
                               {tf.pnl >= 0 ? '+' : ''}{formatCurrency(tf.pnl)}
                             </p>
                           </div>
                         ))}
+                        {data.analysisBestTimeframes.length > 3 && (
+                          <button 
+                            onClick={() => openAnalysisModal('timeframes')} 
+                            className="w-full py-2 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              open_in_new
+                            </span>
+                            Ver Todos
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1810,7 +1940,7 @@ export default function Dashboard() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                   <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary">analytics</span>
-                    Volume Financeiro do Período
+                    Volume Financeiro do Período & Trades
                   </h4>
                   {/* Metric Switcher */}
                   <div className="flex bg-surface-container rounded-xl p-1 border border-outline-variant/10">
@@ -1835,8 +1965,15 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                <div className="flex justify-center mb-6">
+                  <div className="bg-surface-container border border-outline-variant/20 px-6 py-3 rounded-xl text-center shadow-sm">
+                    <p className="text-on-surface-variant text-xs font-bold uppercase tracking-widest mb-1">Total de Trades (Período)</p>
+                    <p className="text-on-surface font-black text-2xl">{data.analysisTotalTrades}</p>
+                  </div>
+                </div>
+
                 {/* Big Metric Display */}
-                <div className="flex flex-col items-center justify-center text-center py-6">
+                <div className="flex flex-col items-center justify-center text-center py-4">
                   {analysisMetric === 'losses' && (
                     <>
                       <div className="w-16 h-16 bg-error/10 text-error rounded-full flex items-center justify-center mb-3">
@@ -2170,6 +2307,190 @@ export default function Dashboard() {
         </div>
       )}
       </div>
+
+      {activeAnalysisModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className={`bg-surface-container border border-outline-variant/20 rounded-2xl flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200 transition-all ${isAnalysisModalExpanded ? 'w-[98vw] h-[98vh] max-w-none p-4 md:p-6' : 'max-w-2xl w-full max-h-[85vh] p-6 md:p-8'}`}>
+            <div className="flex justify-between items-center mb-6 shrink-0">
+              <h3 className="text-xl font-bold font-headline text-on-surface flex items-center justify-between w-full">
+                <span>
+                  {activeAnalysisModal === 'setups' && 'Todos os Setups'}
+                  {activeAnalysisModal === 'pairs' && 'Todos os Pares'}
+                  {activeAnalysisModal === 'sessions' && 'Todas as Sessões'}
+                  {activeAnalysisModal === 'psychology' && 'Todos os Psicológicos'}
+                  {activeAnalysisModal === 'days' && 'Todos os Dias da Semana'}
+                  {activeAnalysisModal === 'timeframes' && 'Todos os Timeframes'}
+                </span>
+              </h3>
+              <div className="flex items-center gap-2">
+                {isAnalysisModalExpanded && (
+                  <div className="flex bg-surface-container-high rounded-full p-1 mr-2 border border-outline-variant/10 shrink-0">
+                    <button onClick={() => setAnalysisModalChartType('pie')} className={`px-3 py-1.5 text-xs font-bold rounded-full transition-colors flex items-center gap-1 ${analysisModalChartType === 'pie' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}><span className="material-symbols-outlined text-[16px]">pie_chart</span><span className="hidden sm:inline">Pizza</span></button>
+                    <button onClick={() => setAnalysisModalChartType('bar')} className={`px-3 py-1.5 text-xs font-bold rounded-full transition-colors flex items-center gap-1 ${analysisModalChartType === 'bar' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}><span className="material-symbols-outlined text-[16px]">bar_chart</span><span className="hidden sm:inline">Barras</span></button>
+                  </div>
+                )}
+                <button onClick={toggleAnalysisModalExpanded} className="text-on-surface-variant hover:text-on-surface transition-colors p-2 bg-surface-container-high rounded-full shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">{isAnalysisModalExpanded ? 'close_fullscreen' : 'open_in_full'}</span>
+                </button>
+                <button onClick={closeAnalysisModal} className="text-on-surface-variant hover:text-on-surface transition-colors p-2 bg-surface-container-high rounded-full shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className={`flex-1 overflow-hidden flex gap-6 ${isAnalysisModalExpanded ? 'flex-col lg:flex-row' : 'flex-col'}`}>
+              {isAnalysisModalExpanded && (
+                <div className="flex-1 bg-surface-container-high rounded-xl p-4 min-h-[300px] flex items-center justify-center w-full lg:w-2/3 h-full">
+                   {(() => {
+                      let chartData: any[] = [];
+                      let colorMap = ['#c3f5ff', '#ffb4ab', '#b4f2c0', '#f2b4e5', '#fdd38b'];
+                      if (activeAnalysisModal === 'setups') chartData = data.analysisBestSetups;
+                      else if (activeAnalysisModal === 'pairs') chartData = data.analysisBestPairs;
+                      else if (activeAnalysisModal === 'sessions') chartData = data.analysisBestSessions;
+                      else if (activeAnalysisModal === 'psychology') {
+                         chartData = data.analysisPredominantPsychology.map(([name, value]) => ({ name, wins: value }));
+                         colorMap = ['#f2b4e5', '#c3f5ff', '#b4f2c0', '#ffb4ab'];
+                      }
+                      else if (activeAnalysisModal === 'days') chartData = data.analysisBestDaysOfWeek;
+                      else if (activeAnalysisModal === 'timeframes') chartData = data.analysisBestTimeframes;
+
+                      if (!chartData || chartData.length === 0) return <p className="text-on-surface-variant">Sem dados suficientes.</p>;
+
+                      if (analysisModalChartType === 'pie') {
+                        return (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={chartData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius="40%"
+                                outerRadius="70%"
+                                paddingAngle={5}
+                                dataKey="wins"
+                                nameKey="name"
+                              >
+                                {chartData.map((entry: any, index: number) => (
+                                  <Cell key={`cell-${index}`} fill={colorMap[index % colorMap.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip contentStyle={{ backgroundColor: '#1e1e24', border: 'none', borderRadius: '8px', color: '#e2e2e9' }} />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        );
+                      } else {
+                        return (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#2d2d35" vertical={false} />
+                              <XAxis dataKey="name" stroke="#71717a" tick={{ fill: '#71717a' }} />
+                              <YAxis stroke="#71717a" tick={{ fill: '#71717a' }} />
+                              <Tooltip contentStyle={{ backgroundColor: '#1e1e24', border: 'none', borderRadius: '8px', color: '#e2e2e9' }} cursor={{fill: '#2d2d35'}} />
+                              <Bar dataKey="wins" radius={[4, 4, 0, 0]}>
+                                {chartData.map((entry: any, index: number) => (
+                                  <Cell key={`cell-${index}`} fill={colorMap[index % colorMap.length]} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        );
+                      }
+                   })()}
+                </div>
+              )}
+
+              <div className={`overflow-y-auto custom-scrollbar pr-2 flex flex-col space-y-3 ${isAnalysisModalExpanded ? 'w-full lg:w-1/3' : 'w-full flex-1'}`}>
+                {activeAnalysisModal === 'setups' && data.analysisBestSetups.map((setup, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-4 bg-surface-container-high rounded-xl">
+                    <div>
+                      <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#c3f5ff', '#ffb4ab', '#b4f2c0', '#f2b4e5'][idx % 4] }}></span>
+                        <span className="truncate">{setup.name}</span>
+                      </p>
+                      <p className="text-xs text-on-surface-variant">Win Rate: {setup.winRate.toFixed(1)}% ({setup.wins}/{setup.total})</p>
+                    </div>
+                    <p className={`font-bold shrink-0 ${setup.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                      {setup.pnl >= 0 ? '+' : ''}{formatCurrency(setup.pnl)}
+                    </p>
+                  </div>
+                ))}
+                {activeAnalysisModal === 'pairs' && data.analysisBestPairs.map((pair, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-4 bg-surface-container-high rounded-xl">
+                    <div>
+                      <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#b4f2c0', '#c3f5ff', '#ffb4ab', '#f2b4e5'][idx % 4] }}></span>
+                        <span className="truncate">{pair.name}</span>
+                      </p>
+                      <p className="text-xs text-on-surface-variant">Win Rate: {pair.winRate.toFixed(1)}% ({pair.wins}/{pair.total})</p>
+                    </div>
+                    <p className={`font-bold shrink-0 ${pair.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                      {pair.pnl >= 0 ? '+' : ''}{formatCurrency(pair.pnl)}
+                    </p>
+                  </div>
+                ))}
+                {activeAnalysisModal === 'sessions' && data.analysisBestSessions.map((session, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-4 bg-surface-container-high rounded-xl">
+                    <div>
+                      <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5', '#fdd38b'][idx % 5] }}></span>
+                        <span className="truncate">{session.name}</span>
+                      </p>
+                      <p className="text-xs text-on-surface-variant">Win Rate: {session.winRate.toFixed(1)}% ({session.wins}/{session.total})</p>
+                    </div>
+                    <p className={`font-bold shrink-0 ${session.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                      {session.pnl >= 0 ? '+' : ''}{formatCurrency(session.pnl)}
+                    </p>
+                  </div>
+                ))}
+                {activeAnalysisModal === 'psychology' && data.analysisPredominantPsychology.map(([state, count], idx) => (
+                  <div key={idx} className="flex justify-between items-center p-4 bg-surface-container-high rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#f2b4e5', '#c3f5ff', '#b4f2c0', '#ffb4ab'][idx % 4] }}></span>
+                      <span className="text-2xl shrink-0">
+                        {state === 'Calmo' && '🧘'}
+                        {state === 'Entusiasmado' && '⚡'}
+                        {state === 'Ansioso' && '😰'}
+                        {state === 'Cansado' && '😴'}
+                      </span>
+                      <p className="font-bold text-on-surface uppercase text-sm truncate">{state}</p>
+                    </div>
+                    <p className="font-bold text-on-surface-variant shrink-0">{count} trades</p>
+                  </div>
+                ))}
+                {activeAnalysisModal === 'days' && data.analysisBestDaysOfWeek.map((day, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-4 bg-surface-container-high rounded-xl">
+                    <div>
+                      <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#c3f5ff', '#ffb4ab', '#b4f2c0', '#f2b4e5'][idx % 4] }}></span>
+                        <span className="truncate">{day.name}</span>
+                      </p>
+                      <p className="text-xs text-on-surface-variant">{day.wins} {day.wins === 1 ? 'ganho' : 'ganhos'} em {day.total} {day.total === 1 ? 'trade' : 'trades'}</p>
+                    </div>
+                    <p className={`font-bold shrink-0 ${day.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                      {day.pnl >= 0 ? '+' : ''}{formatCurrency(day.pnl)}
+                    </p>
+                  </div>
+                ))}
+                {activeAnalysisModal === 'timeframes' && data.analysisBestTimeframes.map((tf, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-4 bg-surface-container-high rounded-xl">
+                    <div>
+                      <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5'][idx % 4] }}></span>
+                        <span className="truncate">{tf.name}</span>
+                      </p>
+                      <p className="text-xs text-on-surface-variant">Win Rate: {tf.winRate.toFixed(1)}% ({tf.wins}/{tf.total})</p>
+                    </div>
+                    <p className={`font-bold shrink-0 ${tf.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                      {tf.pnl >= 0 ? '+' : ''}{formatCurrency(tf.pnl)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Account Modal */}
       {isAddAccountModalOpen && (
