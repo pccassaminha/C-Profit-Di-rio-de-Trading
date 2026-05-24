@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, storage } from '../firebase';
 import { updateProfile, verifyBeforeUpdateEmail, updatePassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { 
+  doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, deleteDoc 
+} from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Eye, EyeOff, MessageSquare, ThumbsUp, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
+import { 
+  Eye, EyeOff, MessageSquare, ThumbsUp, Trash2, Camera, MapPin, 
+  Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, 
+  Edit3, Mail, User, Home, Smartphone, KeyRound, Image as ImageIcon, Plus, ShieldCheck, HelpCircle, MoreVertical
+} from 'lucide-react';
 import Modal from './Modal';
 
 export default function Profile() {
@@ -19,6 +25,31 @@ export default function Profile() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const [editingPost, setEditingPost] = useState<any | null>(null);
+  const [editLegend, setEditLegend] = useState('');
+  const [postDropdownId, setPostDropdownId] = useState<string | null>(null);
+
+  // Profile metadata fields (Facebook style)
+  const [bio, setBio] = useState('');
+  const [coverURL, setCoverURL] = useState('');
+  const [work, setWork] = useState('');
+  const [liveIn, setLiveIn] = useState('');
+
+  // Individual visibility toggles
+  const [isWorkPrivate, setIsWorkPrivate] = useState(false);
+  const [isLiveInPrivate, setIsLiveInPrivate] = useState(false);
+  const [isPhoneNumberPrivate, setIsPhoneNumberPrivate] = useState(false);
+  const [isEmailPrivate, setIsEmailPrivate] = useState(false);
+
+  // Tab systems
+  const [activeTab, setActiveTab] = useState<'tudo' | 'sobre' | 'amigos' | 'fotos'>('tudo');
+  const [isEditing, setIsEditing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [allCommunityUsers, setAllCommunityUsers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -38,47 +69,151 @@ export default function Profile() {
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
-        // Tentar primeiro no novo caminho 'usuarios' (SaaS)
-        let userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-        
-        // Se não encontrar, tenta no antigo 'users'
-        if (!userDoc.exists()) {
-          userDoc = await getDoc(doc(db, 'users', user.uid));
-        }
+        try {
+          // Tentar primeiro no novo caminho 'usuarios' (SaaS)
+          let userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+          
+          // Se não encontrar, tenta no antigo 'users'
+          if (!userDoc.exists()) {
+            userDoc = await getDoc(doc(db, 'users', user.uid));
+          }
 
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          if (data.phoneNumber) setPhoneNumber(data.phoneNumber);
-          if (data.photoURL) setPhotoURL(data.photoURL);
-          if (data.isPrivate !== undefined) setIsPrivate(data.isPrivate);
+            if (userDoc.exists()) {
+              const data = userDoc.data();
+              if (data.phoneNumber) setPhoneNumber(data.phoneNumber);
+              if (data.photoURL) setPhotoURL(data.photoURL);
+              if (data.isPrivate !== undefined) setIsPrivate(data.isPrivate);
+              if (data.bio) setBio(data.bio);
+              if (data.coverURL) setCoverURL(data.coverURL);
+              if (data.work) setWork(data.work);
+              if (data.liveIn) setLiveIn(data.liveIn);
+
+              if (data.isWorkPrivate !== undefined) setIsWorkPrivate(data.isWorkPrivate);
+              if (data.isLiveInPrivate !== undefined) setIsLiveInPrivate(data.isLiveInPrivate);
+              if (data.isPhoneNumberPrivate !== undefined) setIsPhoneNumberPrivate(data.isPhoneNumberPrivate);
+              if (data.isEmailPrivate !== undefined) setIsEmailPrivate(data.isEmailPrivate);
+            }
+        } catch (err) {
+          console.warn("Operating in offline/cached mode for profile details:", err);
+        } finally {
+          setIsLoading(false);
         }
       }
     };
     fetchUserData();
 
     if (user) {
+      // Real-time followers/following counter from Firestore list snapshot
+      const unsubFollowers = onSnapshot(collection(db, 'usuarios', user.uid, 'followers'), (snap) => {
+        setFollowersCount(snap.size);
+      }, (err) => {
+        console.warn("Followers count error or offline mode active.", err);
+      });
+      const unsubFollowing = onSnapshot(collection(db, 'usuarios', user.uid, 'following'), (snap) => {
+        setFollowingCount(snap.size);
+      }, (err) => {
+        console.warn("Following count error or offline mode active.", err);
+      });
+
+      // Real-time feed list for user posts
       const q = query(
         collection(db, 'community_posts'),
         where('userId', '==', user.uid)
       );
-      const unsub = onSnapshot(q, (snapshot) => {
+      const unsubPosts = onSnapshot(q, (snapshot) => {
         const postsList = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
-        // Sort by createdAt descending safely in JS
+        // Sort by createdAt descending safely
         postsList.sort((a: any, b: any) => {
           const timeA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()) : 0;
           const timeB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()) : 0;
           return timeB - timeA;
         });
         setMyPosts(postsList);
+      }, (err) => {
+        console.warn("Users posts snapshot offline mode alert.", err);
       });
-      return () => unsub();
+
+      // Load other community users for friends list suggestion
+      const unsubAllUsers = onSnapshot(collection(db, 'usuarios'), (snap) => {
+        const list = snap.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        }));
+        setAllCommunityUsers(list);
+      }, (err) => {
+        console.warn("All community users offline snapshot alert.", err);
+      });
+
+      return () => {
+        unsubFollowers();
+        unsubFollowing();
+        unsubPosts();
+        unsubAllUsers();
+      };
     }
   }, [user]);
 
   const closeModal = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
+
+  const handleOpenUserProfile = (targetUser: any) => {
+    const userPayload = {
+      id: targetUser.id,
+      name: targetUser.nome || targetUser.displayName || 'Trader',
+      photo: targetUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(targetUser.nome || 'U')}&background=random`
+    };
+    // Save to localStorage so that if rendering fresh, it picks it up
+    localStorage.setItem('selected_community_profile_user', JSON.stringify(userPayload));
+    
+    // Dispatch instant live event in case Community is already mounted
+    window.dispatchEvent(new CustomEvent('openCommunityUserProfile', { detail: userPayload }));
+    
+    // Switch main app navigation tab to community
+    window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'community' }));
+  };
+
+  const getSuggestedTraders = () => {
+    if (!user) return [];
+    
+    // Calculate mutual scores for all community users
+    const candidates = allCommunityUsers
+      .filter(u => u.id !== user.uid)
+      .map(u => {
+        let score = 0;
+        
+        // Match current city (highest weight)
+        if (u.liveIn && liveIn && u.liveIn.trim().toLowerCase() === liveIn.trim().toLowerCase()) {
+          score += 6;
+        }
+        
+        // Match profession / work (medium weight)
+        if (u.work && work && u.work.trim().toLowerCase() === work.trim().toLowerCase()) {
+          score += 4;
+        } else if (u.work && work) {
+          score += 1.5; // partial match or both working
+        }
+
+        // Active Bio similarity or presence
+        if (u.bio && bio) {
+          score += 1;
+        }
+        
+        // Add a stable but pseudo-random factor using the user's ID to keep recommendations fresh and varied, but stable for a user
+        let idHash = 0;
+        for (let i = 0; i < u.id.length; i++) {
+          idHash = (idHash + u.id.charCodeAt(i)) % 100;
+        }
+        score += idHash / 25; // adds 0 to 4.0 points for stable variety
+        
+        return { user: u, score };
+      });
+      
+    // Sort highest score first
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates.map(c => c.user);
+  };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -100,7 +235,7 @@ export default function Profile() {
         await uploadBytes(fileRef, file);
         const url = await getDownloadURL(fileRef);
         
-        // Update both state, Auth profile, and Firestore
+        // Update states and databases
         setPhotoURL(url);
         await updateProfile(user, { photoURL: url });
         
@@ -117,7 +252,7 @@ export default function Profile() {
         setModalConfig({
           isOpen: true,
           title: "Erro de Upload",
-          message: `Falha ao enviar foto: ${error.message}. Entre em contato com o suporte ou tente novamente mais tarde.`,
+          message: `Falha ao enviar foto de perfil: ${error.message}`,
           isError: true,
         });
       } finally {
@@ -129,32 +264,65 @@ export default function Profile() {
     }
   };
 
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && user) {
+      if (file.size > 5 * 1024 * 1024) {
+        setModalConfig({
+          isOpen: true,
+          title: "Erro",
+          message: "A imagem de capa deve ter no máximo 5MB.",
+          isError: true,
+          onConfirm: closeModal
+        });
+        return;
+      }
+      setIsSaving(true);
+      try {
+        const fileRef = ref(storage, `covers/${user.uid}/${Date.now()}_${file.name}`);
+        await uploadBytes(fileRef, file);
+        const url = await getDownloadURL(fileRef);
+        
+        setCoverURL(url);
+        
+        const userDocRef = doc(db, 'usuarios', user.uid);
+        await setDoc(userDocRef, { coverURL: url }, { merge: true });
+
+        setModalConfig({
+          isOpen: true,
+          title: "Capa Atualizada",
+          message: "Sua foto de capa foi alterada com sucesso."
+        });
+      } catch (error: any) {
+        console.error("Error uploading cover:", error);
+        setModalConfig({
+          isOpen: true,
+          title: "Erro de Upload",
+          message: `Falha ao enviar capa: ${error.message}`,
+          isError: true,
+        });
+      } finally {
+        setIsSaving(false);
+        if (coverInputRef.current) {
+          coverInputRef.current.value = '';
+        }
+      }
+    }
+  };
+
   const handleSaveClick = () => {
     if (!user) return;
     
-    if (password) {
-      setModalConfig({
-        isOpen: true,
-        title: "Alterar Senha",
-        message: "Você inseriu uma nova senha. Tem certeza que deseja alterar sua senha?",
-        onConfirm: () => {
-          closeModal();
-          executeSave();
-        },
-        onCancel: closeModal
-      });
-    } else {
-      setModalConfig({
-        isOpen: true,
-        title: "Salvar Alterações",
-        message: "Tem certeza que deseja salvar as alterações no seu perfil?",
-        onConfirm: () => {
-          closeModal();
-          executeSave();
-        },
-        onCancel: closeModal
-      });
-    }
+    setModalConfig({
+      isOpen: true,
+      title: "Salvar Alterações",
+      message: "Confirmar gravação das suas informações de trader do C Profit?",
+      onConfirm: () => {
+        closeModal();
+        executeSave();
+      },
+      onCancel: closeModal
+    });
   };
 
   const executeSave = async () => {
@@ -164,8 +332,6 @@ export default function Profile() {
       const newDisplayName = `${firstName} ${lastName}`.trim();
       const authUpdate: any = { displayName: newDisplayName };
       
-      // photoURL might be a base64 string which is too long for Firebase Auth profile
-      // We only update Auth profile if it's a "normal" URL or small enough
       if (photoURL) {
         authUpdate.photoURL = photoURL;
       }
@@ -175,15 +341,23 @@ export default function Profile() {
       }
 
       const profileData = {
-        nome: newDisplayName, // "nome" used in Auth.tsx SaaS sync
+        nome: newDisplayName,
         phoneNumber,
         photoURL,
         userId: user.uid,
         isPrivate,
+        bio,
+        coverURL,
+        work,
+        liveIn,
+        isWorkPrivate,
+        isLiveInPrivate,
+        isPhoneNumberPrivate,
+        isEmailPrivate,
         updatedAt: new Date().toISOString()
       };
 
-      // Savar em ambos para compatibilidade, preferindo 'usuarios'
+      // Guardar nos dois para compatibilidade de esquema (usuarios e antiga users)
       await setDoc(doc(db, 'usuarios', user.uid), profileData, { merge: true });
       try {
         await setDoc(doc(db, 'users', user.uid), profileData, { merge: true });
@@ -194,7 +368,7 @@ export default function Profile() {
         setModalConfig({
           isOpen: true,
           title: "Verificação de E-mail",
-          message: "Um link de verificação foi enviado para o novo e-mail. Por favor, verifique para concluir a alteração.",
+          message: "Foi enviado um e-mail de confirmação para a nova morada. Por favor confirme-o para concluir a alteração.",
           onConfirm: closeModal
         });
       }
@@ -207,11 +381,11 @@ export default function Profile() {
       setModalConfig({
         isOpen: true,
         title: "Sucesso",
-        message: "Perfil atualizado com sucesso!",
+        message: "O seu perfil de trader foi gravado com sucesso!",
         confirmText: "OK",
         onConfirm: () => {
           closeModal();
-          window.location.reload();
+          setIsEditing(false);
         }
       });
     } catch (error: any) {
@@ -219,8 +393,8 @@ export default function Profile() {
       if (error.code === 'auth/requires-recent-login') {
         setModalConfig({
           isOpen: true,
-          title: "Atenção",
-          message: "Para alterar a senha ou e-mail, você precisa ter feito login recentemente. Por favor, saia e entre novamente.",
+          title: "Sessão Expirada",
+          message: "Para atualizar dados sensíveis (e-mail, palavra-passe), necessita de se autenticar novamente.",
           isError: true,
           onConfirm: closeModal
         });
@@ -228,7 +402,7 @@ export default function Profile() {
         setModalConfig({
           isOpen: true,
           title: "Erro",
-          message: `Erro ao atualizar perfil: ${error.message}`,
+          message: `Ocorreu um erro ao gravar perfil: ${error.message}`,
           isError: true,
           onConfirm: closeModal
         });
@@ -238,219 +412,678 @@ export default function Profile() {
     }
   };
 
+  const handleDeletePost = async (postId: string) => {
+    if (confirm('Deseja excluir esta publicação permanentemente?')) {
+      try {
+        await deleteDoc(doc(db, 'community_posts', postId));
+      } catch (err) {
+        console.error('Erro ao deletar:', err);
+      }
+    }
+  };
+
+  const handleStartEditPost = (post: any) => {
+    setEditingPost(post);
+    setEditLegend(post.legend || '');
+    setPostDropdownId(null);
+  };
+
+  const handleSaveEditPost = async () => {
+    if (!editingPost) return;
+    try {
+      await updateDoc(doc(db, 'community_posts', editingPost.id), {
+        legend: editLegend
+      });
+      setEditingPost(null);
+      setEditLegend('');
+      alert('Publicação editada com sucesso!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao guardar a publicação editada.');
+    }
+  };
+
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto w-full space-y-8">
-      <h2 className="text-2xl md:text-3xl font-bold text-on-surface font-headline">Meu Perfil</h2>
+    <div className="w-full max-w-5xl mx-auto px-0 md:px-4 py-4 md:py-8 space-y-6 select-text text-left">
       
-      <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 space-y-8">
+      {/* 1. UPPER COVER & AVATAR BLOCK (Facebook Style Layout) */}
+      <div className="bg-surface rounded-none md:rounded-[32px] overflow-hidden border border-outline-variant/10 shadow-lg relative flex flex-col items-center">
         
-        {/* Profile Picture Section */}
-        <div className="flex flex-col md:flex-row items-center gap-6 pb-8 border-b border-outline-variant/20">
-          <div className="relative group">
-            <div className="w-24 h-24 rounded-full bg-surface-container-highest border-2 border-primary/20 overflow-hidden flex items-center justify-center">
-              {photoURL ? (
-                <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <span className="material-symbols-outlined text-4xl text-on-surface-variant">person</span>
-              )}
-            </div>
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-0 right-0 w-8 h-8 bg-primary text-on-primary rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
-            >
-              <span className="material-symbols-outlined text-sm">edit</span>
-            </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handlePhotoUpload} 
-              accept="image/*" 
-              className="hidden" 
+        {/* Capa banner */}
+        <div className="w-full h-44 sm:h-64 relative bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950 overflow-hidden">
+          {coverURL ? (
+            <img 
+              src={coverURL} 
+              alt="Foto de capa" 
+              className="w-full h-full object-cover" 
+              referrerPolicy="no-referrer"
             />
-          </div>
-          <div className="text-center md:text-left">
-            <h3 className="text-lg font-bold text-on-surface">Foto de Perfil</h3>
-            <p className="text-sm text-on-surface-variant">Formatos suportados: JPG, PNG. Tamanho máximo: 1MB.</p>
-          </div>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center p-4 relative">
+              <div className="absolute inset-0 bg-neutral-900/50 mix-blend-multiply"></div>
+              <span className="text-[110px] text-primary/10 select-none font-bold uppercase tracking-tight font-headline -translate-y-5">C PROFIT</span>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Primeiro Nome</label>
-            <input 
-              type="text" 
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
+        {/* User Profile Avatar Overlay Header */}
+        <div className="w-full max-w-4xl px-6 relative flex flex-col sm:flex-row items-center sm:items-end gap-5 -mt-16 sm:-mt-20 pb-5">
+          <div className="relative group shrink-0 w-32 h-32 sm:w-40 sm:h-40">
+            <img 
+              src={photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'U')}&background=random`} 
+              alt={user?.displayName || 'Trader'}
+              className="w-full h-full rounded-full object-cover border-4 border-surface shadow-2xl bg-surface-container"
+              referrerPolicy="no-referrer"
             />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Último Nome</label>
-            <input 
-              type="text" 
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">E-mail</label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Número de Telefone</label>
-            <input 
-              type="tel" 
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="+244 900 000 000"
-              className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
-            />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Nova Senha</label>
-            <div className="relative">
+            {/* Avatar upload overlay hover */}
+            <label className="absolute inset-0 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white">
+              <Camera size={26} />
               <input 
-                type={showPassword ? "text" : "password"} 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Deixe em branco para não alterar"
-                className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 pr-12 text-on-surface outline-none focus:border-primary transition-colors" 
+                type="file" 
+                ref={fileInputRef}
+                accept="image/*" 
+                className="hidden" 
+                onChange={handlePhotoUpload} 
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors focus:outline-none"
-              >
-                <span className="material-symbols-outlined">
-                  {showPassword ? 'visibility_off' : 'visibility'}
-                </span>
-              </button>
-            </div>
+            </label>
           </div>
 
-          {/* Privacy Profile Lock Option */}
-          <div className="space-y-4 md:col-span-2 pt-6 border-t border-outline-variant/10">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="text-primary" size={20} />
-              <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Configuração de Privacidade do Perfil</h4>
+          {/* Profile Name and quick Bio summary */}
+          <div className="flex-1 text-center sm:text-left space-y-2 pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
+              <h1 className="text-2xl sm:text-3xl font-black text-on-surface uppercase tracking-tight flex items-center justify-center sm:justify-start gap-1.5">
+                {user?.displayName || 'Membro do C Profit'}
+                <Award size={22} className="text-primary fill-primary animate-pulse" />
+              </h1>
             </div>
             
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-surface-container/30 p-5 rounded-[24px] border border-outline-variant/10 gap-4">
-              <div className="space-y-1">
-                <p className="text-sm font-extrabold text-on-surface flex items-center gap-2">
-                  {isPrivate ? <EyeOff className="text-error" size={16} /> : <Eye className="text-secondary" size={16} />}
-                  Bloquear Perfil Público (Tornar Perfil Privado)
-                </p>
-                <p className="text-xs text-on-surface-variant leading-relaxed max-w-xl">
-                  Se ativado, outros usuários não poderão abrir seu perfil ao clicar no seu nome, restringindo acesso às suas estatísticas, contagem de publicações e histórico pessoal na comunidade.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPrivate(!isPrivate)}
-                className={`w-14 h-8 rounded-full transition-colors relative flex items-center p-1 shrink-0 cursor-pointer outline-none ${isPrivate ? 'bg-primary' : 'bg-[#e5e7eb]/10 border border-outline-variant/20'}`}
-              >
-                <span className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isPrivate ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
+            <p className="text-xs sm:text-sm text-on-surface-variant max-w-md italic opacity-90">
+              {bio || "Partilhe a sua bio para inspirar outros investidores..."}
+            </p>
+
+            {/* Quick Metrics of Follow system */}
+            <div className="flex items-center justify-center sm:justify-start gap-3.5 text-xs text-on-surface-variant font-medium">
+              <span className="bg-surface-container-high px-2.5 py-1 rounded-lg">
+                <strong className="text-primary font-bold">{followersCount}</strong> seguidores
+              </span>
+              <span className="opacity-30">•</span>
+              <span className="bg-surface-container-high px-2.5 py-1 rounded-lg">
+                <strong className="text-primary font-bold">{followingCount}</strong> a seguir
+              </span>
             </div>
+          </div>
+
+          {/* Top Actions alignment */}
+          <div className="flex gap-2 shrink-0 pb-1 w-full sm:w-auto justify-center">
+            <button
+              onClick={() => {
+                setIsEditing(!isEditing);
+                setActiveTab('sobre');
+              }}
+              className="py-2.5 px-5 rounded-xl bg-primary text-on-primary hover:opacity-90 text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
+            >
+              <Edit3 size={14} />
+              {isEditing ? 'Ver Perfil' : 'Editar Perfil'}
+            </button>
+            <button
+              onClick={() => setActiveTab('tudo')}
+              className="py-2.5 px-5 rounded-xl bg-surface-container border border-outline-variant/10 hover:bg-surface-container-high text-on-surface text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+            >
+              <MessageSquare size={14} />
+              Timeline ({myPosts.length})
+            </button>
           </div>
         </div>
 
-        <div className="pt-6 border-t border-outline-variant/20 flex justify-between items-center">
-          <button className="text-primary font-bold hover:underline">Atualizar Plano</button>
-          <button 
-            onClick={handleSaveClick}
-            disabled={isSaving}
-            className="bg-primary text-on-primary px-8 py-3 rounded-xl font-bold hover:brightness-110 transition-all disabled:opacity-50"
-          >
-            {isSaving ? 'Salvando...' : 'Salvar Alterações'}
-          </button>
+        {/* Facebook Style Tabs bar */}
+        <div className="w-full max-w-4xl px-6 flex items-center gap-1 border-t border-outline-variant/10 text-xs font-bold text-on-surface-variant overflow-x-auto">
+          {(['tudo', 'sobre', 'amigos', 'fotos'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => {
+                setActiveTab(tab);
+                if (tab !== 'sobre') setIsEditing(false);
+              }}
+              className={`py-4 px-5 border-b-2 capitalize tracking-wide transition-all shrink-0 ${activeTab === tab ? 'border-primary text-primary font-extrabold' : 'border-transparent hover:text-on-surface'}`}
+            >
+              {tab === 'tudo' ? 'Timeline' : tab === 'sobre' ? 'Sobre / Edições' : tab}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Own Community Activity Section */}
-      <div className="bg-surface-container-low border border-outline-variant/20 rounded-[32px] p-6 md:p-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-outline-variant/10">
-          <div>
-            <h3 className="text-lg font-black font-headline uppercase tracking-widest text-[#00f5a0] flex items-center gap-2">
-              <MessageSquare size={20} />
-              Sua Atividade na Comunidade C Profit
-            </h3>
-            <p className="text-xs text-on-surface-variant mt-1">Estatísticas e histórico de publicações do seu perfil de trader</p>
-          </div>
-          <div className="bg-primary/10 border border-primary/20 px-4 py-2 rounded-2xl text-center shrink-0">
-            <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Contribuições</p>
-            <p className="text-2xl font-black text-on-surface leading-none mt-1">{myPosts.length}</p>
-          </div>
+      {/* 2. SPLIT LAYOUT BY TABS SELECT */}
+      {isLoading ? (
+        <div className="py-20 flex justify-center items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-
-        {myPosts.length === 0 ? (
-          <div className="py-12 text-center text-on-surface-variant text-sm bg-surface-container/20 border border-dashed border-outline-variant/15 rounded-3xl">
-            Você ainda não realizou nenhuma publicação na comunidade.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {myPosts.map(post => (
-              <div key={post.id} className="bg-surface-container/40 border border-outline-variant/10 rounded-3xl p-5 flex flex-col justify-between hover:border-primary/20 transition-colors group relative overflow-hidden">
-                <div>
-                  <div className="flex justify-between items-start gap-3">
-                    <span className={`text-[10.5px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg ${post.type === 'forex' ? 'bg-primary/15 text-primary border border-primary/25' : 'bg-secondary/15 text-secondary border border-secondary/25'}`}>
-                      {post.type === 'forex' ? 'Forex Market' : 'Opções Binárias'}
-                    </span>
-                    <button 
-                      onClick={async () => {
-                        if (confirm('Deseja excluir esta publicação permanentemente?')) {
-                          try {
-                            await deleteDoc(doc(db, 'community_posts', post.id));
-                          } catch (err) {
-                            console.error('Erro ao deletar:', err);
-                          }
-                        }
-                      }}
-                      className="text-on-surface-variant opacity-60 hover:opacity-100 hover:text-error transition-all p-1.5 hover:bg-error/10 rounded-xl"
-                      title="Excluir Publicação"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+      ) : (
+        <div className="w-full">
+          
+          {/* TAB 1: ALL (TIMELINE / TUDO) */}
+          {activeTab === 'tudo' && (
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              
+              {/* Sidebar Info columns (2 Grid Cols) */}
+              <div className="lg:col-span-2 space-y-6">
+                
+                {/* Apresentação / About summary */}
+                <div className="bg-surface border border-outline-variant/10 rounded-2xl p-5 space-y-4 shadow-sm">
+                  <h3 className="font-extrabold text-sm text-on-surface uppercase tracking-wider border-b border-outline-variant/15 pb-2">Apresentação</h3>
                   
-                  <p className="text-sm font-semibold text-on-surface leading-relaxed mt-4 line-clamp-3">
-                    {post.legend}
-                  </p>
+                  <div className="space-y-3.5 text-xs text-on-surface-variant font-medium">
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-3">
+                        <Briefcase size={16} className="text-primary opacity-75" />
+                        <span>Profissão: <strong className="text-on-surface">{work || "Nenhum cargo definido"}</strong></span>
+                      </div>
+                      {isWorkPrivate && <span className="text-[10px] text-error flex items-center gap-0.5 shrink-0"><EyeOff size={11} /> Privado</span>}
+                    </div>
 
-                  {post.imageUrl && (
-                    <div className="mt-4 rounded-2xl overflow-hidden max-h-[160px] border border-outline-variant/10">
-                      <img src={post.imageUrl} alt="Post visualization" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-3">
+                        <MapPin size={16} className="text-primary opacity-75" />
+                        <span>Vive em: <strong className="text-on-surface">{liveIn || "Localização não disponível"}</strong></span>
+                      </div>
+                      {isLiveInPrivate && <span className="text-[10px] text-error flex items-center gap-0.5 shrink-0"><EyeOff size={11} /> Privado</span>}
+                    </div>
+
+                    {phoneNumber && (
+                      <div className="flex items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-3">
+                          <Smartphone size={16} className="text-primary opacity-75" />
+                          <span>Contacto: <strong className="text-on-surface">{phoneNumber}</strong></span>
+                        </div>
+                        {isPhoneNumberPrivate && <span className="text-[10px] text-error flex items-center gap-0.5 shrink-0"><EyeOff size={11} /> Privado</span>}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Mail size={16} className="text-primary opacity-75 shrink-0" />
+                        <span className="truncate">E-mail: <strong className="text-on-surface">{email}</strong></span>
+                      </div>
+                      {isEmailPrivate && <span className="text-[10px] text-error flex items-center gap-0.5 shrink-0"><EyeOff size={11} /> Privado</span>}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setIsEditing(true);
+                      setActiveTab('sobre');
+                    }}
+                    className="w-full text-center py-2 bg-surface-container active:scale-95 transition-all rounded-xl border border-outline-variant/10 hover:bg-surface-container-high text-xs font-bold text-on-surface-variant uppercase tracking-wider"
+                  >
+                    Editar Detalhes Públicos
+                  </button>
+                </div>
+
+                {/* Collage gallery for own Photos */}
+                <div className="bg-surface border border-outline-variant/10 rounded-2xl p-5 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-outline-variant/15 pb-2">
+                    <h3 className="font-extrabold text-sm text-on-surface uppercase tracking-wider">A sua galeria</h3>
+                    <button onClick={() => setActiveTab('fotos')} className="text-xs text-primary font-bold hover:underline">Ver todas</button>
+                  </div>
+
+                  {myPosts.filter(p => !!p.imageUrl).length === 0 ? (
+                    <div className="py-6 text-center text-[11px] text-on-surface-variant opacity-60 border border-dashed border-outline-variant/10 rounded-xl">
+                      Nenhuma imagem publicada nas análises.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-1.5 rounded-xl overflow-hidden">
+                      {myPosts.filter(p => !!p.imageUrl).slice(0, 9).map((post, index) => (
+                        <div key={index} className="aspect-square bg-surface-container-high overflow-hidden group relative">
+                          <img src={post.imageUrl} alt="Highlight publication" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" referrerPolicy="no-referrer" />
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
 
-                <div className="mt-5 pt-4 border-t border-outline-variant/10 flex justify-between items-center text-xs text-on-surface-variant font-medium">
-                  <span className="opacity-65">
-                    {post.createdAt ? new Date(post.createdAt.toDate ? post.createdAt.toDate() : post.createdAt).toLocaleDateString() : 'Recente'}
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <ThumbsUp size={13} className="text-[#00f5a0]" />
-                      <strong>{post.likesCount || 0}</strong>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MessageSquare size={13} className="text-secondary" />
-                      <strong>{post.commentsCount || 0}</strong>
-                    </span>
+                {/* Suggestions of traders sidebar */}
+                <div className="bg-surface border border-outline-variant/10 rounded-2xl p-5 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-outline-variant/15 pb-2">
+                    <h3 className="font-extrabold text-xs text-on-surface uppercase tracking-wider">Traders que talvez conheces</h3>
+                    <button onClick={() => setActiveTab('amigos')} className="text-xs text-primary font-bold hover:underline">Ver todos</button>
                   </div>
+
+                  {getSuggestedTraders().length === 0 ? (
+                    <div className="py-6 text-center text-[11px] text-on-surface-variant opacity-60 border border-dashed border-outline-variant/10 rounded-xl">
+                      Nenhum outro membro sugerido.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-x-2 gap-y-3 text-center">
+                      {getSuggestedTraders().slice(0, 6).map((item, index) => (
+                        <div 
+                          key={index} 
+                          onClick={() => handleOpenUserProfile(item)}
+                          className="flex flex-col items-center gap-1 cursor-pointer group hover:scale-105 transition-all duration-200"
+                        >
+                          <img 
+                            src={item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome || 'U')}&background=random`} 
+                            alt={item.nome}
+                            className="w-12 h-12 rounded-xl object-cover bg-black/10 group-hover:opacity-80 transition-opacity"
+                            referrerPolicy="no-referrer"
+                          />
+                          <span className="text-[10px] text-on-surface font-semibold max-w-full truncate">
+                            {item.nome}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
+
+              {/* Central post feeds columns (3 Grid Cols) */}
+              <div className="lg:col-span-3 space-y-5">
+                
+                {/* Real count indicators */}
+                <div className="bg-surface border border-outline-variant/10 rounded-2xl p-4 flex justify-between items-center text-xs text-on-surface-variant">
+                  <span>Sua atividade de Trader</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-primary">{myPosts.length}</span> Publicações
+                  </div>
+                </div>
+
+                {/* Feed output list */}
+                <div className="space-y-4">
+                  {myPosts.length === 0 ? (
+                    <div className="py-16 text-center text-on-surface-variant text-xs bg-surface border border-dashed border-outline-variant/10 rounded-2xl flex flex-col items-center justify-center space-y-2">
+                      <ImageIcon className="text-on-surface-variant opacity-40" size={28} />
+                      <p>Ainda não realizou nenhuma publicação no quadro de análise.</p>
+                    </div>
+                  ) : (
+                    myPosts.map(post => (
+                      <div key={post.id} className="bg-surface border border-outline-variant/10 rounded-2xl p-4 flex flex-col space-y-3.5 shadow-sm text-left">
+                        {/* Feed card header */}
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-3">
+                            <img 
+                              src={photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'U')}&background=random`} 
+                              alt="avatar" 
+                              className="w-9 h-9 rounded-xl object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-extrabold text-on-surface uppercase tracking-tight">{user?.displayName}</span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-lg border uppercase ${post.type === 'forex' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-secondary/10 text-secondary border-secondary/20'}`}>
+                                  {post.type === 'forex' ? 'Forex' : 'Opções Binárias'}
+                                </span>
+                              </div>
+                              <span className="text-[9.5px] text-on-surface-variant opacity-60">
+                                {post.createdAt ? new Date(post.createdAt.toDate ? post.createdAt.toDate() : post.createdAt).toLocaleDateString() : 'Recentemente'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="relative">
+                            <button 
+                              onClick={() => setPostDropdownId(postDropdownId === post.id ? null : post.id)}
+                              className="p-1.5 rounded-xl hover:bg-surface-container text-on-surface-variant transition-colors"
+                              title="Opções"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+                            {postDropdownId === post.id && (
+                              <div className="absolute right-0 top-8 w-32 bg-surface border border-outline-variant/15 rounded-xl shadow-lg py-1 z-30 overflow-hidden divide-y divide-outline-variant/10">
+                                <button 
+                                  onClick={() => handleStartEditPost(post)}
+                                  className="w-full text-left px-3 py-2 text-xs text-on-surface font-semibold hover:bg-primary/10 hover:text-primary transition-colors flex items-center gap-2"
+                                >
+                                  <Edit3 size={13} />
+                                  <span>Editar</span>
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    setPostDropdownId(null);
+                                    handleDeletePost(post.id);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs text-error font-semibold hover:bg-error/10 transition-colors flex items-center gap-2"
+                                >
+                                  <Trash2 size={13} />
+                                  <span>Excluir</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Feed Card text */}
+                        <p className="text-xs sm:text-sm text-on-surface leading-normal whitespace-pre-wrap">{post.legend}</p>
+
+                        {/* Image asset attachments */}
+                        {post.imageUrl && (
+                          <div className="rounded-xl overflow-hidden border border-outline-variant/10 max-h-80">
+                            <img src={post.imageUrl} alt="Asset attachment" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          </div>
+                        )}
+
+                        {/* Engagement counters feedback */}
+                        <div className="border-t border-outline-variant/10 pt-3 flex justify-between items-center text-xs text-on-surface-variant">
+                          <span className="flex items-center gap-1.5">
+                            <ThumbsUp size={13} className="text-[#00f5a0]" />
+                            <strong>{post.likesCount || 0}</strong> Gosto(s)
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <MessageSquare size={13} className="text-secondary" />
+                            <strong>{post.commentsCount || 0}</strong> comentário(s)
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: OVER / SOBRE (Configurações do perfil) */}
+          {activeTab === 'sobre' && (
+            <div className="bg-surface border border-outline-variant/10 rounded-2xl p-5 md:p-8 text-left space-y-8 shadow-sm">
+              <div className="flex items-center justify-between border-b border-outline-variant/15 pb-3">
+                <h3 className="font-extrabold text-md text-on-surface tracking-wide uppercase flex items-center gap-2">
+                  <User size={18} className="text-primary" />
+                  Informações Pessoais do Trader
+                </h3>
+                <span className="text-xs text-on-surface-variant opacity-60">C Profit Conta Oficial</span>
+              </div>
+
+              {/* Bio block editable */}
+              <div className="space-y-2">
+                <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider block">Biografia de Introdução</label>
+                <textarea 
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Ex: Trader Profissional especializado no mercado de Forex e Opções Binárias desde 2018..."
+                  rows={2}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface placeholder:opacity-50"
+                />
+              </div>
+
+              {/* Standard grids profile inputs fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider block">Primeiro Nome</label>
+                  <input 
+                    type="text" 
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider block">Último Nome</label>
+                  <input 
+                    type="text" 
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center pb-0.5">
+                    <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">E-mail Comercial / Conta</label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-semibold text-error">
+                      <input 
+                        type="checkbox" 
+                        checked={isEmailPrivate} 
+                        onChange={(e) => setIsEmailPrivate(e.target.checked)}
+                        className="rounded border-outline-variant text-[#00f5a0] focus:ring-[#00f5a0] bg-[#1a2035] w-3.5 h-3.5"
+                      />
+                      <span>Tornar Privado</span>
+                    </label>
+                  </div>
+                  <input 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center pb-0.5">
+                    <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">Nº Telemóvel</label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-semibold text-error">
+                      <input 
+                        type="checkbox" 
+                        checked={isPhoneNumberPrivate} 
+                        onChange={(e) => setIsPhoneNumberPrivate(e.target.checked)}
+                        className="rounded border-outline-variant text-[#00f5a0] focus:ring-[#00f5a0] bg-[#1a2035] w-3.5 h-3.5"
+                      />
+                      <span>Tornar Privado</span>
+                    </label>
+                  </div>
+                  <input 
+                    type="tel" 
+                    value={phoneNumber}
+                    placeholder="Ex: +244 921 319 200"
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center pb-0.5">
+                    <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">Profissão / Trabalho</label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-semibold text-error">
+                      <input 
+                        type="checkbox" 
+                        checked={isWorkPrivate} 
+                        onChange={(e) => setIsWorkPrivate(e.target.checked)}
+                        className="rounded border-outline-variant text-[#00f5a0] focus:ring-[#00f5a0] bg-[#1a2035] w-3.5 h-3.5"
+                      />
+                      <span>Tornar Privado</span>
+                    </label>
+                  </div>
+                  <input 
+                    type="text" 
+                    value={work}
+                    placeholder="Ex: Engenheiro de Software ou Trader Independente"
+                    onChange={(e) => setWork(e.target.value)}
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center pb-0.5">
+                    <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">Cidade Atual</label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-semibold text-error">
+                      <input 
+                        type="checkbox" 
+                        checked={isLiveInPrivate} 
+                        onChange={(e) => setIsLiveInPrivate(e.target.checked)}
+                        className="rounded border-outline-variant text-[#00f5a0] focus:ring-[#00f5a0] bg-[#1a2035] w-3.5 h-3.5"
+                      />
+                      <span>Tornar Privado</span>
+                    </label>
+                  </div>
+                  <input 
+                    type="text" 
+                    value={liveIn}
+                    placeholder="Ex: Luanda"
+                    onChange={(e) => setLiveIn(e.target.value)}
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
+                  />
+                </div>
+              </div>
+
+              {/* Sensitive operations (Password Updates) */}
+              <div className="space-y-3.5 pt-6 border-t border-outline-variant/15">
+                <div className="flex items-center gap-2">
+                  <KeyRound size={16} className="text-primary" />
+                  <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider block">Alterar Palavra-passe</label>
+                </div>
+
+                <div className="relative max-w-lg">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Deixe em branco para manter a palavra-passe atual"
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 pr-12 text-xs focus:outline-none focus:border-primary text-on-surfaceplaceholder:opacity-50" 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors focus:outline-none"
+                  >
+                    <span className="material-symbols-outlined !text-[16px]">
+                      {showPassword ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Security locks & privacy block */}
+              <div className="space-y-4 pt-6 border-t border-outline-variant/15">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="text-[#00f5a0]" size={18} />
+                  <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider block">Definição de Privacidade do Canal</h4>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-surface-container/30 p-5 rounded-2xl border border-outline-variant/10 gap-4">
+                  <div className="space-y-1 text-left">
+                    <p className="text-xs sm:text-sm font-extrabold text-on-surface flex items-center gap-1.5">
+                      {isPrivate ? <EyeOff className="text-error" size={16} /> : <Eye className="text-secondary" size={16} />}
+                      Bloquear Perfil Trader Público (Tornar Perfil Privado)
+                    </p>
+                    <p className="text-xs text-on-surface-variant leading-relaxed max-w-xl opacity-75">
+                      Se ativado, outros utilizadores da Comunidade C Profit ficarão impossibilitados de inspecionar o seu feed de publicações pessoal, informações profissionais ou número de seguidores.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPrivate(!isPrivate)}
+                    className={`w-14 h-8 rounded-full transition-colors relative flex items-center p-1 shrink-0 cursor-pointer outline-none ${isPrivate ? 'bg-primary' : 'bg-white/10 border border-outline-variant/15'}`}
+                  >
+                    <span className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform duration-300 ${isPrivate ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-6 border-t border-outline-variant/15 flex justify-end gap-3 items-center">
+                <button 
+                  onClick={handleSaveClick}
+                  disabled={isSaving}
+                  className="bg-primary text-on-primary px-8 py-3 rounded-xl text-xs font-black uppercase tracking-wider shadow-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {isSaving ? 'Salvando...' : 'Gravar Alterações'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: TRADERS / AMIGOS (Outros utilizadores) */}
+          {activeTab === 'amigos' && (
+            <div className="bg-surface border border-outline-variant/10 rounded-2xl p-6 text-left space-y-6 shadow-sm">
+              <div className="flex items-center justify-between border-b border-outline-variant/15 pb-2">
+                <h3 className="font-extrabold text-sm text-on-surface uppercase tracking-wider">Investidores da Comunidade C Profit</h3>
+                <span className="text-xs text-on-surface-variant font-bold">{allCommunityUsers.length} membros no total</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {allCommunityUsers.map((item, index) => (
+                  <div 
+                    key={index} 
+                    onClick={() => handleOpenUserProfile(item)}
+                    className="bg-surface-container/30 border border-outline-variant/10 rounded-2xl p-3.5 flex items-center gap-3.5 hover:border-primary/40 cursor-pointer active:scale-95 transition-all duration-200"
+                  >
+                    <img 
+                      src={item.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nome || 'U')}&background=random`} 
+                      alt={item.nome}
+                      className="w-12 h-12 rounded-xl object-cover hover:opacity-80 transition-opacity"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="flex-1 space-y-0.5 min-w-0">
+                      <p className="font-bold text-xs text-on-surface hover:text-primary transition-colors truncate uppercase tracking-wide">{item.nome || "Membro do C Profit"}</p>
+                      <p className="text-[10px] text-on-surface-variant opacity-65 truncate italic">{item.bio || "O Silêncio é de Ouro."}</p>
+                      <p className="text-[9.5px] text-primary font-semibold">Trader Oficial</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: IMAGES / FOTOS (Galeria de imagens publicadas) */}
+          {activeTab === 'fotos' && (
+            <div className="bg-surface border border-outline-variant/10 rounded-2xl p-6 text-left space-y-6 shadow-sm">
+              <div className="flex items-center justify-between border-b border-outline-variant/15 pb-2">
+                <h3 className="font-extrabold text-sm text-on-surface uppercase tracking-wider">Minhas Fotografias de Análises</h3>
+                <span className="text-text font-bold text-xs">{myPosts.filter(p => !!p.imageUrl).length} Fotos</span>
+              </div>
+
+              {myPosts.filter(p => !!p.imageUrl).length === 0 ? (
+                <div className="py-16 text-center text-on-surface-variant text-xs border border-dashed border-outline-variant/10 rounded-2xl flex flex-col items-center justify-center space-y-2">
+                  <ImageIcon className="text-on-surface-variant opacity-40" size={26} />
+                  <p>Não possui nenhuma fotografia de análise publicada na comunidade.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {myPosts.filter(p => !!p.imageUrl).map((post, index) => (
+                    <div key={index} className="aspect-square bg-surface-container-high relative overflow-hidden group rounded-xl border border-outline-variant/10">
+                      <img src={post.imageUrl} alt="Analysis visualization" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" referrerPolicy="no-referrer" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* Edit Post Modal overlay */}
+      {editingPost && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-surface border border-outline-variant/10 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center border-b border-outline-variant/10 pb-3">
+              <h3 className="text-sm font-black text-on-surface uppercase tracking-wider flex items-center gap-2">
+                <Edit3 size={16} className="text-primary" />
+                Editar Minha Publicação
+              </h3>
+              <button 
+                onClick={() => setEditingPost(null)}
+                className="p-1 px-2.5 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-colors text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Legenda da Análise / Mensagem</label>
+              <textarea
+                value={editLegend}
+                onChange={(e) => setEditLegend(e.target.value)}
+                placeholder="Qual o seu pensamento sobre esta análise?"
+                className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl p-4 text-xs text-on-surface focus:outline-none focus:border-primary min-h-[120px] resize-y custom-scrollbar"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setEditingPost(null)}
+                className="px-4 py-2 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 transition-colors text-xs font-bold uppercase tracking-wider rounded-xl"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveEditPost}
+                disabled={!editLegend.trim()}
+                className="px-5 py-2 bg-primary text-on-primary hover:bg-primary/95 transition-all text-xs font-black uppercase tracking-wider rounded-xl disabled:opacity-45"
+              >
+                Salvar Alterações
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <Modal {...modalConfig} />
     </div>

@@ -3,7 +3,7 @@ import { db, auth, storage } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, increment, deleteDoc, getDoc, setDoc, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
-import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home } from 'lucide-react';
+import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft } from 'lucide-react';
 
 interface Post {
   id: string;
@@ -97,6 +97,32 @@ export default function Community() {
       setAllCommunityUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return unsubAll;
+  }, []);
+
+  useEffect(() => {
+    const checkSelectedUser = () => {
+      const stored = localStorage.getItem('selected_community_profile_user');
+      if (stored) {
+        try {
+          const u = JSON.parse(stored);
+          setSelectedProfileUser(u);
+          localStorage.removeItem('selected_community_profile_user');
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    };
+    
+    checkSelectedUser();
+    
+    const handleProfileSelect = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setSelectedProfileUser(customEvent.detail);
+      }
+    };
+    window.addEventListener('openCommunityUserProfile', handleProfileSelect);
+    return () => window.removeEventListener('openCommunityUserProfile', handleProfileSelect);
   }, []);
 
   useEffect(() => {
@@ -1377,6 +1403,16 @@ export default function Community() {
               <X size={20} />
             </button>
 
+            {/* Modal Back Button on the top-left of the modal */}
+            <button 
+              onClick={() => setSelectedProfileUser(null)}
+              className="absolute top-4 left-4 z-[120] px-3.5 py-2 rounded-full bg-neutral-900/80 hover:bg-neutral-900 text-white border border-white/10 hover:scale-105 transition-all cursor-pointer backdrop-blur-md flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider"
+              title="Voltar à Comunidade"
+            >
+              <ArrowLeft size={14} className="text-primary" />
+              <span>Voltar à Comunidade</span>
+            </button>
+
             {/* Main Column container */}
             <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-surface-container-lowest animate-in slide-in-from-bottom duration-300">
               
@@ -1396,23 +1432,8 @@ export default function Community() {
                     // Default elegant abstract stock block
                     <div className="w-full h-full flex flex-col items-center justify-center p-4 relative">
                       <div className="absolute inset-0 bg-neutral-905/40 mix-blend-multiply"></div>
-                      <span className="text-[100px] text-primary/10 select-none font-bold uppercase tracking-tighter">C PROFIT</span>
-                      <span className="text-[11px] font-mono opacity-30 text-primary absolute bottom-4">COMMUNITY TRADER PROFILE V2</span>
+                      <span className="text-[100px] text-primary/10 select-none font-bold uppercase tracking-tighter -translate-y-5 font-headline">C PROFIT</span>
                     </div>
-                  )}
-                  
-                  {/* If own profile: allow upload cover */}
-                  {selectedProfileUser.id === auth.currentUser?.uid && (
-                    <label className="absolute bottom-4 right-4 bg-black/60 hover:bg-black/80 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-1.5 cursor-pointer backdrop-blur-md transition-all active:scale-95">
-                      <Camera size={14} />
-                      Editar foto de capa
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        className="hidden" 
-                        onChange={(e) => handleUploadProfilePhoto(e, true)} 
-                      />
-                    </label>
                   )}
                 </div>
 
@@ -1604,71 +1625,47 @@ export default function Community() {
                             <h3 className="font-extrabold text-sm text-on-surface uppercase tracking-wide">Apresentação</h3>
                             
                             <div className="space-y-3.5 text-xs text-on-surface-variant font-medium">
-                              {selectedUserDetailedProfile?.work ? (
+                              {!selectedUserDetailedProfile?.isWorkPrivate && selectedUserDetailedProfile?.work ? (
                                 <div className="flex items-center gap-2.5">
                                   <Briefcase size={16} className="text-on-surface-variant opacity-60" />
                                   <span>Trabalha como <strong className="text-on-surface">{selectedUserDetailedProfile.work}</strong></span>
                                 </div>
-                              ) : (
-                                <div className="flex items-center gap-2.5">
-                                  <Briefcase size={16} className="text-on-surface-variant opacity-60" />
-                                  <span className="opacity-60">Nenhuma profissão definida</span>
-                                </div>
-                              )}
+                              ): null}
 
-                              {selectedUserDetailedProfile?.school && (
-                                <div className="flex items-center gap-2.5">
-                                  <GraduationCap size={16} className="text-on-surface-variant opacity-60" />
-                                  <span>Frequentou <strong className="text-on-surface">{selectedUserDetailedProfile.school}</strong></span>
-                                </div>
-                              )}
-
-                              {selectedUserDetailedProfile?.liveIn ? (
+                              {!selectedUserDetailedProfile?.isLiveInPrivate && selectedUserDetailedProfile?.liveIn ? (
                                 <div className="flex items-center gap-2.5">
                                   <MapPin size={16} className="text-on-surface-variant opacity-60" />
                                   <span>Vive em <strong className="text-on-surface">{selectedUserDetailedProfile.liveIn}</strong></span>
                                 </div>
-                              ) : (
-                                <div className="flex items-center gap-2.5">
-                                  <MapPin size={16} className="text-on-surface-variant opacity-60" />
-                                  <span className="opacity-60">Nenhuma localização definida</span>
-                                </div>
-                              )}
+                              ): null}
 
-                              {selectedUserDetailedProfile?.homeTown && (
+                              {!selectedUserDetailedProfile?.isHomeTownPrivate && selectedUserDetailedProfile?.homeTown ? (
                                 <div className="flex items-center gap-2.5">
                                   <Home size={16} className="text-on-surface-variant opacity-60" />
                                   <span>De <strong className="text-on-surface">{selectedUserDetailedProfile.homeTown}</strong></span>
                                 </div>
-                              )}
+                              ): null}
 
-                              {selectedUserDetailedProfile?.relationship && (
-                                <div className="flex items-center gap-2.5">
-                                  <Heart size={16} className="text-on-surface-variant opacity-60" />
-                                  <span>Estado civil <strong className="text-on-surface">{selectedUserDetailedProfile.relationship}</strong></span>
-                                </div>
-                              )}
-
-                              {selectedUserDetailedProfile?.birthday && (
+                              {!selectedUserDetailedProfile?.isBirthdayPrivate && selectedUserDetailedProfile?.birthday ? (
                                 <div className="flex items-center gap-2.5">
                                   <Calendar size={16} className="text-on-surface-variant opacity-60" />
                                   <span>Faz anos a <strong className="text-on-surface">{selectedUserDetailedProfile.birthday}</strong></span>
                                 </div>
-                              )}
+                              ): null}
 
-                              {selectedUserDetailedProfile?.phoneNumber && (
+                              {!selectedUserDetailedProfile?.isPhoneNumberPrivate && selectedUserDetailedProfile?.phoneNumber ? (
                                 <div className="flex items-center gap-2.5">
                                   <Smartphone size={16} className="text-on-surface-variant opacity-60" />
                                   <span>Telemóvel: <strong className="text-on-surface">{selectedUserDetailedProfile.phoneNumber}</strong></span>
                                 </div>
-                              )}
+                              ): null}
 
-                              {selectedUserDetailedProfile?.email && (
+                              {!selectedUserDetailedProfile?.isEmailPrivate && selectedUserDetailedProfile?.email ? (
                                 <div className="flex items-center gap-2.5">
                                   <Mail size={16} className="text-on-surface-variant opacity-60" />
                                   <span className="truncate">E-mail: <strong className="text-on-surface">{selectedUserDetailedProfile.email}</strong></span>
                                 </div>
-                              )}
+                              ): null}
                             </div>
 
                             {/* If own profile, offer toggle button directly */}
@@ -1981,21 +1978,12 @@ export default function Community() {
                                       <span className="text-[10px] text-on-surface-variant">Nome de utilizador</span>
                                     </div>
                                   </li>
-                                  {selectedUserDetailedProfile?.birthday && (
+                                  {!selectedUserDetailedProfile?.isBirthdayPrivate && selectedUserDetailedProfile?.birthday && (
                                     <li className="flex items-start gap-3">
                                       <Calendar className="text-on-surface-variant opacity-60 w-4 h-4" />
                                       <div>
                                         <span className="text-on-surface font-semibold block">{selectedUserDetailedProfile.birthday}</span>
                                         <span className="text-[10px] text-on-surface-variant">Aniversário</span>
-                                      </div>
-                                    </li>
-                                  )}
-                                  {selectedUserDetailedProfile?.relationship && (
-                                    <li className="flex items-start gap-3">
-                                      <Heart className="text-on-surface-variant opacity-60 w-4 h-4" />
-                                      <div>
-                                        <span className="text-on-surface font-semibold block">{selectedUserDetailedProfile.relationship}</span>
-                                        <span className="text-[10px] text-on-surface-variant">Relacionamento</span>
                                       </div>
                                     </li>
                                   )}
@@ -2005,7 +1993,7 @@ export default function Community() {
                               <div className="space-y-4">
                                 <h4 className="text-xs font-extrabold uppercase tracking-wide text-primary">Lugares</h4>
                                 <ul className="space-y-3.5">
-                                  {selectedUserDetailedProfile?.liveIn && (
+                                  {!selectedUserDetailedProfile?.isLiveInPrivate && selectedUserDetailedProfile?.liveIn && (
                                     <li className="flex items-start gap-3">
                                       <MapPin className="text-on-surface-variant opacity-60 w-4 h-4" />
                                       <div>
@@ -2014,7 +2002,7 @@ export default function Community() {
                                       </div>
                                     </li>
                                   )}
-                                  {selectedUserDetailedProfile?.homeTown && (
+                                  {!selectedUserDetailedProfile?.isHomeTownPrivate && selectedUserDetailedProfile?.homeTown && (
                                     <li className="flex items-start gap-3">
                                       <Home className="text-on-surface-variant opacity-60 w-4 h-4" />
                                       <div>
@@ -2029,9 +2017,9 @@ export default function Community() {
 
                             <div className="border-t border-outline-variant/10 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-6">
                               <div className="space-y-4">
-                                <h4 className="text-xs font-extrabold uppercase tracking-wide text-primary">Trabalho e Educação</h4>
+                                <h4 className="text-xs font-extrabold uppercase tracking-wide text-primary">Profissão</h4>
                                 <ul className="space-y-3.5">
-                                  {selectedUserDetailedProfile?.work && (
+                                  {!selectedUserDetailedProfile?.isWorkPrivate && selectedUserDetailedProfile?.work ? (
                                     <li className="flex items-start gap-3">
                                       <Briefcase className="text-on-surface-variant opacity-60 w-4 h-4" />
                                       <div>
@@ -2039,15 +2027,8 @@ export default function Community() {
                                         <span className="text-[10px] text-on-surface-variant">Emprego</span>
                                       </div>
                                     </li>
-                                  )}
-                                  {selectedUserDetailedProfile?.school && (
-                                    <li className="flex items-start gap-3">
-                                      <GraduationCap className="text-on-surface-variant opacity-60 w-4 h-4" />
-                                      <div>
-                                        <span className="text-on-surface font-semibold block">{selectedUserDetailedProfile.school}</span>
-                                        <span className="text-[10px] text-on-surface-variant">Escola/Universidade</span>
-                                      </div>
-                                    </li>
+                                  ) : (
+                                    <li className="text-[10.5px] italic text-on-surface-variant/50">Nenhuma informação pública de trabalho</li>
                                   )}
                                 </ul>
                               </div>
@@ -2055,7 +2036,7 @@ export default function Community() {
                               <div className="space-y-4">
                                 <h4 className="text-xs font-extrabold uppercase tracking-wide text-primary">Contactos</h4>
                                 <ul className="space-y-3.5">
-                                  {selectedUserDetailedProfile?.phoneNumber && (
+                                  {!selectedUserDetailedProfile?.isPhoneNumberPrivate && selectedUserDetailedProfile?.phoneNumber && (
                                     <li className="flex items-start gap-3">
                                       <Smartphone className="text-on-surface-variant opacity-60 w-4 h-4" />
                                       <div>
@@ -2064,7 +2045,7 @@ export default function Community() {
                                       </div>
                                     </li>
                                   )}
-                                  {selectedUserDetailedProfile?.email && (
+                                  {!selectedUserDetailedProfile?.isEmailPrivate && selectedUserDetailedProfile?.email ? (
                                     <li className="flex items-start gap-3">
                                       <Mail className="text-on-surface-variant opacity-60 w-4 h-4" />
                                       <div>
@@ -2072,7 +2053,7 @@ export default function Community() {
                                         <span className="text-[10px] text-on-surface-variant">Endereço de e-mail</span>
                                       </div>
                                     </li>
-                                  )}
+                                  ) : null}
                                 </ul>
                               </div>
                             </div>

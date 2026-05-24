@@ -36,6 +36,12 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
   const [groupSettingsName, setGroupSettingsName] = useState('');
   const [groupSettingsDesc, setGroupSettingsDesc] = useState('');
 
+  // User search/invite logic inside group chats
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [invitedUserIds, setInvitedUserIds] = useState<string[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+
   // Unread state
   const [totalUnread, setTotalUnread] = useState(0);
 
@@ -48,6 +54,28 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     const handleOpen = () => setIsOpen(true);
     window.addEventListener('openGlobalChat', handleOpen);
     return () => window.removeEventListener('openGlobalChat', handleOpen);
+  }, []);
+
+  // Listen for all user profiles from 'usuarios' collection
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'usuarios'), (snap) => {
+      setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, []);
+
+  // Listen for pending room invites for current user
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const q = query(
+      collection(db, 'room_invites'),
+      where('receiverId', '==', auth.currentUser.uid),
+      where('status', '==', 'pending')
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setPendingInvites(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
   }, []);
 
   useEffect(() => {
@@ -118,6 +146,49 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
 
     return () => unsub();
   }, [activeChat]);
+
+  const handleAcceptInvite = async (invite: any) => {
+    try {
+      await updateDoc(doc(db, 'room_invites', invite.id), { status: 'accepted' });
+      await updateDoc(doc(db, 'chats', invite.roomId), {
+        participants: arrayUnion(auth.currentUser?.uid)
+      });
+      alert('Entraste na sala de bate-papo com sucesso!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao aceitar convite.');
+    }
+  };
+
+  const handleDeclineInvite = async (invite: any) => {
+    try {
+      await updateDoc(doc(db, 'room_invites', invite.id), { status: 'declined' });
+      alert('Convite recusado.');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao recusar convite.');
+    }
+  };
+
+  const handleInviteUserToRoom = async (targetUser: any) => {
+    if (!activeChat || !auth.currentUser) return;
+    try {
+      await addDoc(collection(db, 'room_invites'), {
+        roomId: activeChat.id,
+        roomName: activeChat.name || 'Nova Sala',
+        senderId: auth.currentUser.uid,
+        senderName: auth.currentUser.displayName || 'Trader',
+        receiverId: targetUser.id,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+      setInvitedUserIds(prev => [...prev, targetUser.id]);
+      alert(`Convite enviado para ${targetUser.nome || 'Trader'}!`);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao enviar convite.');
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,12 +366,54 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
           <div className={`${activeChat ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r border-outline-variant/20 bg-surface-container-lowest flex-col`}>
             <div className="p-4 border-b border-outline-variant/10 flex justify-between items-center shrink-0">
               <h2 className="text-lg font-black font-headline uppercase tracking-widest text-on-surface">Conversas</h2>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setIsGroupModalOpen(true)} className="p-2 hover:bg-surface-container rounded-full text-primary transition-colors bg-primary/10" title="Criar Sala">
-                  <Users size={18} />
-                </button>
-              </div>
             </div>
+
+            {/* Prominent Wide Action CTA for Room Creation, closing the active chat as requested */}
+            <div className="p-3 bg-surface-container-low shrink-0 border-b border-outline-variant/10 space-y-2">
+              <button 
+                onClick={() => {
+                  setActiveChat(null); // Closes active chat
+                  setIsGroupModalOpen(true); // Opens build a room modal
+                }} 
+                className="w-full py-2.5 px-4 bg-primary text-on-primary hover:bg-primary/90 hover:scale-[1.02] active:scale-95 transition-all text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 rounded-2xl shadow-lg shadow-primary/15"
+                title="Criar Sala"
+              >
+                <Users size={16} />
+                <span>+ Criar Nova Sala</span>
+              </button>
+
+              {/* Real-time pending room invites notifications */}
+              {pendingInvites.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Convites de Sala ({pendingInvites.length})</p>
+                  {pendingInvites.map(invite => (
+                    <div 
+                      key={invite.id} 
+                      className="p-3 bg-primary/10 border border-primary/20 rounded-2xl animate-in fade-in zoom-in duration-200"
+                    >
+                      <p className="text-[11px] text-on-surface leading-tight">
+                        O trader <strong className="text-primary">{invite.senderName}</strong> convidou-te para fazer parte de sua sala <strong className="text-primary">"{invite.roomName}"</strong>.
+                      </p>
+                      <div className="flex gap-1.5 mt-2 justify-end">
+                        <button 
+                          onClick={() => handleAcceptInvite(invite)}
+                          className="px-2.5 py-1 bg-primary text-on-primary text-[9px] font-bold rounded-lg uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all"
+                        >
+                          Aceitar
+                        </button>
+                        <button 
+                          onClick={() => handleDeclineInvite(invite)}
+                          className="px-2.5 py-1 bg-error/15 text-error text-[9px] font-extrabold rounded-lg uppercase tracking-wider hover:bg-error/25 active:scale-95 transition-all"
+                        >
+                          Recusar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               {chats.map(chat => {
                  const unread = chat.unreadCount?.[auth.currentUser?.uid || ''];
@@ -480,40 +593,150 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                 </div>
 
                 {activeChat.admins?.includes(auth.currentUser?.uid || '') && (
-                  <div className="mb-6">
-                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest pl-1 mb-1 block">Adicionar Participante (Email)</label>
-                    <div className="flex gap-2">
+                  <div className="mb-6 p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10 space-y-3">
+                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest block pl-1">
+                      Convidar Traders por Nome / Usuário
+                    </label>
+                    <div className="relative">
                       <input 
-                        type="email"
-                        value={newParticipantEmail}
-                        onChange={e => setNewParticipantEmail(e.target.value)}
-                        placeholder="email@trader.com"
-                        className="flex-1 bg-surface-container border-none rounded-xl px-4 py-2 text-sm text-on-surface focus:ring-2 focus:ring-primary"
+                        type="text"
+                        value={userSearchQuery}
+                        onChange={e => setUserSearchQuery(e.target.value)}
+                        placeholder="Pesquisar trader por nome..."
+                        className="w-full bg-surface-container border border-outline-variant/10 rounded-xl px-4 py-2 text-sm text-on-surface focus:outline-none focus:border-primary"
                       />
-                      <button onClick={handleAddParticipant} disabled={!newParticipantEmail.trim()} className="bg-primary text-on-primary px-3 rounded-xl hover:bg-primary/90 disabled:opacity-50">
-                        Adicionar
-                      </button>
                     </div>
+
+                    {userSearchQuery.trim() !== '' && (
+                      <div className="max-h-48 overflow-y-auto bg-surface border border-outline-variant/10 rounded-xl divide-y divide-outline-variant/10 custom-scrollbar">
+                        {allUsers.filter(u => {
+                          const queryText = userSearchQuery.toLowerCase();
+                          const mainName = (u.nome || u.displayName || u.username || '').toLowerCase();
+                          return mainName.includes(queryText) && u.id !== auth.currentUser?.uid;
+                        }).map(u => {
+                          const isParticipant = activeChat.participants.includes(u.id);
+                          const isAlreadyInvited = invitedUserIds.includes(u.id);
+
+                          return (
+                            <div key={u.id} className="flex items-center justify-between p-2.5">
+                              <div className="flex items-center gap-2">
+                                <img 
+                                  src={u.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'U')}&background=random`} 
+                                  className="w-8 h-8 rounded-full object-cover" 
+                                  referrerPolicy="no-referrer"
+                                />
+                                <span className="text-xs font-bold text-on-surface">{u.nome || u.username || 'Trader'}</span>
+                              </div>
+
+                              <button
+                                onClick={() => handleInviteUserToRoom(u)}
+                                disabled={isParticipant || isAlreadyInvited}
+                                className={`px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wider transition-all ${
+                                  isParticipant 
+                                    ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                                    : isAlreadyInvited 
+                                      ? 'bg-primary/20 text-primary cursor-not-allowed'
+                                      : 'bg-primary text-on-primary hover:scale-105 active:scale-95'
+                                }`}
+                              >
+                                {isParticipant ? 'Membro' : isAlreadyInvited ? 'Convidado' : 'Convidar'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                        {allUsers.filter(u => {
+                          const queryText = userSearchQuery.toLowerCase();
+                          const mainName = (u.nome || u.displayName || u.username || '').toLowerCase();
+                          return mainName.includes(queryText) && u.id !== auth.currentUser?.uid;
+                        }).length === 0 && (
+                          <p className="p-3 text-xs text-on-surface-variant text-center">Nenhum trader encontrado.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </>
             )}
 
             {activeChat.type === 'direct' && (
-              <div className="mb-6">
-                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest pl-1 mb-1 block">Adicionar Participante (Torna-se Sala)</label>
-                <div className="flex gap-2">
+              <div className="mb-6 p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10 space-y-3">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest block pl-1">
+                  Convidar Traders à Conversa (Torna-se Sala)
+                </label>
+                <div className="relative">
                   <input 
-                    type="email"
-                    value={newParticipantEmail}
-                    onChange={e => setNewParticipantEmail(e.target.value)}
-                    placeholder="email@trader.com"
-                    className="flex-1 bg-surface-container border-none rounded-xl px-4 py-2 text-sm text-on-surface focus:ring-2 focus:ring-primary"
+                    type="text"
+                    value={userSearchQuery}
+                    onChange={e => setUserSearchQuery(e.target.value)}
+                    placeholder="Pesquisar trader por nome..."
+                    className="w-full bg-surface-container border border-outline-variant/10 rounded-xl px-4 py-2 text-sm text-on-surface focus:outline-none focus:border-primary"
                   />
-                  <button onClick={handleAddParticipant} disabled={!newParticipantEmail.trim()} className="bg-primary text-on-primary px-3 rounded-xl hover:bg-primary/90 disabled:opacity-50 text-sm font-bold">
-                    Adicionar
-                  </button>
                 </div>
+
+                {userSearchQuery.trim() !== '' && (
+                  <div className="max-h-48 overflow-y-auto bg-surface border border-outline-variant/10 rounded-xl divide-y divide-outline-variant/10 custom-scrollbar">
+                    {allUsers.filter(u => {
+                      const queryText = userSearchQuery.toLowerCase();
+                      const mainName = (u.nome || u.displayName || u.username || '').toLowerCase();
+                      return mainName.includes(queryText) && u.id !== auth.currentUser?.uid;
+                    }).map(u => {
+                      const isParticipant = activeChat.participants.includes(u.id);
+                      const isAlreadyInvited = invitedUserIds.includes(u.id);
+
+                      return (
+                        <div key={u.id} className="flex items-center justify-between p-2.5">
+                          <div className="flex items-center gap-2">
+                            <img 
+                              src={u.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'U')}&background=random`} 
+                              className="w-8 h-8 rounded-full object-cover" 
+                              referrerPolicy="no-referrer"
+                            />
+                            <span className="text-xs font-bold text-on-surface">{u.nome || u.username || 'Trader'}</span>
+                          </div>
+
+                          <button
+                            onClick={async () => {
+                              try {
+                                const currentUid = auth.currentUser?.uid;
+                                if (!currentUid) return;
+                                
+                                await updateDoc(doc(db, 'chats', activeChat.id), {
+                                  type: 'group',
+                                  name: 'Nova Sala de Conversa',
+                                  description: 'Grupo convertido de conversa direta',
+                                  admins: [currentUid],
+                                  updatedAt: serverTimestamp()
+                                });
+                                
+                                await handleInviteUserToRoom(u);
+                              } catch (err) {
+                                console.error(err);
+                                alert('Erro ao converter conversa');
+                              }
+                            }}
+                            disabled={isParticipant || isAlreadyInvited}
+                            className={`px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wider transition-all ${
+                              isParticipant 
+                                ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                                : isAlreadyInvited 
+                                  ? 'bg-primary/20 text-primary cursor-not-allowed'
+                                  : 'bg-primary text-on-primary hover:scale-105 active:scale-95'
+                            }`}
+                          >
+                            {isParticipant ? 'Membro' : isAlreadyInvited ? 'Convidado' : 'Convidar'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {allUsers.filter(u => {
+                      const queryText = userSearchQuery.toLowerCase();
+                      const mainName = (u.nome || u.displayName || u.username || '').toLowerCase();
+                      return mainName.includes(queryText) && u.id !== auth.currentUser?.uid;
+                    }).length === 0 && (
+                      <p className="p-3 text-xs text-on-surface-variant text-center">Nenhum trader encontrado.</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

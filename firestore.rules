@@ -58,7 +58,8 @@ service cloud.firestore {
     // Referrals (Indicações / Afiliados)
     match /referrals/{referralId} {
       allow get, list: if isAuthenticated() && (resource.data.referrerId == request.auth.uid || isAdmin());
-      allow create, update, delete: if isAdmin();
+      allow create: if isAuthenticated() && (request.resource.data.referredId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
     }
 
     // Affiliate Payouts (Levantamentos do Saldo de Afiliado)
@@ -112,7 +113,7 @@ service cloud.firestore {
     // User Profile - Both paths for compatibility
     match /users/{userId} {
       allow get: if isAuthenticated();
-      allow list: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
@@ -130,7 +131,7 @@ service cloud.firestore {
 
     match /usuarios/{userId} {
       allow get: if isAuthenticated();
-      allow list: if isAdmin();
+      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
@@ -141,6 +142,14 @@ service cloud.firestore {
       }
       match /accounts/{accountId} {
         allow read, write: if isOwner(userId) || isAdmin();
+      }
+      match /followers/{followerId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && request.auth.uid == followerId;
+      }
+      match /following/{followingId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId) || isAdmin();
       }
     }
 
@@ -197,6 +206,15 @@ service cloud.firestore {
         allow create: if isAuthenticated() && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
         allow update, delete: if isAuthenticated() && (resource.data.senderId == request.auth.uid || isAdmin() || request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.admins);
       }
+    }
+
+    // Room Invites System
+    match /room_invites/{inviteId} {
+      allow get: if isAuthenticated() && (resource.data.receiverId == request.auth.uid || resource.data.senderId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && (resource.data.receiverId == request.auth.uid || resource.data.senderId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.receiverId == request.auth.uid || resource.data.senderId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.senderId == request.auth.uid);
     }
   }
 }

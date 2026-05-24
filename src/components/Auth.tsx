@@ -167,62 +167,64 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       let validCoupon: any = null;
       let solvedReferredUid: string | null = null;
 
-      if (!isLogin && couponCode.trim() !== '') {
-        const uppercaseCode = couponCode.trim().toUpperCase();
-
-        // 1. Check if it's a promotional coupon (Maestro coupon)
-        const qCoupons = query(collection(db, 'coupons'), where('code', '==', uppercaseCode));
-        const couponSnap = await getDocs(qCoupons);
-        
-        if (!couponSnap.empty) {
-          const couponDoc = couponSnap.docs[0].data();
-          if (couponDoc.active) {
-            validCoupon = { id: couponSnap.docs[0].id, ...couponDoc };
-          } else {
-            setError('Cupom de desconto inativo.');
-            setLoading(false);
-            return;
-          }
-        } else if (uppercaseCode === 'DESCONTODE50%') {
-          // Fallback if coupon collection is not synced or loaded yet
-          validCoupon = {
-            id: 'descontode50_static',
-            code: 'DESCONTODE50%',
-            discountType: 'percentage',
-            discountValue: 50,
-            targetPlan: 'all',
-            partnerRef: 'Plataforma',
-            active: true
-          };
-        } else {
-          // 2. See if it matches a user's reference code (refCode)
-          const qUserRef = query(collection(db, 'usuarios'), where('refCode', '==', uppercaseCode));
-          const userRefSnap = await getDocs(qUserRef);
-          
-          if (!userRefSnap.empty) {
-            solvedReferredUid = userRefSnap.docs[0].id; // The UID of the parent referrer user
-          } else {
-            // Check if they directly pasted a full UID as code
-            const parentUserDoc = await getDoc(doc(db, 'usuarios', couponCode.trim()));
-            if (parentUserDoc.exists()) {
-              solvedReferredUid = parentUserDoc.id;
-            } else {
-              setError('Cupom ou código de indicação (convite) inexistente ou inativo.');
-              setLoading(false);
-              return;
-            }
-          }
-        }
-      }
-
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
         const userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
         onSuccess();
       } else {
+        // Create the user in Firebase Auth FIRST! This immediately authenticates the session
+        // and allows the coupon and referral resolution queries to execute without permission errors.
         const result = await createUserWithEmailAndPassword(auth, email, password);
         if (name) {
-          await updateProfile(result.user, { displayName: name });
+          try {
+            await updateProfile(result.user, { displayName: name });
+          } catch (profileErr) {
+            console.error('Erro ao atualizar nome de exibição:', profileErr);
+          }
+        }
+
+        if (couponCode.trim() !== '') {
+          const uppercaseCode = couponCode.trim().toUpperCase();
+
+          // 1. Check if it's a promotional coupon (Maestro coupon)
+          const qCoupons = query(collection(db, 'coupons'), where('code', '==', uppercaseCode));
+          const couponSnap = await getDocs(qCoupons);
+          
+          if (!couponSnap.empty) {
+            const couponDoc = couponSnap.docs[0].data();
+            if (couponDoc.active) {
+              validCoupon = { id: couponSnap.docs[0].id, ...couponDoc };
+            } else {
+              console.warn('Cupom de desconto inativo.');
+            }
+          } else if (uppercaseCode === 'DESCONTODE50%') {
+            // Fallback if coupon collection is not synced or loaded yet
+            validCoupon = {
+              id: 'descontode50_static',
+              code: 'DESCONTODE50%',
+              discountType: 'percentage',
+              discountValue: 50,
+              targetPlan: 'all',
+              partnerRef: 'Plataforma',
+              active: true
+            };
+          } else {
+            // 2. See if it matches a user's reference code (refCode)
+            const qUserRef = query(collection(db, 'usuarios'), where('refCode', '==', uppercaseCode));
+            const userRefSnap = await getDocs(qUserRef);
+            
+            if (!userRefSnap.empty) {
+              solvedReferredUid = userRefSnap.docs[0].id; // The UID of the parent referrer user
+            } else {
+              // Check if they directly pasted a full UID as code
+              const parentUserDoc = await getDoc(doc(db, 'usuarios', couponCode.trim()));
+              if (parentUserDoc.exists()) {
+                solvedReferredUid = parentUserDoc.id;
+              } else {
+                console.warn('Cupom ou código de indicação inexistente ou inativo.');
+              }
+            }
+          }
         }
         
         const referredBy = localStorage.getItem('referredBy') || null;
