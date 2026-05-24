@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, auth } from '../firebase';
+import { db, auth, storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { Send, Users, UserPlus, Settings, Info, Lock, Key, Edit2, Trash2, X, ShieldCheck, MessageSquare, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -29,12 +30,18 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
+  const [groupPhoto, setGroupPhoto] = useState<File | null>(null);
+  const [groupPhotoPreview, setGroupPhotoPreview] = useState<string | null>(null);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   
   // Settings 
   const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
   const [newParticipantEmail, setNewParticipantEmail] = useState('');
   const [groupSettingsName, setGroupSettingsName] = useState('');
   const [groupSettingsDesc, setGroupSettingsDesc] = useState('');
+  const [groupSettingsPhoto, setGroupSettingsPhoto] = useState<File | null>(null);
+  const [groupSettingsPhotoPreview, setGroupSettingsPhotoPreview] = useState<string | null>(null);
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
 
   // User search/invite logic inside group chats
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -230,11 +237,20 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
 
   const createGroup = async () => {
     if (!groupName.trim() || !auth.currentUser) return;
+    setIsCreatingGroup(true);
     try {
+      let photoURL = '';
+      if (groupPhoto) {
+        const fileRef = ref(storage, `chat_groups/${Date.now()}_${groupPhoto.name}`);
+        await uploadBytes(fileRef, groupPhoto);
+        photoURL = await getDownloadURL(fileRef);
+      }
+
       await addDoc(collection(db, 'chats'), {
         type: 'group',
         name: groupName,
         description: groupDescription,
+        photoURL: photoURL || null,
         admins: [auth.currentUser.uid],
         participants: [auth.currentUser.uid],
         createdAt: serverTimestamp(),
@@ -243,22 +259,38 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
       setIsGroupModalOpen(false);
       setGroupName('');
       setGroupDescription('');
+      setGroupPhoto(null);
+      setGroupPhotoPreview(null);
     } catch (err) {
-      console.error(err);
+      console.error('Error creating group:', err);
+    } finally {
+      setIsCreatingGroup(false);
     }
   };
 
   const handleUpdateGroupInfo = async () => {
     if (!activeChat || !auth.currentUser || !activeChat.admins?.includes(auth.currentUser.uid)) return;
+    setIsUpdatingSettings(true);
     try {
-      await updateDoc(doc(db, 'chats', activeChat.id), {
+      const updates: any = {
         name: groupSettingsName,
-        description: groupSettingsDesc
-      });
+        description: groupSettingsDesc,
+        updatedAt: serverTimestamp()
+      };
+      
+      if (groupSettingsPhoto) {
+        const fileRef = ref(storage, `chat_groups/${Date.now()}_${groupSettingsPhoto.name}`);
+        await uploadBytes(fileRef, groupSettingsPhoto);
+        updates.photoURL = await getDownloadURL(fileRef);
+      }
+      
+      await updateDoc(doc(db, 'chats', activeChat.id), updates);
       alert('Info da sala atualizada.');
       setIsChatSettingsOpen(false);
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsUpdatingSettings(false);
     }
   };
 
@@ -324,6 +356,8 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     if (!activeChat) return;
     setGroupSettingsName(activeChat.name || '');
     setGroupSettingsDesc(activeChat.description || '');
+    setGroupSettingsPhoto(null);
+    setGroupSettingsPhotoPreview(activeChat.photoURL || null);
     setIsChatSettingsOpen(true);
   };
 
@@ -417,21 +451,35 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               {chats.map(chat => {
                  const unread = chat.unreadCount?.[auth.currentUser?.uid || ''];
+                 const defaultAvatar = chat.type === 'group' 
+                   ? `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name || 'G')}&background=random`
+                   : `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.otherUserName || 'U')}&background=random`;
+                 const chatPhoto = chat.photoURL || defaultAvatar;
+
                  return (
                   <div 
                     key={chat.id} 
                     onClick={() => setActiveChat(chat)}
-                    className={`p-4 border-b border-outline-variant/5 cursor-pointer transition-colors relative ${activeChat?.id === chat.id ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-surface-container'}`}
+                    className={`p-3 lg:p-4 border-b border-outline-variant/5 cursor-pointer flex items-center gap-3 transition-colors relative ${activeChat?.id === chat.id ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-surface-container'}`}
                   >
-                    <h3 className="font-bold text-sm text-on-surface flex items-center gap-2 pr-6 truncate">
-                      {chat.type === 'group' ? <Users size={14} className="text-primary shrink-0"/> : null}
-                      {chat.type === 'group' ? chat.name : chat.otherUserName}
-                    </h3>
-                    <p className="text-xs text-on-surface-variant truncate mt-1">
-                      {chat.lastMessage || 'Nenhuma mensagem ainda'}
-                    </p>
+                    <div className="w-10 h-10 rounded-full bg-surface-container shrink-0 overflow-hidden relative border border-outline-variant/10">
+                      <img src={chatPhoto} alt="Chat" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      {chat.type === 'group' && (
+                        <div className="absolute -bottom-1 -right-1 bg-surface rounded-full p-0.5 border border-outline-variant/10">
+                           <Users size={10} className="text-primary"/>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0 pr-6">
+                      <h3 className="font-bold text-sm text-on-surface truncate">
+                        {chat.type === 'group' ? chat.name : chat.otherUserName}
+                      </h3>
+                      <p className="text-xs text-on-surface-variant truncate mt-0.5">
+                        {chat.lastSenderName && `${chat.lastSenderName.split(' ')[0]}: `}{chat.lastMessage || 'Nenhuma mensagem.'}
+                      </p>
+                    </div>
                     {!!unread && unread > 0 && activeChat?.id !== chat.id && (
-                       <span className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 bg-error text-white text-[8px] font-black rounded-full flex items-center justify-center">
+                       <span className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 bg-error text-white text-[8px] font-black rounded-full flex items-center justify-center shadow-sm">
                          {unread > 9 ? '9+' : unread}
                        </span>
                     )}
@@ -453,6 +501,19 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                     <button onClick={() => setActiveChat(null)} className="p-1 -ml-1 hover:bg-surface-container rounded-lg md:hidden">
                        <span className="material-symbols-outlined text-on-surface-variant">arrow_back</span>
                     </button>
+                    
+                    {/* Chat Header Avatar */}
+                    <div className="w-10 h-10 rounded-full bg-surface-container overflow-hidden shrink-0 border border-outline-variant/10">
+                      <img 
+                        src={activeChat.photoURL || (activeChat.type === 'group' 
+                          ? `https://ui-avatars.com/api/?name=${encodeURIComponent(activeChat.name || 'G')}&background=random`
+                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(activeChat.otherUserName || 'U')}&background=random`)}
+                        alt="Chat Preview" 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    
                     <div>
                       <h2 className="text-sm font-bold text-on-surface flex items-center gap-2 truncate">
                         {activeChat.type === 'group' ? activeChat.name : activeChat.otherUserName}
@@ -476,20 +537,36 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-surface-container-low/30">
                   {messages.map((msg, idx) => {
                     const isMine = msg.senderId === auth.currentUser?.uid;
-                    const showName = !isMine && activeChat.type === 'group' && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
+                    const isGroup = activeChat.type === 'group';
+                    const showAvatarAndName = !isMine && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
                     
                     return (
-                      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[75%] rounded-2xl p-3 ${isMine ? 'bg-primary text-on-primary rounded-tr-none' : 'bg-surface-container-high text-on-surface rounded-tl-none'}`}>
-                          {showName && (
+                      <div key={msg.id} className={`flex w-full ${isMine ? 'justify-end' : 'justify-start'}`}>
+                        {!isMine && showAvatarAndName && (
+                          <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mr-2 self-end mb-1">
+                            <img 
+                              src={msg.senderPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || 'U')}&background=random`}
+                              alt={msg.senderName}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        )}
+                        {!isMine && !showAvatarAndName && <div className="w-8 mr-2 flex-shrink-0" />}
+
+                        <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm ${isMine ? 'bg-primary text-on-primary rounded-br-sm' : 'bg-surface-container-highest text-on-surface rounded-bl-sm'}`}>
+                          {showAvatarAndName && isGroup && (
                             <p className="text-[10px] font-black text-primary mb-1 uppercase tracking-wider">{msg.senderName}</p>
                           )}
                           <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">
                             {renderMessageText(msg.text)}
                           </p>
-                          <p className={`text-[9px] mt-1.5 text-right font-medium ${isMine ? 'text-on-primary/70' : 'text-on-surface-variant/70'}`}>
-                            {msg.createdAt ? new Date(msg.createdAt.toDate ? msg.createdAt.toDate() : msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </p>
+                          <div className={`flex items-center justify-end gap-1 mt-1 ${isMine ? 'text-on-primary/70' : 'text-on-surface-variant'}`}>
+                            <span className="text-[9px] font-medium">
+                              {msg.createdAt ? new Date(msg.createdAt.toDate ? msg.createdAt.toDate() : msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                            {isMine && <span className="material-symbols-outlined text-[12px]">done_all</span>}
+                          </div>
                         </div>
                       </div>
                     );
@@ -531,6 +608,37 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
           <div className="bg-surface rounded-3xl p-6 w-full max-w-sm">
             <h3 className="text-xl font-bold mb-4">Nova Sala de Bate-Papo</h3>
             <div className="space-y-4">
+              <div className="flex flex-col items-center justify-center mb-4">
+                <div className="w-24 h-24 rounded-full bg-surface-container overflow-hidden mb-2 relative group cursor-pointer border border-outline-variant/10">
+                  {groupPhotoPreview ? (
+                    <img src={groupPhotoPreview} alt="Group Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="flex items-center justify-center w-full h-full text-on-surface-variant">
+                      <Users size={32} />
+                    </div>
+                  )}
+                  <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                    <Edit2 size={24} className="text-white" />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setGroupPhoto(file);
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            if (ev.target) setGroupPhotoPreview(ev.target.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }} 
+                    />
+                  </label>
+                </div>
+                <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">Foto da Sala</span>
+              </div>
               <div>
                 <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest pl-1 mb-1 block">Nome da Sala</label>
                 <input 
@@ -550,8 +658,29 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
               </div>
             </div>
             <div className="flex gap-2 justify-end mt-6">
-              <button onClick={() => setIsGroupModalOpen(false)} className="px-4 py-2 rounded-xl text-on-surface-variant hover:bg-surface-container font-bold text-sm">Cancelar</button>
-              <button onClick={createGroup} disabled={!groupName.trim()} className="px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-sm disabled:opacity-50">Criar</button>
+              <button 
+                onClick={() => {
+                  setIsGroupModalOpen(false);
+                  setGroupPhoto(null);
+                  setGroupPhotoPreview(null);
+                }} 
+                className="px-4 py-2 rounded-xl text-on-surface-variant hover:bg-surface-container font-bold text-sm disabled:opacity-50"
+                disabled={isCreatingGroup}
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={createGroup} 
+                disabled={!groupName.trim() || isCreatingGroup} 
+                className="px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isCreatingGroup ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Criando...
+                  </>
+                ) : 'Criar'}
+              </button>
             </div>
           </div>
         </div>
@@ -568,6 +697,40 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
             {activeChat.type === 'group' && (
               <>
                 <div className="space-y-4 mb-6">
+                  <div className="flex flex-col items-center justify-center mb-4">
+                    <div className={`w-24 h-24 rounded-full bg-surface-container overflow-hidden mb-2 relative border border-outline-variant/10 ${activeChat.admins?.includes(auth.currentUser?.uid || '') ? 'group cursor-pointer' : ''}`}>
+                      {groupSettingsPhotoPreview ? (
+                        <img src={groupSettingsPhotoPreview} alt="Group Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex items-center justify-center w-full h-full text-on-surface-variant">
+                          <Users size={32} />
+                        </div>
+                      )}
+                      
+                      {activeChat.admins?.includes(auth.currentUser?.uid || '') && (
+                        <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                          <Edit2 size={24} className="text-white" />
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setGroupSettingsPhoto(file);
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  if (ev.target) setGroupSettingsPhotoPreview(ev.target.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }} 
+                          />
+                        </label>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">Foto da Sala</span>
+                  </div>
                   <div>
                     <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest pl-1 mb-1 block">Nome</label>
                     <input 
@@ -588,7 +751,18 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                     />
                   </div>
                   {activeChat.admins?.includes(auth.currentUser?.uid || '') && (
-                    <button onClick={handleUpdateGroupInfo} className="w-full py-2.5 bg-primary/20 text-primary font-bold rounded-xl text-sm">Guardar Alterações</button>
+                    <button 
+                      onClick={handleUpdateGroupInfo} 
+                      disabled={isUpdatingSettings}
+                      className="w-full py-2.5 bg-primary/20 text-primary font-bold rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isUpdatingSettings ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                          Guardando...
+                        </>
+                      ) : 'Guardar Alterações'}
+                    </button>
                   )}
                 </div>
 

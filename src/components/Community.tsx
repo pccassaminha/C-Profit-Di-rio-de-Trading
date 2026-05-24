@@ -69,6 +69,29 @@ export default function Community() {
   });
   
   const [allCommunityUsers, setAllCommunityUsers] = useState<any[]>([]);
+  const [dbPhoto, setDbPhoto] = useState<string | null>(null);
+  const [dbName, setDbName] = useState<string>('');
+
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    const unsub = onSnapshot(doc(db, 'usuarios', currentUser.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.photoURL) setDbPhoto(data.photoURL);
+        if (data.nome) setDbName(data.nome);
+      } else {
+        onSnapshot(doc(db, 'users', currentUser.uid), (altSnap) => {
+          if (altSnap.exists()) {
+            const altData = altSnap.data();
+            if (altData.photoURL) setDbPhoto(altData.photoURL);
+            if (altData.nome) setDbName(altData.nome);
+          }
+        });
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Local inline comment state inside profile feed
   const [profilePostCommentInputs, setProfilePostCommentInputs] = useState<{[postId: string]: string}>({});
@@ -337,8 +360,8 @@ export default function Community() {
       } else {
         await addDoc(collection(db, 'community_posts'), {
           userId: auth.currentUser.uid,
-          userName: auth.currentUser.displayName || 'Membro C Profit',
-          userPhoto: auth.currentUser.photoURL || '',
+          userName: dbName || auth.currentUser.displayName || 'Membro C Profit',
+          userPhoto: dbPhoto || auth.currentUser.photoURL || '',
           legend: newPost.legend,
           imageUrl: finalImageUrl,
           imageUrls: formattedUrls,
@@ -405,8 +428,8 @@ export default function Community() {
     try {
       await addDoc(collection(db, 'community_posts', postId, 'comments'), {
         userId: auth.currentUser.uid,
-        userName: auth.currentUser.displayName || 'Membro C Profit',
-        userPhoto: auth.currentUser.photoURL || '',
+        userName: dbName || auth.currentUser.displayName || 'Membro C Profit',
+        userPhoto: dbPhoto || auth.currentUser.photoURL || '',
         text: newComment,
         createdAt: serverTimestamp()
       });
@@ -748,7 +771,7 @@ export default function Community() {
       <div className="bg-surface-container-low border border-outline-variant/10 rounded-[32px] p-4 md:p-6 shadow-xl shadow-black/5">
         <div className="flex items-center gap-4 mb-4">
           <img 
-            src={auth.currentUser?.photoURL || `https://ui-avatars.com/api/?name=${auth.currentUser?.displayName || 'Traders'}&background=random`} 
+            src={dbPhoto || auth.currentUser?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(dbName || auth.currentUser?.displayName || 'Traders')}&background=random`} 
             alt="Me" 
             className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border border-outline-variant/10"
             referrerPolicy="no-referrer"
@@ -760,7 +783,7 @@ export default function Community() {
             }}
             className="flex-1 bg-surface-container hover:bg-surface-container-high text-on-surface-variant/60 text-left px-6 py-3 md:py-4 rounded-full text-sm md:text-base transition-all font-medium border border-outline-variant/5"
           >
-            No que está a pensar, {auth.currentUser?.displayName?.split(' ')[0] || 'Trader'}?
+            No que está a pensar, {(dbName || auth.currentUser?.displayName || 'Trader').split(' ')[0]}?
           </button>
         </div>
         
@@ -2077,41 +2100,142 @@ export default function Community() {
 
                     {/* TAB 3: FRIENDS / AMIGOS List Grid */}
                     {activeProfileTab === 'amigos' && (
-                      <div className="bg-surface border border-outline-variant/10 rounded-2xl p-6 text-left space-y-4 shadow-sm">
-                        <h3 className="font-extrabold text-md text-on-surface tracking-wide">Amigos da Comunidade C Profit</h3>
+                      <div className="bg-surface border border-outline-variant/10 rounded-2xl p-6 text-left space-y-8 shadow-sm">
                         
-                        {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id).length === 0 ? (
-                          <div className="py-12 border border-dashed border-outline-variant/10 rounded-xl text-center text-xs text-on-surface-variant opacity-70">
-                            Nenhum outro membro listado.
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id).map((friendUser) => (
-                              <div 
-                                key={friendUser.id}
-                                className="flex items-center gap-3 p-3 bg-surface-container/30 border border-outline-variant/10 rounded-xl hover:border-primary/20 hover:bg-surface-container/50 transition-all cursor-pointer group"
-                                onClick={() => {
-                                  setSelectedProfileUser({
-                                    id: friendUser.id,
-                                    name: friendUser.nome || friendUser.username || 'Membro C Profit',
-                                    photo: friendUser.photoURL || ''
-                                  });
-                                }}
-                              >
-                                <img 
-                                  src={friendUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(friendUser.nome || friendUser.username || 'F')}&background=random`} 
-                                  alt={friendUser.nome}
-                                  className="w-12 h-12 rounded-xl object-cover shrink-0 bg-black/10"
-                                  referrerPolicy="no-referrer"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-xs font-bold text-on-surface truncate group-hover:underline">{friendUser.nome || friendUser.username}</h4>
-                                  <span className="text-[10px] text-on-surface-variant block truncate">Investidor Registado</span>
+                        {/* Section 1: Amigos */}
+                        <div className="space-y-4">
+                          <h3 className="font-extrabold text-md text-on-surface tracking-wide flex items-center gap-2">
+                            <Users size={18} className="text-primary" />
+                            Amigos já adicionados
+                          </h3>
+                          
+                          {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && friendsList.includes(u.id)).length === 0 ? (
+                            <div className="py-8 border border-dashed border-outline-variant/10 rounded-xl text-center text-xs text-on-surface-variant opacity-70">
+                              Nenhum amigo adicionado ainda.
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && friendsList.includes(u.id)).map((friendUser) => (
+                                <div 
+                                  key={friendUser.id}
+                                  className="flex items-center gap-3 p-3 bg-surface-container/30 border border-outline-variant/10 rounded-xl hover:border-primary/20 hover:bg-surface-container/50 transition-all group"
+                                >
+                                  <img 
+                                    src={friendUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(friendUser.nome || friendUser.username || 'F')}&background=random`} 
+                                    alt={friendUser.nome}
+                                    className="w-12 h-12 rounded-xl object-cover shrink-0 bg-black/10 cursor-pointer"
+                                    referrerPolicy="no-referrer"
+                                    onClick={() => {
+                                      setSelectedProfileUser({
+                                        id: friendUser.id,
+                                        name: friendUser.nome || friendUser.username || 'Membro C Profit',
+                                        photo: friendUser.photoURL || ''
+                                      });
+                                    }}
+                                  />
+                                  <div 
+                                    className="flex-1 min-w-0 cursor-pointer"
+                                    onClick={() => {
+                                      setSelectedProfileUser({
+                                        id: friendUser.id,
+                                        name: friendUser.nome || friendUser.username || 'Membro C Profit',
+                                        photo: friendUser.photoURL || ''
+                                      });
+                                    }}
+                                  >
+                                    <h4 className="text-xs font-bold text-on-surface truncate group-hover:underline">{friendUser.nome || friendUser.username}</h4>
+                                    <span className="text-[10px] text-on-surface-variant block truncate">Amigo</span>
+                                  </div>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (!auth.currentUser) return;
+                                      const friendRef = doc(db, 'users', auth.currentUser.uid, 'friends', friendUser.id);
+                                      const friendOfMineRef = doc(db, 'users', friendUser.id, 'friends', auth.currentUser.uid);
+                                      try {
+                                        await deleteDoc(friendRef);
+                                        await deleteDoc(friendOfMineRef);
+                                      } catch (err) { }
+                                    }}
+                                    className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
+                                    title="Remover Amigo"
+                                  >
+                                    <UserMinus size={16} />
+                                  </button>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Section 2: Investidores C Profit */}
+                        <div className="space-y-4 pt-4 border-t border-outline-variant/10">
+                          <h3 className="font-extrabold text-md text-on-surface tracking-wide flex items-center gap-2">
+                            <Globe size={18} className="text-primary" />
+                            Investidores da Comunidade C Profit
+                          </h3>
+                          <p className="text-xs text-on-surface-variant max-w-lg mb-2">
+                            Descubra outros membros da comunidade e adicione-os como amigos.
+                          </p>
+                          
+                          {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && !friendsList.includes(u.id)).length === 0 ? (
+                            <div className="py-8 border border-dashed border-outline-variant/10 rounded-xl text-center text-xs text-on-surface-variant opacity-70">
+                              Nenhum outro membro encontrado.
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && !friendsList.includes(u.id)).map((friendUser) => (
+                                <div 
+                                  key={friendUser.id}
+                                  className="flex items-center gap-3 p-3 bg-surface-container/30 border border-outline-variant/10 rounded-xl hover:border-primary/20 hover:bg-surface-container/50 transition-all group"
+                                >
+                                  <img 
+                                    src={friendUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(friendUser.nome || friendUser.username || 'F')}&background=random`} 
+                                    alt={friendUser.nome}
+                                    className="w-12 h-12 rounded-xl object-cover shrink-0 bg-black/10 cursor-pointer"
+                                    referrerPolicy="no-referrer"
+                                    onClick={() => {
+                                      setSelectedProfileUser({
+                                        id: friendUser.id,
+                                        name: friendUser.nome || friendUser.username || 'Membro C Profit',
+                                        photo: friendUser.photoURL || ''
+                                      });
+                                    }}
+                                  />
+                                  <div 
+                                    className="flex-1 min-w-0 cursor-pointer"
+                                    onClick={() => {
+                                      setSelectedProfileUser({
+                                        id: friendUser.id,
+                                        name: friendUser.nome || friendUser.username || 'Membro C Profit',
+                                        photo: friendUser.photoURL || ''
+                                      });
+                                    }}
+                                  >
+                                    <h4 className="text-xs font-bold text-on-surface truncate group-hover:underline">{friendUser.nome || friendUser.username}</h4>
+                                    <span className="text-[10px] text-on-surface-variant block truncate">Investidor Registado</span>
+                                  </div>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (!auth.currentUser) return;
+                                      const friendRef = doc(db, 'users', auth.currentUser.uid, 'friends', friendUser.id);
+                                      const friendOfMineRef = doc(db, 'users', friendUser.id, 'friends', auth.currentUser.uid);
+                                      try {
+                                        await setDoc(friendRef, { addedAt: serverTimestamp() });
+                                        await setDoc(friendOfMineRef, { addedAt: serverTimestamp() });
+                                      } catch (err) { }
+                                    }}
+                                    className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+                                    title="Adicionar Amigo"
+                                  >
+                                    <UserPlus size={16} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 

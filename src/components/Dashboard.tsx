@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { DateRangePicker } from './DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
-import { collection, addDoc, onSnapshot, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
@@ -163,6 +163,31 @@ export default function Dashboard() {
   });
 
   const [isExporting, setIsExporting] = useState(false);
+  const [dbPhoto, setDbPhoto] = useState<string | null>(null);
+  const [dbName, setDbName] = useState<string>('');
+
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    
+    const unsub = onSnapshot(doc(db, 'usuarios', currentUser.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.photoURL) setDbPhoto(data.photoURL);
+        if (data.nome) setDbName(data.nome);
+      } else {
+        onSnapshot(doc(db, 'users', currentUser.uid), (altSnap) => {
+          if (altSnap.exists()) {
+            const altData = altSnap.data();
+            if (altData.photoURL) setDbPhoto(altData.photoURL);
+            if (altData.nome) setDbName(altData.nome);
+          }
+        });
+      }
+    });
+    
+    return () => unsub();
+  }, []);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const dashboardRef = React.useRef<HTMLDivElement>(null);
   const exportDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -2085,14 +2110,14 @@ export default function Dashboard() {
             <>
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-12">
                 <div className="w-20 h-20 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden shrink-0">
-                  {auth.currentUser?.photoURL ? (
-                    <img src={auth.currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                  {dbPhoto || auth.currentUser?.photoURL ? (
+                    <img src={dbPhoto || auth.currentUser?.photoURL || ''} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <span className="material-symbols-outlined text-5xl text-on-surface-variant">person</span>
                   )}
                 </div>
                 <div>
-                  <h2 className="text-on-surface font-bold text-2xl md:text-3xl font-headline">{auth.currentUser?.displayName || 'Usuário'}</h2>
+                  <h2 className="text-on-surface font-bold text-2xl md:text-3xl font-headline">{dbName || auth.currentUser?.displayName || 'Usuário'}</h2>
                   <div className="flex items-center gap-3 mt-2">
                     <span className="text-on-surface-variant text-base">{accounts.find(a => a.id === selectedAccount)?.accountNumber}</span>
                     <button className="text-on-surface-variant hover:text-on-surface transition-colors">

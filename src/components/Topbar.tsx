@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { auth, db } from '../firebase';
 import { useTrades } from '../hooks/useTrades';
-import { collection, query, onSnapshot, orderBy, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, where, doc } from 'firebase/firestore';
 
 export default function Topbar({ 
   toggleSidebar, 
@@ -19,7 +19,35 @@ export default function Topbar({
   const { userPlan } = useTrades();
   const currentUser = auth.currentUser;
   const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
-  const userName = currentUser?.displayName || 'Usuário';
+
+  const [dbPhoto, setDbPhoto] = useState<string | null>(null);
+  const [dbName, setDbName] = useState<string>('');
+
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    // Listen to "usuarios" doc
+    const unsub = onSnapshot(doc(db, 'usuarios', currentUser.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.photoURL) setDbPhoto(data.photoURL);
+        if (data.nome) setDbName(data.nome);
+      } else {
+        // Fallback to "users" doc
+        onSnapshot(doc(db, 'users', currentUser.uid), (altSnap) => {
+          if (altSnap.exists()) {
+            const altData = altSnap.data();
+            if (altData.photoURL) setDbPhoto(altData.photoURL);
+            if (altData.nome) setDbName(altData.nome);
+          }
+        });
+      }
+    });
+    
+    return () => unsub();
+  }, [currentUser]);
+
+  const userName = dbName || currentUser?.displayName || 'Usuário';
   const initial = userName.charAt(0).toUpperCase();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -248,8 +276,8 @@ export default function Topbar({
             className={`flex items-center gap-2 bg-surface-container border border-outline-variant/20 rounded-full pl-1 pr-4 py-1 cursor-pointer hover:bg-surface-container-high transition-colors ${dropdownOpen ? 'ring-2 ring-primary bg-surface-container-high' : ''}`}
           >
             <div className="w-8 h-8 rounded-full bg-on-surface text-background flex items-center justify-center font-bold text-xs overflow-hidden">
-              {auth.currentUser?.photoURL ? (
-                <img src={auth.currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+              {dbPhoto || auth.currentUser?.photoURL ? (
+                <img src={dbPhoto || auth.currentUser?.photoURL || ''} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 initial
               )}

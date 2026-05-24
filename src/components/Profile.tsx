@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, storage } from '../firebase';
-import { updateProfile, verifyBeforeUpdateEmail, updatePassword } from 'firebase/auth';
+import { updateProfile, verifyBeforeUpdateEmail, sendPasswordResetEmail } from 'firebase/auth';
 import { 
-  doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, deleteDoc 
+  doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, deleteDoc, getDocs, collectionGroup
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
@@ -58,17 +58,63 @@ const compressImageToBase64 = (file: File, maxWidth = 300, maxHeight = 300, qual
   });
 };
 
+const syncHistoricalProfileData = async (uid: string, newPhotoURL: string, newName: string) => {
+  try {
+    const updatePromises: Promise<void>[] = [];
+    
+    // Posts payload
+    const postPayload: any = {};
+    if (newPhotoURL) postPayload.userPhoto = newPhotoURL.startsWith('data:') 
+      ? `https://ui-avatars.com/api/?name=${encodeURIComponent(newName || 'U')}&background=random` 
+      : newPhotoURL;
+    if (newName) postPayload.userName = newName;
+
+    if (Object.keys(postPayload).length > 0) {
+      // Update posts
+      const postsQuery = query(collection(db, 'community_posts'), where('userId', '==', uid));
+      const postsSnap = await getDocs(postsQuery);
+      postsSnap.forEach(docSnap => {
+        updatePromises.push(updateDoc(docSnap.ref, postPayload));
+      });
+
+      // Update comments
+      const commentsQuery = query(collectionGroup(db, 'comments'), where('userId', '==', uid));
+      const commentsSnap = await getDocs(commentsQuery);
+      commentsSnap.forEach(docSnap => {
+        updatePromises.push(updateDoc(docSnap.ref, postPayload));
+      });
+    }
+
+    // Messages payload
+    const msgPayload: any = {};
+    if (newPhotoURL) msgPayload.senderPhoto = postPayload.userPhoto; // reuse same logic
+    if (newName) msgPayload.senderName = newName;
+    
+    if (Object.keys(msgPayload).length > 0) {
+      const messagesQuery = query(collectionGroup(db, 'messages'), where('senderId', '==', uid));
+      const messagesSnap = await getDocs(messagesQuery);
+      messagesSnap.forEach(docSnap => {
+        updatePromises.push(updateDoc(docSnap.ref, msgPayload));
+      });
+    }
+
+    await Promise.all(updatePromises);
+    console.log("Historical data synced successfully:", updatePromises.length, "documents updated");
+  } catch (err) {
+    console.error("Error syncing historical profile data:", err);
+  }
+};
+
 export default function Profile() {
   const user = auth.currentUser;
   const [firstName, setFirstName] = useState(user?.displayName?.split(' ')[0] || '');
   const [lastName, setLastName] = useState(user?.displayName?.split(' ').slice(1).join(' ') || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [password, setPassword] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [photoURL, setPhotoURL] = useState(user?.photoURL || '');
   const [isPrivate, setIsPrivate] = useState(false);
   const [myPosts, setMyPosts] = useState<any[]>([]);
-  const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -132,6 +178,7 @@ export default function Profile() {
               const data = userDoc.data();
               if (data.firstName) setFirstName(data.firstName);
               if (data.lastName) setLastName(data.lastName);
+              if (data.contactEmail) setContactEmail(data.contactEmail);
               if (data.phoneNumber) setPhoneNumber(data.phoneNumber);
               if (data.photoURL) setPhotoURL(data.photoURL);
               if (data.isPrivate !== undefined) setIsPrivate(data.isPrivate);
@@ -275,10 +322,22 @@ export default function Profile() {
         
         // Update states and databases
         setPhotoURL(url);
-        await updateProfile(user, { photoURL: url });
         
         const userDocRef = doc(db, 'usuarios', user.uid);
         await setDoc(userDocRef, { photoURL: url }, { merge: true });
+
+        // Update auth profile with a shorter URL to avoid 'Photo URL too long' error
+        try {
+          const shortUrl = url.startsWith('data:') 
+            ? `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'U')}&background=random`
+            : url;
+          await updateProfile(user, { photoURL: shortUrl });
+        } catch (authErr) {
+          console.warn("Could not save photoURL in Auth:", authErr);
+        }
+
+        // Sync historical posts and comments
+        syncHistoricalProfileData(user.uid, url, user.displayName || '');
 
         setModalConfig({
           isOpen: true,
@@ -310,7 +369,6 @@ export default function Profile() {
       
       // Update states and databases
       setPhotoURL(url);
-      await updateProfile(user, { photoURL: url });
       
       const userDocRef = doc(db, 'usuarios', user.uid);
       await setDoc(userDocRef, { photoURL: url }, { merge: true });
@@ -318,6 +376,19 @@ export default function Profile() {
       try {
         await setDoc(doc(db, 'users', user.uid), { photoURL: url }, { merge: true });
       } catch (e) {}
+
+      // Update auth profile with a shorter URL to avoid 'Photo URL too long' error
+      try {
+        const shortUrl = url.startsWith('data:') 
+          ? `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'U')}&background=random`
+          : url;
+        await updateProfile(user, { photoURL: shortUrl });
+      } catch (authErr) {
+        console.warn("Could not save photoURL in Auth:", authErr);
+      }
+
+      // Sync historical posts and comments
+      syncHistoricalProfileData(user.uid, url, user.displayName || '');
 
       setIsPhotoModalOpen(false);
       setSelectedPhotoFile(null);
@@ -377,6 +448,29 @@ export default function Profile() {
     }
   };
 
+  const handlePasswordReset = async () => {
+    if (!user?.email) return;
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      setModalConfig({
+        isOpen: true,
+        title: "E-mail Enviado",
+        message: "Enviamos um link de recuperação para o seu e-mail da conta. Siga as instruções para criar uma nova palavra-passe.",
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
+    } catch (error: any) {
+      console.error(error);
+      setModalConfig({
+        isOpen: true,
+        title: "Erro",
+        message: "Ocorreu um erro ao enviar o e-mail de recuperação. Tente novamente mais tarde.",
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
+    }
+  };
+
   const handleSaveClick = () => {
     if (!user) return;
     
@@ -400,17 +494,31 @@ export default function Profile() {
       const authUpdate: any = { displayName: newDisplayName };
       
       if (photoURL) {
-        authUpdate.photoURL = photoURL;
+        authUpdate.photoURL = photoURL.startsWith('data:')
+          ? `https://ui-avatars.com/api/?name=${encodeURIComponent(newDisplayName)}&background=random`
+          : photoURL;
       }
 
-      if (newDisplayName !== user.displayName || authUpdate.photoURL) {
-        await updateProfile(user, authUpdate);
+      if (newDisplayName !== user.displayName || authUpdate.photoURL !== user.photoURL) {
+        try {
+          await updateProfile(user, authUpdate);
+        } catch (authErr) {
+          console.warn("Could not save photoURL in Auth:", authErr);
+          if (newDisplayName !== user.displayName) {
+            // fallback to only name
+            await updateProfile(user, { displayName: newDisplayName });
+          }
+        }
       }
+
+      // Sync historical posts and comments when name or photo changes
+      syncHistoricalProfileData(user.uid, photoURL, newDisplayName);
 
       const profileData = {
         nome: newDisplayName,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        contactEmail,
         phoneNumber,
         photoURL,
         userId: user.uid,
@@ -440,11 +548,6 @@ export default function Profile() {
           message: "Foi enviado um e-mail de confirmação para a nova morada. Por favor confirme-o para concluir a alteração.",
           onConfirm: closeModal
         });
-      }
-
-      if (password) {
-        await updatePassword(user, password);
-        setPassword('');
       }
 
       setModalConfig({
@@ -671,7 +774,7 @@ export default function Profile() {
                     <div className="flex items-center justify-between gap-2.5">
                       <div className="flex items-center gap-3 min-w-0">
                         <Mail size={16} className="text-primary opacity-75 shrink-0" />
-                        <span className="truncate">E-mail: <strong className="text-on-surface">{email}</strong></span>
+                        <span className="truncate">E-mail: <strong className="text-on-surface">{contactEmail || email}</strong></span>
                       </div>
                       {isEmailPrivate && <span className="text-[10px] text-error flex items-center gap-0.5 shrink-0"><EyeOff size={11} /> Privado</span>}
                     </div>
@@ -896,7 +999,7 @@ export default function Profile() {
 
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center pb-0.5">
-                    <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">E-mail Comercial / Conta</label>
+                    <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">E-mail Comercial</label>
                     <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-semibold text-error">
                       <input 
                         type="checkbox" 
@@ -909,8 +1012,8 @@ export default function Profile() {
                   </div>
                   <input 
                     type="email" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
                     className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
                   />
                 </div>
@@ -982,34 +1085,44 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Sensitive operations (Password Updates) */}
-              <div className="space-y-3.5 pt-6 border-t border-outline-variant/15">
-                <div className="flex items-center gap-2">
-                  <KeyRound size={16} className="text-primary" />
-                  <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider block">Alterar Palavra-passe</label>
+              {/* Sensitive operations (Account Email and Password Updates) */}
+              <div className="space-y-6 pt-6 border-t border-outline-variant/15">
+                <div className="space-y-3.5">
+                  <div className="flex items-center gap-2">
+                    <Mail size={16} className="text-primary" />
+                    <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider block">Alterar E-mail da Conta</label>
+                  </div>
+                  <div className="relative max-w-lg">
+                    <input 
+                      type="email" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="E-mail da sua conta C Profit"
+                      className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
+                    />
+                  </div>
                 </div>
 
-                <div className="relative max-w-lg">
-                  <input 
-                    type={showPassword ? "text" : "password"} 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Deixe em branco para manter a palavra-passe atual"
-                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 pr-12 text-xs focus:outline-none focus:border-primary text-on-surfaceplaceholder:opacity-50" 
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors focus:outline-none"
-                  >
-                    <span className="material-symbols-outlined !text-[16px]">
-                      {showPassword ? 'visibility_off' : 'visibility'}
-                    </span>
-                  </button>
-                </div>
-              </div>
+                <div className="space-y-3.5">
+                  <div className="flex items-center gap-2">
+                    <KeyRound size={16} className="text-primary" />
+                    <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider block">Alterar Palavra-passe</label>
+                  </div>
 
-              {/* Security locks & privacy block */}
+                  <div className="relative max-w-lg">
+                    <button
+                      type="button"
+                      onClick={handlePasswordReset}
+                      className="w-full bg-surface-container hover:bg-surface-container-high transition-colors border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none text-left flex justify-between items-center text-on-surface"
+                    >
+                      <span>Enviar link de alteração de palavra-passe para o meu e-mail</span>
+                      <span className="material-symbols-outlined text-[16px] text-on-surface-variant">mail</span>
+                    </button>
+                  </div>
+                </div>
+            </div>
+
+            {/* Security locks & privacy block */}
               <div className="space-y-4 pt-6 border-t border-outline-variant/15">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="text-[#00f5a0]" size={18} />
