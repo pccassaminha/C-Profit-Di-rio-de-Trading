@@ -37,7 +37,8 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [couponCode, setCouponCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -93,9 +94,16 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         const resolvedPlanType = 'trial_15';
         const resolvedExpiryDate = expiryDate.toISOString();
 
+        const googleDisplayName = result.user.displayName || 'Usuário Google';
+        const parts = googleDisplayName.trim().split(' ');
+        const googleFirstName = parts[0] || '';
+        const googleLastName = parts.slice(1).join(' ') || '';
+
         // Create initial profile for Google user with 15 days free trial
         await setDoc(userRef, {
-          nome: result.user.displayName || 'Usuário Google',
+          nome: googleDisplayName,
+          firstName: googleFirstName,
+          lastName: googleLastName,
           email: result.user.email,
           createdAt: new Date().toISOString(),
           plan_type: resolvedPlanType,
@@ -175,9 +183,10 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         // Create the user in Firebase Auth FIRST! This immediately authenticates the session
         // and allows the coupon and referral resolution queries to execute without permission errors.
         const result = await createUserWithEmailAndPassword(auth, email, password);
-        if (name) {
+        const fullName = `${firstName.trim()} ${lastName.trim()}`;
+        if (fullName) {
           try {
-            await updateProfile(result.user, { displayName: name });
+            await updateProfile(result.user, { displayName: fullName });
           } catch (profileErr) {
             console.error('Erro ao atualizar nome de exibição:', profileErr);
           }
@@ -253,7 +262,9 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         const resolvedExpiryDate = expiryDate.toISOString();
 
         const newUserData: any = {
-          nome: name,
+          nome: fullName,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           email: email,
           phoneNumber: phoneNumber,
           createdAt: new Date().toISOString(),
@@ -280,7 +291,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
           await addDoc(collection(db, 'referrals'), {
             referrerId: finalReferredUid || referredBy,
             referredId: result.user.uid,
-            referredName: name || 'Novo Trader',
+            referredName: fullName || 'Novo Trader',
             referredEmail: email,
             referredPlan: 'trial_15',
             paymentAmount: 0,
@@ -403,19 +414,36 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="space-y-2 overflow-hidden"
+                    className="grid grid-cols-1 sm:grid-cols-2 gap-4 overflow-hidden"
                   >
-                    <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50">Nome Completo</label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40" size={20} />
-                      <input 
-                        type="text" 
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Ex: João Trader"
-                        className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-4 text-on-surface outline-none focus:border-primary transition-all font-bold placeholder:text-on-surface-variant/30"
-                      />
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50">Primeiro Nome</label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40" size={20} />
+                        <input 
+                          type="text" 
+                          required
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          placeholder="Ex: João"
+                          className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-4 text-on-surface outline-none focus:border-primary transition-all font-bold placeholder:text-on-surface-variant/30 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50">Sobrenome</label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40" size={20} />
+                        <input 
+                          type="text" 
+                          required
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Ex: Silva"
+                          className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-4 text-on-surface outline-none focus:border-primary transition-all font-bold placeholder:text-on-surface-variant/30 text-sm"
+                        />
+                      </div>
                     </div>
                   </motion.div>
                 )}

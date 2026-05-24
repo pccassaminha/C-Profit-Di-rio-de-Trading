@@ -12,6 +12,52 @@ import {
 } from 'lucide-react';
 import Modal from './Modal';
 
+const compressImageToBase64 = (file: File, maxWidth = 300, maxHeight = 300, quality = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const src = event.target?.result as string;
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressedBase64);
+        } else {
+          resolve(src); // fallback to original base64
+        }
+      };
+      img.onerror = (err) => {
+        reject(err);
+      };
+    };
+    reader.onerror = (err) => {
+      reject(err);
+    };
+  });
+};
+
 export default function Profile() {
   const user = auth.currentUser;
   const [firstName, setFirstName] = useState(user?.displayName?.split(' ')[0] || '');
@@ -30,6 +76,10 @@ export default function Profile() {
   const [editingPost, setEditingPost] = useState<any | null>(null);
   const [editLegend, setEditLegend] = useState('');
   const [postDropdownId, setPostDropdownId] = useState<string | null>(null);
+
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
+  const [selectedPhotoPreview, setSelectedPhotoPreview] = useState<string | null>(null);
 
   // Profile metadata fields (Facebook style)
   const [bio, setBio] = useState('');
@@ -80,6 +130,8 @@ export default function Profile() {
 
             if (userDoc.exists()) {
               const data = userDoc.data();
+              if (data.firstName) setFirstName(data.firstName);
+              if (data.lastName) setLastName(data.lastName);
               if (data.phoneNumber) setPhoneNumber(data.phoneNumber);
               if (data.photoURL) setPhotoURL(data.photoURL);
               if (data.isPrivate !== undefined) setIsPrivate(data.isPrivate);
@@ -214,26 +266,12 @@ export default function Profile() {
     candidates.sort((a, b) => b.score - a.score);
     return candidates.map(c => c.user);
   };
-
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && user) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        setModalConfig({
-          isOpen: true,
-          title: "Erro",
-          message: "A imagem deve ter no máximo 5MB.",
-          isError: true,
-          onConfirm: closeModal
-        });
-        return;
-      }
-      
       setIsSaving(true);
       try {
-        const fileRef = ref(storage, `profiles/${user.uid}/${Date.now()}_${file.name}`);
-        await uploadBytes(fileRef, file);
-        const url = await getDownloadURL(fileRef);
+        const url = await compressImageToBase64(file, 300, 300, 0.7);
         
         // Update states and databases
         setPhotoURL(url);
@@ -248,11 +286,11 @@ export default function Profile() {
           message: "Sua foto de perfil foi alterada com sucesso."
         });
       } catch (error: any) {
-        console.error("Error uploading photo:", error);
+        console.error("Error processing photo:", error);
         setModalConfig({
           isOpen: true,
           title: "Erro de Upload",
-          message: `Falha ao enviar foto de perfil: ${error.message}`,
+          message: `Falha ao processar foto de perfil: ${error.message}`,
           isError: true,
         });
       } finally {
@@ -264,24 +302,53 @@ export default function Profile() {
     }
   };
 
+  const handleSavePhotoModal = async () => {
+    if (!selectedPhotoFile || !user) return;
+    setIsSaving(true);
+    try {
+      const url = await compressImageToBase64(selectedPhotoFile, 300, 300, 0.7);
+      
+      // Update states and databases
+      setPhotoURL(url);
+      await updateProfile(user, { photoURL: url });
+      
+      const userDocRef = doc(db, 'usuarios', user.uid);
+      await setDoc(userDocRef, { photoURL: url }, { merge: true });
+      
+      try {
+        await setDoc(doc(db, 'users', user.uid), { photoURL: url }, { merge: true });
+      } catch (e) {}
+
+      setIsPhotoModalOpen(false);
+      setSelectedPhotoFile(null);
+      setSelectedPhotoPreview(null);
+
+      setModalConfig({
+        isOpen: true,
+        title: "Foto Atualizada",
+        message: "Sua foto de perfil foi alterada com sucesso.",
+        onConfirm: closeModal
+      });
+    } catch (error: any) {
+      console.error("Error processing photo from modal:", error);
+      setModalConfig({
+        isOpen: true,
+        title: "Erro de Upload",
+        message: `Falha ao processar foto de perfil: ${error.message}`,
+        isError: true,
+        onConfirm: closeModal
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && user) {
-      if (file.size > 5 * 1024 * 1024) {
-        setModalConfig({
-          isOpen: true,
-          title: "Erro",
-          message: "A imagem de capa deve ter no máximo 5MB.",
-          isError: true,
-          onConfirm: closeModal
-        });
-        return;
-      }
       setIsSaving(true);
       try {
-        const fileRef = ref(storage, `covers/${user.uid}/${Date.now()}_${file.name}`);
-        await uploadBytes(fileRef, file);
-        const url = await getDownloadURL(fileRef);
+        const url = await compressImageToBase64(file, 900, 300, 0.75);
         
         setCoverURL(url);
         
@@ -294,11 +361,11 @@ export default function Profile() {
           message: "Sua foto de capa foi alterada com sucesso."
         });
       } catch (error: any) {
-        console.error("Error uploading cover:", error);
+        console.error("Error processing cover:", error);
         setModalConfig({
           isOpen: true,
           title: "Erro de Upload",
-          message: `Falha ao enviar capa: ${error.message}`,
+          message: `Falha ao processar capa: ${error.message}`,
           isError: true,
         });
       } finally {
@@ -342,6 +409,8 @@ export default function Profile() {
 
       const profileData = {
         nome: newDisplayName,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         phoneNumber,
         photoURL,
         userId: user.uid,
@@ -468,24 +537,25 @@ export default function Profile() {
 
         {/* User Profile Avatar Overlay Header */}
         <div className="w-full max-w-4xl px-6 relative flex flex-col sm:flex-row items-center sm:items-end gap-5 -mt-16 sm:-mt-20 pb-5">
-          <div className="relative group shrink-0 w-32 h-32 sm:w-40 sm:h-40">
+          <div className="relative group shrink-0 w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-surface shadow-2xl bg-surface-container overflow-hidden">
             <img 
               src={photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'U')}&background=random`} 
               alt={user?.displayName || 'Trader'}
-              className="w-full h-full rounded-full object-cover border-4 border-surface shadow-2xl bg-surface-container"
+              className="w-full h-full object-cover rounded-full"
               referrerPolicy="no-referrer"
             />
             {/* Avatar upload overlay hover */}
-            <label className="absolute inset-0 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white">
+            <button 
+              onClick={() => {
+                setSelectedPhotoFile(null);
+                setSelectedPhotoPreview(null);
+                setIsPhotoModalOpen(true);
+              }}
+              className="absolute inset-0 bg-black/50 hover:bg-black/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white border-none outline-none w-full h-full"
+              title="Alterar foto de perfil"
+            >
               <Camera size={26} />
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                accept="image/*" 
-                className="hidden" 
-                onChange={handlePhotoUpload} 
-              />
-            </label>
+            </button>
           </div>
 
           {/* Profile Name and quick Bio summary */}
@@ -1081,6 +1151,132 @@ export default function Profile() {
                 Salvar Alterações
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Photo Upload Modal Overlay */}
+      {isPhotoModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-surface border border-outline-variant/10 rounded-3xl max-w-sm w-full p-6 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 text-center">
+            
+            <div className="flex justify-between items-center border-b border-outline-variant/10 pb-3">
+              <h3 className="text-sm font-black text-on-surface uppercase tracking-wider flex items-center gap-2">
+                <Camera size={16} className="text-primary" />
+                Alterar Foto de Perfil
+              </h3>
+              <button 
+                onClick={() => {
+                  setIsPhotoModalOpen(false);
+                  setSelectedPhotoFile(null);
+                  setSelectedPhotoPreview(null);
+                }}
+                className="p-1 px-2.5 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-colors text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-center">
+              <p className="text-xs text-on-surface-variant">
+                Selecione uma imagem do seu dispositivo para a sua nova foto de perfil.
+              </p>
+
+              {/* Central Round Preview */}
+              <div className="flex justify-center">
+                {selectedPhotoPreview ? (
+                  <div className="flex flex-col items-center space-y-3">
+                    <div className="relative w-36 h-36 rounded-full overflow-hidden border-4 border-primary shadow-xl bg-surface-container">
+                      <img 
+                        src={selectedPhotoPreview} 
+                        alt="Nova foto de perfil" 
+                        className="w-full h-full object-cover rounded-full" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer text-white rounded-full">
+                        <Camera size={20} />
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert("A imagem deve ter no máximo 5MB.");
+                                return;
+                              }
+                              setSelectedPhotoFile(file);
+                              setSelectedPhotoPreview(URL.createObjectURL(file));
+                            }
+                          }} 
+                        />
+                      </label>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setSelectedPhotoFile(null);
+                        setSelectedPhotoPreview(null);
+                      }}
+                      className="text-[11px] text-error font-extrabold uppercase tracking-wider hover:underline bg-transparent border-none outline-none"
+                    >
+                      Remover Seleção
+                    </button>
+                  </div>
+                ) : (
+                  <label className="border-2 border-dashed border-outline-variant/30 hover:border-primary/50 rounded-full w-36 h-36 flex flex-col items-center justify-center cursor-pointer transition-all bg-surface-container/40 p-4">
+                    <Camera size={28} className="text-on-surface-variant/70 mb-1.5" />
+                    <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Escolher Foto</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 5 * 1024 * 1024) {
+                            alert("A imagem deve ter no máximo 5MB.");
+                            return;
+                          }
+                          setSelectedPhotoFile(file);
+                          setSelectedPhotoPreview(URL.createObjectURL(file));
+                        }
+                      }} 
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-center gap-2 pt-2 w-full">
+              <button
+                onClick={() => {
+                  setIsPhotoModalOpen(false);
+                  setSelectedPhotoFile(null);
+                  setSelectedPhotoPreview(null);
+                }}
+                disabled={isSaving}
+                className="flex-1 py-2.5 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 transition-colors text-xs font-bold uppercase tracking-wider rounded-xl disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSavePhotoModal}
+                disabled={!selectedPhotoFile || isSaving}
+                className="flex-1 py-2.5 bg-primary text-on-primary hover:bg-primary/95 transition-all text-xs font-black uppercase tracking-wider rounded-xl disabled:opacity-45 flex items-center justify-center gap-1.5"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                    <span>A salvar...</span>
+                  </>
+                ) : (
+                  <span>Concluído</span>
+                )}
+              </button>
+            </div>
+
           </div>
         </div>
       )}
