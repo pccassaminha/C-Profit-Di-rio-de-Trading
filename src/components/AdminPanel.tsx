@@ -13,6 +13,8 @@ export default function AdminPanel() {
   const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
 
   const [activeTab, setActiveTab ] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast' | 'maestros' | 'affiliates'>('users');
+  const [affiliateTab, setAffiliateTab] = useState<'overview' | 'config' | 'commissions' | 'payouts' | 'trials'>('overview');
+  const [affilSearch, setAffilSearch] = useState('');
   const [editingUser, setEditingUser] = useState<any>(null);
   const [showBillingModal, setShowBillingModal] = useState<boolean>(false);
   const [showBroadcastModal, setShowBroadcastModal] = useState<boolean>(false);
@@ -748,7 +750,7 @@ export default function AdminPanel() {
                 >
                   <option value="">Filtro: Todos Planos</option>
                   <option value="Iniciante">Iniciante / Gratuito</option>
-                  <option value="trial_15">Trial 15 dias (Grátis)</option>
+                  <option value="trial_30">Trial 30 dias (Grátis)</option>
                   <option value="mensal_6">Mensal (6 Contas)</option>
                   <option value="trimestral_6">Trimestral (6 Contas)</option>
                   <option value="semestral_8">Semestral (8 Contas)</option>
@@ -862,7 +864,7 @@ export default function AdminPanel() {
                         </td>
                         <td className="p-6">
                           <span className={`${
-                            u.plan_type === 'trial_15'
+                            (u.plan_type === 'trial_15' || u.plan_type === 'trial_30')
                               ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                               : u.plan_type === 'Iniciante' || !u.plan_type
                               ? 'bg-neutral-500/10 text-neutral-400 border border-neutral-500/25'
@@ -1676,7 +1678,7 @@ export default function AdminPanel() {
                         <td className="p-4 text-xs text-on-surface-variant font-medium">{u.partnerRef || '-'}</td>
                         <td className="p-4">
                           <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                            u.plan_type === 'trial_15' 
+                            (u.plan_type === 'trial_15' || u.plan_type === 'trial_30')
                               ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' 
                               : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                           }`}>
@@ -1894,8 +1896,18 @@ export default function AdminPanel() {
 
       {activeTab === 'affiliates' && (
         <div className="space-y-8 animate-in fade-in duration-200">
+          {/* Affiliate Sub-Tabs */}
+          <div className="flex flex-wrap gap-2 p-2 bg-surface-container rounded-2xl border border-outline-variant/20 sticky top-[72px] z-20 backdrop-blur-md">
+            <button onClick={() => setAffiliateTab('overview')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${affiliateTab === 'overview' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>Visão Geral & Caixa</button>
+            <button onClick={() => setAffiliateTab('config')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${affiliateTab === 'config' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>Configurações de Parceiros</button>
+            <button onClick={() => { setAffiliateTab('commissions'); setAffilSearch(''); }} className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${affiliateTab === 'commissions' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>Comissões Pendentes <span className="bg-white/20 px-1.5 rounded-sm">{adminReferrals.filter(r => r.status === 'pending_approval').length}</span></button>
+            <button onClick={() => { setAffiliateTab('payouts'); setAffilSearch(''); }} className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${affiliateTab === 'payouts' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>Pedidos de Saque <span className="bg-white/20 px-1.5 rounded-sm">{adminPayouts.filter(p => p.status === 'pending').length}</span></button>
+            <button onClick={() => { setAffiliateTab('trials'); setAffilSearch(''); }} className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${affiliateTab === 'trials' ? 'bg-cyan-500 text-white' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>Geração de Leads Trial <span className="bg-white/20 px-1.5 rounded-sm">{adminReferrals.filter(r => r.status === 'approved' && r.rewardType === 'free_month' && r.paymentAmount === 0).length}</span></button>
+          </div>
           
-          {/* Dashboard Stats Panel */}
+          {affiliateTab === 'overview' && (
+            <>
+              {/* Dashboard Stats Panel */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <button 
               onClick={() => setSelectedStatList(selectedStatList === 'faturado' ? null : 'faturado')}
@@ -2111,8 +2123,11 @@ export default function AdminPanel() {
               )}
             </div>
           )}
+          </>
+          )}
 
           {/* Configuration of Active Method */}
+          {affiliateTab === 'config' && (
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl">
             <h3 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">rule</span> Ajuste das Diretrizes de Afiliados (Business)
@@ -2137,7 +2152,7 @@ export default function AdminPanel() {
                 <div>
                   <p className="font-bold text-sm">Opção 1: Convidar 5 = 1 Mês Grátis (Modo Parceria)</p>
                   <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                    Ideal para crescimento orgânico acelerado. A cada 5 recomendações registadas, o afiliado ganha 1 mês grátis (as recomendações recebem 15 dias de teste grátis).
+                    Ideal para crescimento orgânico acelerado. A cada 5 recomendações registadas, o afiliado ganha 1 mês grátis (as recomendações recebem 30 dias de teste grátis).
                   </p>
                 </div>
               </button>
@@ -2163,22 +2178,33 @@ export default function AdminPanel() {
               </button>
             </div>
           </div>
+          )}
 
           {/* Pending Commissions waiting confirmation by Maestro */}
+          {affiliateTab === 'commissions' && (
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
-            <div className="p-6 border-b border-outline-variant/15 flex justify-between items-center bg-surface-container">
+            <div className="p-6 border-b border-outline-variant/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container">
               <div>
                 <h3 className="font-bold text-sm text-on-surface uppercase tracking-wider flex items-center gap-2">
                   <span className="material-symbols-outlined text-amber-500">pending_actions</span> Comissões & Indicações por Confirmar
                 </h3>
                 <p className="text-xs text-on-surface-variant mt-0.5">Transações geradas por primeiros pagamentos de usuários convidados</p>
               </div>
-              <span className="text-xs font-mono bg-surface-container-high px-3 py-1 rounded-full font-bold text-on-surface-variant">
-                {adminReferrals.filter(r => r.status === 'pending_approval').length} Pendentes
-              </span>
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <input 
+                  type="text" 
+                  placeholder="Pesquisar..." 
+                  value={affilSearch}
+                  onChange={(e) => setAffilSearch(e.target.value)}
+                  className="w-full sm:w-auto bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2 text-xs text-on-surface outline-none focus:border-amber-500 placeholder:text-on-surface-variant/40"
+                />
+                <span className="text-xs font-mono bg-surface-container-high px-3 py-1 rounded-full font-bold text-on-surface-variant whitespace-nowrap">
+                  {adminReferrals.filter(r => r.status === 'pending_approval' && (!affilSearch || r.referredName?.toLowerCase().includes(affilSearch.toLowerCase()) || r.referredEmail?.toLowerCase().includes(affilSearch.toLowerCase()))).length} Pendentes
+                </span>
+              </div>
             </div>
 
-            {adminReferrals.filter(r => r.status === 'pending_approval').length === 0 ? (
+            {adminReferrals.filter(r => r.status === 'pending_approval' && (!affilSearch || r.referredName?.toLowerCase().includes(affilSearch.toLowerCase()) || r.referredEmail?.toLowerCase().includes(affilSearch.toLowerCase()))).length === 0 ? (
               <div className="p-8 text-center text-xs text-on-surface-variant/70 italic">Nenhuma indicação pendente de validação pelos Maestros.</div>
             ) : (
               <table className="w-full text-left border-collapse">
@@ -2192,7 +2218,7 @@ export default function AdminPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10 text-xs text-on-surface select-none">
-                  {adminReferrals.filter(r => r.status === 'pending_approval').map(ref => {
+                  {adminReferrals.filter(r => r.status === 'pending_approval' && (!affilSearch || r.referredName?.toLowerCase().includes(affilSearch.toLowerCase()) || r.referredEmail?.toLowerCase().includes(affilSearch.toLowerCase()))).map(ref => {
                     const referrerUser = users.find(u => u.id === ref.referrerId);
                     return (
                       <tr key={ref.id} className="hover:bg-surface-container/20 transition-colors">
@@ -2236,23 +2262,34 @@ export default function AdminPanel() {
               </table>
             )}
           </div>
+          )}
 
           {/* Affiliate Payout requests waiting payment */}
+          {affiliateTab === 'payouts' && (
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
-            <div className="p-6 border-b border-outline-variant/15 flex justify-between items-center bg-surface-container">
+            <div className="p-6 border-b border-outline-variant/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container">
               <div>
                 <h3 className="font-bold text-sm text-on-surface uppercase tracking-wider flex items-center gap-2">
                   <span className="material-symbols-outlined text-emerald-500">account_balance_wallet</span> Solicitatções de Saques de Afiliados
                 </h3>
                 <p className="text-xs text-on-surface-variant mt-0.5">Pedidos de transferência de fundos provenientes de comissões acumuladas</p>
               </div>
-              <span className="text-xs font-mono bg-surface-container-high px-3 py-1 rounded-full font-bold text-on-surface-variant">
-                {adminPayouts.filter(p => p.status === 'pending').length} Por Pagar
-              </span>
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <input 
+                  type="text" 
+                  placeholder="Pesquisar..." 
+                  value={affilSearch}
+                  onChange={(e) => setAffilSearch(e.target.value)}
+                  className="w-full sm:w-auto bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2 text-xs text-on-surface outline-none focus:border-emerald-500 placeholder:text-on-surface-variant/40"
+                />
+                <span className="text-xs font-mono bg-surface-container-high px-3 py-1 rounded-full font-bold text-on-surface-variant whitespace-nowrap">
+                  {adminPayouts.filter(p => p.status === 'pending' && (!affilSearch || p.userName?.toLowerCase().includes(affilSearch.toLowerCase()) || p.userEmail?.toLowerCase().includes(affilSearch.toLowerCase()) || p.fullName?.toLowerCase().includes(affilSearch.toLowerCase()))).length} Por Pagar
+                </span>
+              </div>
             </div>
 
-            {adminPayouts.length === 0 ? (
-              <div className="p-8 text-center text-xs text-on-surface-variant/70 italic">Nenhum pedido de levantamento de comissão.</div>
+            {adminPayouts.filter(p => !affilSearch || p.userName?.toLowerCase().includes(affilSearch.toLowerCase()) || p.userEmail?.toLowerCase().includes(affilSearch.toLowerCase()) || p.fullName?.toLowerCase().includes(affilSearch.toLowerCase())).length === 0 ? (
+              <div className="p-8 text-center text-xs text-on-surface-variant/70 italic">Nenhum pedido de levantamento encontrado.</div>
             ) : (
               <table className="w-full text-left border-collapse">
                 <thead className="bg-surface-container text-[10px] uppercase font-black text-on-surface-variant tracking-widest border-b border-outline-variant/15">
@@ -2266,7 +2303,7 @@ export default function AdminPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10 text-xs text-on-surface">
-                  {adminPayouts.map(payout => (
+                  {adminPayouts.filter(p => !affilSearch || p.userName?.toLowerCase().includes(affilSearch.toLowerCase()) || p.userEmail?.toLowerCase().includes(affilSearch.toLowerCase()) || p.fullName?.toLowerCase().includes(affilSearch.toLowerCase())).map(payout => (
                     <tr key={payout.id} className="hover:bg-surface-container/20 transition-colors">
                       <td className="p-4">
                         <p className="font-bold text-on-surface">{payout.userName}</p>
@@ -2314,8 +2351,80 @@ export default function AdminPanel() {
               </table>
             )}
           </div>
+          )}
+
+          {/* Trials / Organic Referrals Table */}
+          {affiliateTab === 'trials' && (
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
+             <div className="p-6 border-b border-outline-variant/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container">
+               <div>
+                  <h3 className="font-bold text-sm text-on-surface uppercase tracking-wider flex items-center gap-2">
+                    <span className="material-symbols-outlined text-cyan-400">group_add</span> Registo de Testes Grátis (Geração de Leads)
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">Membros convidados que efetuaram sucesso no registo. Estes aguardam converter para a sua subscrição.</p>
+               </div>
+               <div className="flex items-center gap-4 w-full sm:w-auto">
+                 <input 
+                   type="text" 
+                   placeholder="Pesquisar..." 
+                   value={affilSearch}
+                   onChange={(e) => setAffilSearch(e.target.value)}
+                   className="w-full sm:w-auto bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2 text-xs text-on-surface outline-none focus:border-cyan-500 placeholder:text-on-surface-variant/40"
+                 />
+                 <span className="text-xs font-mono bg-surface-container-high px-3 py-1 rounded-full font-bold text-on-surface-variant whitespace-nowrap">
+                    {adminReferrals.filter(r => r.status === 'approved' && r.rewardType === 'free_month' && r.paymentAmount === 0 && (!affilSearch || r.referredName?.toLowerCase().includes(affilSearch.toLowerCase()) || r.referredEmail?.toLowerCase().includes(affilSearch.toLowerCase()))).length} Leads
+                 </span>
+               </div>
+             </div>
+             
+             {adminReferrals.filter(r => r.status === 'approved' && r.rewardType === 'free_month' && r.paymentAmount === 0 && (!affilSearch || r.referredName?.toLowerCase().includes(affilSearch.toLowerCase()) || r.referredEmail?.toLowerCase().includes(affilSearch.toLowerCase()))).length === 0 ? (
+               <div className="p-8 text-center text-xs text-on-surface-variant/70 italic">Nenhum convidado em período Trial no momento.</div>
+             ) : (
+                <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-[var(--surface-container)] text-[10px] uppercase font-black text-on-surface-variant tracking-widest border-b border-outline-variant/15 sticky top-0 z-10 backdrop-blur-md">
+                      <tr>
+                        <th className="p-4">Quem Convidou (Padrinho)</th>
+                        <th className="p-4">Lead Registrado</th>
+                        <th className="p-4">Registo e Plano</th>
+                        <th className="p-4">Recompensa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/10 text-xs text-on-surface">
+                       {adminReferrals.filter(r => r.status === 'approved' && r.rewardType === 'free_month' && r.paymentAmount === 0)
+                          .map(ref => {
+                            const referrerUser = users.find(u => u.id === ref.referrerId);
+                            return (
+                               <tr key={ref.id} className="hover:bg-surface-container/20 transition-colors">
+                                 <td className="p-4">
+                                   <p className="font-bold text-on-surface">{referrerUser?.name || 'Afiliado'}</p>
+                                   <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{referrerUser?.email}</p>
+                                 </td>
+                                 <td className="p-4">
+                                   <p className="font-bold text-cyan-400">{ref.referredName}</p>
+                                   <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{ref.referredEmail}</p>
+                                 </td>
+                                 <td className="p-4">
+                                   <span className="font-semibold text-xs font-mono uppercase bg-surface-container-high px-2 py-0.5 rounded border border-outline-variant/15 block w-fit mb-1">{ref.referredPlan?.replace('_', ' ')}</span>
+                                   <span className="text-[10px] text-on-surface-variant">{new Date(ref.createdAt).toLocaleDateString()}</span>
+                                 </td>
+                                 <td className="p-4">
+                                    <span className="bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-black px-2 py-0.5 rounded uppercase text-[10px]">
+                                      Progresso Trial
+                                    </span>
+                                 </td>
+                               </tr>
+                            );
+                       })}
+                    </tbody>
+                  </table>
+                </div>
+             )}
+          </div>
+          )}
 
           {/* Quick Grant of Free Subscription Promo */}
+          {affiliateTab === 'config' && (
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl">
             <h4 className="font-bold text-sm text-on-surface mb-3 uppercase tracking-wider">Premiação Especial: Conceder Plano / Mês Avulso</h4>
             <p className="text-xs text-on-surface-variant mb-6 leading-relaxed">
@@ -2344,6 +2453,7 @@ export default function AdminPanel() {
               </button>
             </div>
           </div>
+          )}
 
         </div>
       )}

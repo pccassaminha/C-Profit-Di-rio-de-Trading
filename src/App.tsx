@@ -156,7 +156,7 @@ export default function App() {
   };
 
   const showCouponBanner = !!user && 
-    (userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'Iniciante' || isExpired) && 
+    (userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30' || userPlan?.plan_type === 'Iniciante' || isExpired) && 
     !isBannerDismissed;
 
   return (

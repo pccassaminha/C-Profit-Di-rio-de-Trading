@@ -116,7 +116,7 @@ export default function UserAffiliate() {
     setTimeout(() => setCodeCopied(false), 2000);
   };
 
-  const promoMessage = `📈 Conheça o C Profit — o terminal definitivo para traders profissionais! \n\nFaça o diário de todos os seus trades automáticos e manuais de Forex e Opções Binárias, controle limites, drawdown, winrate e analise métricas em tempo real!\n\n🎁 Clique no link para fazer o seu cadastro e ganhe 15 DIAS GRÁTIS de teste completo:\n\nLink: ${referralLink}\nOu use o código de indicação: ${myRefCode} na hora de se registrar!`;
+  const promoMessage = `📈 Conheça o C Profit — o terminal definitivo para traders profissionais! \n\nFaça o diário de todos os seus trades automáticos e manuais de Forex e Opções Binárias, controle limites, drawdown, winrate e analise métricas em tempo real!\n\n🎁 Clique no link para fazer o seu cadastro e ganhe 30 DIAS GRÁTIS de teste completo:\n\nLink: ${referralLink}\nOu use o código de indicação: ${myRefCode} na hora de se registrar!`;
 
   const handleCopyMsg = () => {
     navigator.clipboard.writeText(promoMessage);
@@ -320,7 +320,7 @@ export default function UserAffiliate() {
             </div>
 
             <p className="text-xs text-on-surface-variant/80 leading-relaxed font-medium">
-              Abaixo estão suas credenciais exclusivas de convite. Os novos traders podem usar tanto o seu link direto quanto digitar o seu Código de Indicação manualmente durante o cadastro para receber o teste grátis de 15 dias. <strong className="text-primary">Lembre-se: os seus convites são 100% infinitos e ilimitados, mesmo para utilizadores em teste grátis (Trial)!</strong>
+              Abaixo estão suas credenciais exclusivas de convite. Os novos traders podem usar tanto o seu link direto quanto digitar o seu Código de Indicação manualmente durante o cadastro para receber o teste grátis de 30 dias. <strong className="text-primary">Lembre-se: os seus convites são 100% infinitos e ilimitados, mesmo para utilizadores em teste grátis (Trial)!</strong>
             </p>
 
             <div className="space-y-4">

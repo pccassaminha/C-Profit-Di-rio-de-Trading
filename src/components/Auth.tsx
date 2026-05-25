@@ -72,7 +72,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       if (isNewUser) {
         const referredBy = localStorage.getItem('referredBy') || null;
         const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 15);
+        expiryDate.setDate(expiryDate.getDate() + 30);
 
         // Resolve referredBy if it is a short refCode or UID
         let finalReferredUid: string | null = null;
@@ -91,7 +91,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         const isTrialQualified = !!(finalReferredUid || referredBy);
-        const resolvedPlanType = 'trial_15';
+        const resolvedPlanType = 'trial_30';
         const resolvedExpiryDate = expiryDate.toISOString();
 
         const googleDisplayName = result.user.displayName || 'Usuário Google';
@@ -99,7 +99,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         const googleFirstName = parts[0] || '';
         const googleLastName = parts.slice(1).join(' ') || '';
 
-        // Create initial profile for Google user with 15 days free trial
+        // Create initial profile for Google user with 30 days free trial
         await setDoc(userRef, {
           nome: googleDisplayName,
           firstName: googleFirstName,
@@ -122,7 +122,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
             referredId: result.user.uid,
             referredName: result.user.displayName || 'Usuário Google',
             referredEmail: result.user.email || '',
-            referredPlan: 'trial_15',
+            referredPlan: 'trial_30',
             paymentAmount: 0,
             rewardType: 'free_month',
             rewardValue: '1_month_free_progress',
@@ -238,7 +238,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         
         const referredBy = localStorage.getItem('referredBy') || null;
         const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 15);
+        expiryDate.setDate(expiryDate.getDate() + 30);
 
         let finalReferredUid: string | null = null;
         if (solvedReferredUid) {
@@ -258,7 +258,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         const isTrialQualified = !!(finalReferredUid || referredBy);
-        const resolvedPlanType = 'trial_15';
+        const resolvedPlanType = 'trial_30';
         const resolvedExpiryDate = expiryDate.toISOString();
 
         const newUserData: any = {
@@ -293,7 +293,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
             referredId: result.user.uid,
             referredName: fullName || 'Novo Trader',
             referredEmail: email,
-            referredPlan: 'trial_15',
+            referredPlan: 'trial_30',
             paymentAmount: 0,
             rewardType: 'free_month',
             rewardValue: '1_month_free_progress',

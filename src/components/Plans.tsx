@@ -207,7 +207,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
               discountFixed = appliedCoupon.discountValue;
            }
         }
-     } else if (userPlan?.plan_type === 'trial_15') {
+     } else if (userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30') {
         // Auto 50% OFF trial conversion discount
         discountPercentage = 50;
      }
@@ -227,26 +227,28 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
      return finalPriceNum.toLocaleString('pt-PT').replace(/,/g, '.');
   };
 
-  const getFinalDiscountLabel = (plan: any) => {
-     if (appliedCoupon) {
-        if (appliedCoupon.targetPlan !== 'all' && appliedCoupon.targetPlan !== plan.id) return plan.discount;
-        if (appliedCoupon.discountType === 'percentage') {
-           return `-${appliedCoupon.discountValue}% PARCEIRO`;
-        } else {
-           return `-Kz ${appliedCoupon.discountValue} PARCEIRO`;
-        }
-     } else if (userPlan?.plan_type === 'trial_15') {
-        return '-50% TRIAL DESC.';
-     }
-     return plan.discount;
+  const getFinalDiscountLabel = (plan: any, finalPriceStr: string) => {
+      const finalPriceNum = Number(finalPriceStr.replace(/\./g, ''));
+      if (plan.oldPrice) {
+          const oldPriceNum = Number(plan.oldPrice.replace(/\./g, ''));
+          if (oldPriceNum > finalPriceNum) {
+              const perc = Math.round(((oldPriceNum - finalPriceNum) / oldPriceNum) * 100);
+              let suffix = appliedCoupon ? ' SUPERCUPOM' : ' OFF';
+              return `-${perc}%${suffix}`;
+          }
+      }
+      return plan.discount;
   };
 
-  const finalPlans = plans.map(p => ({
-     ...p, 
-     originalPriceStr: p.price,
-     price: getDiscountedPrice(p),
-     discount: getFinalDiscountLabel(p)
-  }));
+  const finalPlans = plans.map(p => {
+     const finalPrice = getDiscountedPrice(p);
+     return {
+         ...p, 
+         originalPriceStr: p.price,
+         price: finalPrice,
+         discount: getFinalDiscountLabel(p, finalPrice)
+     };
+  });
 
   const handleSupport = () => {
     const phone = globalSettings?.whatsappNumber || '244921319200';
@@ -259,7 +261,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       return;
     }
     if (paymentMethod === 'express' && !expressCode.trim()) {
-      alert('Por favor, insira o número de telemóvel do Express.');
+      alert('Por favor, insira o Código da Transação do Express.');
       return;
     }
     setIsSubmitting(true);
@@ -305,7 +307,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
           <div>
             <h2 className="text-error font-black text-xl uppercase tracking-tighter">
               {userPlan?.plan_type === 'trial_15'
-                ? 'Período de Teste Grátis de 15 Dias Expirado'
+                ? 'Período de Teste Grátis de 30 Dias Expirado'
                 : userPlan?.plan_type === 'Iniciante' 
                   ? 'Acesso Restrito: Plano Inativo' 
                   : 'Acesso Bloqueado: Assinatura Expirada'
@@ -313,7 +315,8 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
             </h2>
             <p className="text-on-surface-variant text-sm font-medium opacity-80">
               {userPlan?.plan_type === 'trial_15'
-                ? 'O seu período de experimentação de 15 dias grátis chegou ao fim. Faça a subscrição para reativar todo o terminal profissional.'
+                ? 'O seu período de experimentação de 30 dias grátis chegou ao fim. Faça a subscrição para reativar todo o terminal profissional.'
+
                 : userPlan?.plan_type === 'Iniciante' 
                   ? 'Sua conta ainda não possui uma assinatura ativa. Escolha um plano abaixo para começar.' 
                   : 'Seu período de assinatura terminou. Renove agora para continuar gerenciando seus trades.'
@@ -363,40 +366,14 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
             <h3 className="text-lg font-black text-on-surface uppercase tracking-tight">Tem um Cupom de Desconto?</h3>
           </div>
           
-          {activeCouponsList.length > 0 ? (
-            <div className="space-y-1">
-              <p className="text-xs text-on-surface-variant font-medium">
-                {userPlan?.plan_type === 'trial_15' 
-                  ? 'Como está no período de Trial, aproveite os cupons criados pelo Maestro para converter o seu teste numa assinatura com desconto especial:'
-                  : 'Aproveite os cupons ativos criados pelos nossos Maestros e parceiros para economizar na sua assinatura:'
-                }
-              </p>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {activeCouponsList.map((cp) => (
-                  <button
-                    key={cp.id}
-                    onClick={() => {
-                      setAppliedCoupon(cp);
-                      setValidationMsg({ text: `Cupom "${cp.code}" aplicado com sucesso!`, type: 'success' });
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all border ${
-                      appliedCoupon?.code === cp.code
-                        ? 'bg-primary/20 text-primary border-primary'
-                        : 'bg-surface-container-high border-outline hover:border-primary-variant hover:scale-102'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[14px]">sell</span>
-                    <span>{cp.code}</span>
-                    <span className="opacity-70">
-                      ({cp.discountType === 'percentage' ? `-${cp.discountValue}%` : `-Kz ${cp.discountValue}`})
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-on-surface-variant font-medium">Insira o seu código promocional ou de afiliado à direita para obter descontos exclusivos:</p>
-          )}
+          <div className="space-y-1">
+            <p className="text-xs text-on-surface-variant font-medium">
+              {(userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30')
+                ? 'Como está no período de Trial, se tiver, use um cupão para converter o seu teste numa assinatura com desconto:'
+                : 'Insira o seu código promocional ou de afiliado à direita para obter descontos exclusivos:'
+              }
+            </p>
+          </div>
         </div>
 
         {/* Input Form */}
@@ -700,12 +677,12 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                           )}
 
                           <div className="space-y-2">
-                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Inserir Número de Telemóvel do Canal Express</label>
+                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Inserir Código da Transação Express</label>
                             <input 
                               type="text" 
                               value={expressCode}
                               onChange={(e) => setExpressCode(e.target.value)}
-                              placeholder="921 167 980"
+                              placeholder="Ex: 08343843"
                               className="w-full bg-surface-container border border-amber-500/30 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-amber-500 transition-all font-mono"
                             />
                           </div>
