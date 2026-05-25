@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth, storage } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, increment, deleteDoc, getDoc, setDoc, limit } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, increment, deleteDoc, getDoc, getDocs, setDoc, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
 import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft } from 'lucide-react';
@@ -93,10 +93,66 @@ export default function Community() {
     return () => unsub();
   }, []);
 
+  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
+
   // Local inline comment state inside profile feed
   const [profilePostCommentInputs, setProfilePostCommentInputs] = useState<{[postId: string]: string}>({});
   const [activeProfilePostComments, setActiveProfilePostComments] = useState<{[postId: string]: any[]}>({});
   
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const qIncoming = query(
+      collection(db, 'friend_requests'),
+      where('receiverId', '==', auth.currentUser.uid),
+      where('status', '==', 'pending')
+    );
+    const unsubIncoming = onSnapshot(qIncoming, snap => {
+      setIncomingRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const qOutgoing = query(
+      collection(db, 'friend_requests'),
+      where('senderId', '==', auth.currentUser.uid)
+    );
+    const unsubOutgoing = onSnapshot(qOutgoing, snap => {
+      setOutgoingRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => {
+      unsubIncoming();
+      unsubOutgoing();
+    };
+  }, []);
+
+  // Auto-sync bidirectional friends when a sent request gets accepted
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const q = query(
+      collection(db, 'friend_requests'),
+      where('senderId', '==', auth.currentUser.uid),
+      where('status', '==', 'accepted')
+    );
+    const unsub = onSnapshot(q, async (snap) => {
+      for (const change of snap.docChanges()) {
+        if (change.type === 'added' || change.type === 'modified') {
+          const data = change.doc.data();
+          const friendId = data.receiverId;
+          if (friendId && !friendsList.includes(friendId)) {
+            try {
+              await setDoc(doc(db, 'users', auth.currentUser.uid, 'friends', friendId), { 
+                addedAt: new Date().toISOString() 
+              });
+            } catch (e) {
+              console.error("Error auto-syncing friend:", e);
+            }
+          }
+        }
+      }
+    });
+    return () => unsub();
+  }, [friendsList]);
+
   useEffect(() => {
     if (!auth.currentUser) return;
     const unsub = onSnapshot(query(collection(db, 'users', auth.currentUser.uid, 'blocks')), snap => {
@@ -495,22 +551,141 @@ export default function Community() {
 
   const handleToggleFriend = async () => {
     if (!auth.currentUser || !selectedProfileUser) return;
+    
+    const isFriend = friendsList.includes(selectedProfileUser.id);
     const friendRef = doc(db, 'users', auth.currentUser.uid, 'friends', selectedProfileUser.id);
-    const friendOfMineRef = doc(db, 'users', selectedProfileUser.id, 'friends', auth.currentUser.uid);
+    
     try {
-      if (friendsList.includes(selectedProfileUser.id)) {
+      if (isFriend) {
+        // Remove friend. We delete our own pointer.
         await deleteDoc(friendRef);
-        await deleteDoc(friendOfMineRef);
+        
+        // Also delete any mutual friend requests
+        const qReq = query(
+          collection(db, 'friend_requests'),
+          where('senderId', 'in', [auth.currentUser.uid, selectedProfileUser.id]),
+          where('receiverId', 'in', [auth.currentUser.uid, selectedProfileUser.id])
+        );
+        const reqSnap = await getDocs(qReq);
+        for (const d of reqSnap.docs) {
+          await deleteDoc(doc(db, 'friend_requests', d.id));
+        }
+
         alert(`${selectedProfileUser.name} foi removido dos seus amigos.`);
       } else {
-        await setDoc(friendRef, { addedAt: serverTimestamp() });
-        await setDoc(friendOfMineRef, { addedAt: serverTimestamp() });
-        alert(`${selectedProfileUser.name} adicionado aos seus amigos!`);
+        // Send / Accept Friend Request
+        const incoming = incomingRequests.find(r => r.senderId === selectedProfileUser.id);
+        const outgoing = outgoingRequests.find(r => r.receiverId === selectedProfileUser.id);
+        
+        if (incoming) {
+          // If there's an incoming request from them, accept it!
+          await handleAcceptFriendRequest(incoming);
+        } else if (outgoing) {
+          alert('Já enviou um pedido de amizade. Aguardando a aprovação do trader.');
+        } else {
+          // Send request
+          await handleSendFriendRequest();
+        }
       }
     } catch (err) {
       console.error(err);
       alert('Erro ao processar amizade.');
     }
+  };
+
+  const handleSendFriendRequest = async () => {
+    if (!auth.currentUser || !selectedProfileUser) return;
+    try {
+      const qCheck = query(
+        collection(db, 'friend_requests'),
+        where('senderId', '==', auth.currentUser.uid),
+        where('receiverId', '==', selectedProfileUser.id)
+      );
+      const checkSnap = await getDocs(qCheck);
+      if (!checkSnap.empty) {
+        alert('Já enviou um pedido de amizade.');
+        return;
+      }
+
+      await addDoc(collection(db, 'friend_requests'), {
+        senderId: auth.currentUser.uid,
+        senderName: dbName || auth.currentUser.displayName || 'Trader',
+        senderPhoto: dbPhoto || auth.currentUser.photoURL || '',
+        receiverId: selectedProfileUser.id,
+        receiverName: selectedProfileUser.name,
+        receiverPhoto: selectedProfileUser.photo || '',
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+      alert(`Pedido de amizade enviado para ${selectedProfileUser.name}!`);
+    } catch (err) {
+      console.error('Error sending friend request:', err);
+      alert('Erro ao enviar pedido de amizade.');
+    }
+  };
+
+  const sendFriendRequest = async (targetId: string, targetName: string, targetPhoto: string) => {
+    if (!auth.currentUser) return;
+    try {
+      const qCheck = query(
+        collection(db, 'friend_requests'),
+        where('senderId', '==', auth.currentUser.uid),
+        where('receiverId', '==', targetId)
+      );
+      const checkSnap = await getDocs(qCheck);
+      if (!checkSnap.empty) {
+        alert('Já enviou um pedido de amizade.');
+        return;
+      }
+
+      await addDoc(collection(db, 'friend_requests'), {
+        senderId: auth.currentUser.uid,
+        senderName: dbName || auth.currentUser.displayName || 'Trader',
+        senderPhoto: dbPhoto || auth.currentUser.photoURL || '',
+        receiverId: targetId,
+        receiverName: targetName,
+        receiverPhoto: targetPhoto || '',
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+      alert(`Pedido de amizade enviado para ${targetName}!`);
+    } catch (err) {
+      console.error('Error sending friend request:', err);
+      alert('Erro ao enviar pedido de amizade.');
+    }
+  };
+
+  const handleAcceptFriendRequest = async (req: any) => {
+    if (!auth.currentUser) return;
+    try {
+      // 1. Update request status to accepted
+      await updateDoc(doc(db, 'friend_requests', req.id), { status: 'accepted' });
+      
+      // 2. Add to my friends list
+      await setDoc(doc(db, 'users', auth.currentUser.uid, 'friends', req.senderId), {
+        addedAt: new Date().toISOString()
+      });
+      
+      alert(`Você aceitou o pedido de amizade de ${req.senderName}!`);
+    } catch (err) {
+      console.error('Error accepting friend request:', err);
+      alert('Erro ao aceitar pedido de amizade.');
+    }
+  };
+
+  const handleRejectFriendRequest = async (req: any) => {
+    try {
+      await deleteDoc(doc(db, 'friend_requests', req.id));
+    } catch (err) {
+      console.error('Error rejecting friend request:', err);
+    }
+  };
+
+  const getRecommendedTraders = () => {
+    if (!auth.currentUser) return [];
+    return allCommunityUsers
+      .filter(u => u.id !== auth.currentUser?.uid && !friendsList.includes(u.id) && !blockedUsers.includes(u.id))
+      .slice(0, 5);
   };
 
   const handleToggleDistance = async () => {
@@ -739,13 +914,16 @@ export default function Community() {
     .sort((a, b) => getPostScore(b) - getPostScore(a));
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="text-center space-y-2">
         <h2 className="text-4xl md:text-5xl font-black text-on-surface font-headline uppercase italic tracking-tighter">
           Traders da <span className="text-primary italic">Nguimbi</span>
         </h2>
         <p className="text-on-surface-variant text-sm md:text-base font-medium opacity-70">A sua rede social de trading elite.</p>
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <div className="lg:col-span-2 space-y-8">
 
       {/* Main Tabs (Feed vs Chat) */}
       {showFilter && (
@@ -1142,6 +1320,123 @@ export default function Community() {
           </div>
         )}
       </div>
+    </div>
+
+      {/* Right Sidebar Column (Col span: 1) */}
+      <div className="space-y-6 lg:sticky lg:top-24">
+        
+        {/* FRIEND REQUESTS CARD & WIDGET (PENDING ACTIONS) */}
+        <div className="bg-surface-container-low border border-outline-variant/10 rounded-[32px] p-6 shadow-xl space-y-4">
+           <div className="flex items-center gap-2 pb-2 border-b border-outline-variant/10">
+             <span className="material-symbols-outlined text-primary">group_add</span>
+             <h3 className="font-extrabold text-xs text-on-surface-variant uppercase tracking-widest pl-1">Solicitações Pendentes</h3>
+             {incomingRequests.length > 0 && (
+               <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full font-black">
+                 {incomingRequests.length}
+               </span>
+             )}
+           </div>
+           {incomingRequests.length === 0 ? (
+             <p className="text-xs text-on-surface-variant opacity-60 italic">Nenhum pedido de amizade pendente.</p>
+           ) : (
+             <div className="space-y-3">
+               {incomingRequests.map(req => (
+                 <div key={req.id} className="flex items-center justify-between p-3 bg-surface-container border border-outline-variant/5 rounded-2xl gap-3">
+                   <div className="flex items-center gap-2 min-w-0">
+                     <img 
+                       src={req.senderPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(req.senderName)}&background=random`} 
+                       alt={req.senderName} 
+                       className="w-10 h-10 rounded-xl object-cover shrink-0"
+                       referrerPolicy="no-referrer"
+                     />
+                     <div className="min-w-0">
+                       <p className="text-xs font-black text-on-surface truncate cursor-pointer hover:underline" onClick={() => handleUserClick(req.senderId, req.senderName, req.senderPhoto)}>
+                         {req.senderName}
+                       </p>
+                       <span className="text-[9px] text-on-surface-variant block truncate">Quer ser teu amigo</span>
+                     </div>
+                   </div>
+                   <div className="flex items-center gap-1.5 shrink-0">
+                     <button 
+                       onClick={() => handleAcceptFriendRequest(req)}
+                       className="p-1 px-2.5 bg-primary text-on-primary rounded-lg text-[10px] font-black hover:opacity-90 flex items-center justify-center cursor-pointer transition-all"
+                     >
+                       Aceitar
+                     </button>
+                     <button 
+                       onClick={() => handleRejectFriendRequest(req)}
+                       className="p-1.5 bg-error/10 text-error rounded-lg hover:bg-error/20 flex items-center justify-center cursor-pointer transition-all text-xs"
+                       title="Recusar"
+                     >
+                       X
+                     </button>
+                   </div>
+                 </div>
+               ))}
+             </div>
+           )}
+        </div>
+
+        {/* TRADERS DA COMUNIDADE QUE TALVEZ CONHECES */}
+        <div className="bg-surface-container-low border border-outline-variant/10 rounded-[32px] p-6 shadow-xl space-y-4">
+           <div className="flex items-center gap-2 pb-2 border-b border-outline-variant/10">
+             <span className="material-symbols-outlined text-secondary">explore</span>
+             <h3 className="font-extrabold text-xs text-on-surface-variant uppercase tracking-widest pl-1">Traders que talvez conheças</h3>
+           </div>
+           {getRecommendedTraders().length === 0 ? (
+             <p className="text-xs text-on-surface-variant opacity-60 italic">Nenhuma recomendação de momento.</p>
+           ) : (
+             <div className="space-y-3.5">
+               {getRecommendedTraders().map((trader) => {
+                 const isSent = outgoingRequests.some(r => r.receiverId === trader.id && r.status === 'pending');
+                 const isRecv = incomingRequests.some(r => r.senderId === trader.id);
+                 
+                 return (
+                   <div key={trader.id} className="flex items-center justify-between p-2 hover:bg-surface-container/30 rounded-2xl transition-all group gap-2">
+                     <div className="flex items-center gap-3 min-w-0">
+                       <img 
+                         src={trader.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(trader.nome || trader.username || 'T')}&background=random`} 
+                         alt={trader.nome || trader.username}
+                         className="w-10 h-10 rounded-xl object-cover shrink-0 cursor-pointer"
+                         referrerPolicy="no-referrer"
+                         onClick={() => handleUserClick(trader.id, trader.nome || trader.username || 'Trader', trader.photoURL || '')}
+                       />
+                       <div className="min-w-0">
+                         <h4 className="text-xs font-bold text-on-surface truncate group-hover:underline cursor-pointer" onClick={() => handleUserClick(trader.id, trader.nome || trader.username || 'Trader', trader.photoURL || '')}>
+                           {trader.nome || trader.username}
+                         </h4>
+                         <span className="text-[10px] text-on-surface-variant block truncate">Investidor C Profit</span>
+                       </div>
+                     </div>
+                     
+                     {isSent ? (
+                       <span className="text-[10px] font-bold text-on-surface-variant/60 bg-surface-container px-2 py-1 rounded-lg">Enviado</span>
+                     ) : isRecv ? (
+                       <button 
+                         onClick={() => handleAcceptFriendRequest(incomingRequests.find(r => r.senderId === trader.id))}
+                         className="p-1 px-2.5 bg-primary text-on-primary rounded-lg text-[10px] font-bold cursor-pointer hover:opacity-90 transition-all"
+                       >
+                         Aceitar
+                       </button>
+                     ) : (
+                       <button
+                         onClick={() => sendFriendRequest(trader.id, trader.nome || trader.username, trader.photoURL)}
+                         className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer flex items-center justify-center shrink-0"
+                         title="Adicionar Amigo"
+                       >
+                         <UserPlus size={16} />
+                       </button>
+                     )}
+                   </div>
+                 );
+               })}
+             </div>
+           )}
+        </div>
+
+      </div>
+
+    </div>
 
       {/* Create Post Modal */}
       {isCreateModalOpen && (
@@ -1561,6 +1856,22 @@ export default function Community() {
                           >
                             <UserMinus size={14} />
                             Remover Amigo
+                          </button>
+                        ) : outgoingRequests.some(r => r.receiverId === selectedProfileUser.id && r.status === 'pending') ? (
+                          <button
+                            disabled
+                            className="py-2 px-4 rounded-xl bg-surface-container text-on-surface-variant/60 text-xs font-bold flex items-center gap-1.5 transition-all cursor-not-allowed"
+                          >
+                            <Check size={14} className="text-primary animate-pulse" />
+                            Aguardando Aceitação
+                          </button>
+                        ) : incomingRequests.some(r => r.senderId === selectedProfileUser.id && r.status === 'pending') ? (
+                          <button
+                            onClick={handleToggleFriend}
+                            className="py-2 px-4 rounded-xl bg-primary text-on-primary hover:opacity-95 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-primary/20"
+                          >
+                            <UserPlus size={14} />
+                            Aceitar Pedido
                           </button>
                         ) : (
                           <button
@@ -2151,10 +2462,18 @@ export default function Community() {
                                       e.stopPropagation();
                                       if (!auth.currentUser) return;
                                       const friendRef = doc(db, 'users', auth.currentUser.uid, 'friends', friendUser.id);
-                                      const friendOfMineRef = doc(db, 'users', friendUser.id, 'friends', auth.currentUser.uid);
                                       try {
                                         await deleteDoc(friendRef);
-                                        await deleteDoc(friendOfMineRef);
+                                        // Also delete any existing mutual requests
+                                        const qReq = query(
+                                          collection(db, 'friend_requests'),
+                                          where('senderId', 'in', [auth.currentUser.uid, friendUser.id]),
+                                          where('receiverId', 'in', [auth.currentUser.uid, friendUser.id])
+                                        );
+                                        const reqSnap = await getDocs(qReq);
+                                        for (const d of reqSnap.docs) {
+                                          await deleteDoc(doc(db, 'friend_requests', d.id));
+                                        }
                                       } catch (err) { }
                                     }}
                                     className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
@@ -2215,22 +2534,31 @@ export default function Community() {
                                     <h4 className="text-xs font-bold text-on-surface truncate group-hover:underline">{friendUser.nome || friendUser.username}</h4>
                                     <span className="text-[10px] text-on-surface-variant block truncate">Investidor Registado</span>
                                   </div>
-                                  <button
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      if (!auth.currentUser) return;
-                                      const friendRef = doc(db, 'users', auth.currentUser.uid, 'friends', friendUser.id);
-                                      const friendOfMineRef = doc(db, 'users', friendUser.id, 'friends', auth.currentUser.uid);
-                                      try {
-                                        await setDoc(friendRef, { addedAt: serverTimestamp() });
-                                        await setDoc(friendOfMineRef, { addedAt: serverTimestamp() });
-                                      } catch (err) { }
-                                    }}
-                                    className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
-                                    title="Adicionar Amigo"
-                                  >
-                                    <UserPlus size={16} />
-                                  </button>
+                                  {outgoingRequests.some(r => r.receiverId === friendUser.id && r.status === 'pending') ? (
+                                    <span className="text-[10px] font-bold text-on-surface-variant/60 bg-surface-container px-2 py-1 rounded-lg">Enviado</span>
+                                  ) : incomingRequests.some(r => r.senderId === friendUser.id && r.status === 'pending') ? (
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        const req = incomingRequests.find(r => r.senderId === friendUser.id && r.status === 'pending');
+                                        if (req) await handleAcceptFriendRequest(req);
+                                      }}
+                                      className="p-1 px-2.5 bg-primary text-on-primary rounded-lg text-[10px] font-black hover:opacity-90 cursor-pointer transition-colors"
+                                    >
+                                      Aceitar
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        await sendFriendRequest(friendUser.id, friendUser.nome || friendUser.username || '', friendUser.photoURL || '');
+                                      }}
+                                      className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+                                      title="Adicionar Amigo"
+                                    >
+                                      <UserPlus size={16} />
+                                    </button>
+                                  )}
                                 </div>
                               ))}
                             </div>

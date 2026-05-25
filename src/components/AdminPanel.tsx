@@ -96,8 +96,7 @@ export default function AdminPanel() {
     const sortedUsers = [...users].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
     const index = sortedUsers.findIndex(u => u.id === uid);
     const numericStr = String(1000 + (index >= 0 ? index : users.length));
-    const user = users.find(u => u.id === uid);
-    return `${getInitials(user?.name)}${numericStr}`;
+    return `MC-${numericStr}`;
   };
 
   const filteredUsers = users
@@ -1105,8 +1104,10 @@ export default function AdminPanel() {
                 </div>
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div>
-                    <h4 className="text-lg font-bold text-on-surface">Upgrade solicitado por {users.find(u => u.id === p.userId)?.name || p.userId}</h4>
-                    <p className="text-sm text-on-surface-variant">Plano: <span className="text-on-surface font-bold uppercase tracking-widest">{p.planId?.replace('_', ' ')}</span></p>
+                    <h4 className="text-lg font-bold text-[#00f5a0]">
+                      Upgrade solicitado por {p.userName || users.find(u => u.id === p.userId)?.name || users.find(u => u.id === p.userId)?.nome || `Trader ${getUserDisplayId(p.userId)}`}
+                    </h4>
+                    <p className="text-sm text-on-surface-variant mt-1.5">Plano: <span className="text-on-surface font-bold uppercase tracking-widest">{p.planId?.replace('_', ' ')}</span></p>
                     <p className="text-sm text-on-surface-variant">Método: <span className="text-on-surface font-bold uppercase tracking-wider">{
                       p.paymentMethod === 'express' ? 'Express 📱' : 
                       p.paymentMethod === 'iban' ? 'IBAN 🏛️' : 'MCX Referência 💳'
@@ -2023,8 +2024,8 @@ export default function AdminPanel() {
                           <tr key={p.id} className="hover:bg-surface-container/20 transition-colors">
                             <td className="p-4 font-mono font-bold text-on-surface-variant">#{getPaymentDisplayId(p.id)}</td>
                             <td className="p-4">
-                              <p className="font-bold text-on-surface">{paidUser?.name || 'Inscrito'}</p>
-                              <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{paidUser?.email || p.userId}</p>
+                              <p className="font-bold text-on-surface">{p.userName || paidUser?.name || paidUser?.nome || 'Inscrito'}</p>
+                              <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{paidUser?.email || p.userEmail || `User ID: ${getUserDisplayId(p.userId)}`}</p>
                             </td>
                             <td className="p-4 font-bold uppercase font-mono">{p.planId?.replace('_', ' ')}</td>
                             <td className="p-4 font-bold uppercase tracking-wider text-[10px]">
@@ -2075,8 +2076,8 @@ export default function AdminPanel() {
                         return (
                           <tr key={p.id} className="hover:bg-surface-container/20 transition-colors">
                             <td className="p-4">
-                              <p className="font-bold text-on-surface">{paidUser?.name || 'Trader'}</p>
-                              <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{paidUser?.email}</p>
+                              <p className="font-bold text-on-surface">{p.userName || paidUser?.name || paidUser?.nome || 'Trader'}</p>
+                              <p className="text-[10px] text-on-surface-variant/60 font-mono italic">{paidUser?.email || p.userEmail || `User ID: ${getUserDisplayId(p.userId)}`}</p>
                             </td>
                             <td className="p-4 font-mono font-black text-primary">{p.usedCoupon}</td>
                             <td className="p-4 font-bold text-on-surface font-mono">{p.amount?.toLocaleString()} Kz</td>

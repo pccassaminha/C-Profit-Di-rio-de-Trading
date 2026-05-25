@@ -54,6 +54,27 @@ export default function Topbar({
   const [broadcasts, setBroadcasts] = useState<any[]>([]);
   const [seenIds, setSeenIds] = useState<string[]>([]);
   const [chatUnreads, setChatUnreads] = useState<any[]>([]);
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
+
+  // Subscribe to real-time pending friend requests
+  useEffect(() => {
+    if (!currentUser) return;
+    const qFr = query(
+      collection(db, 'friend_requests'),
+      where('receiverId', '==', currentUser.uid),
+      where('status', '==', 'pending')
+    );
+    const unsubFr = onSnapshot(qFr, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setFriendRequests(items);
+    }, (error) => {
+      console.error('Error fetching friend requests in topbar:', error);
+    });
+    return () => unsubFr();
+  }, [currentUser]);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLDivElement>(null);
@@ -161,7 +182,7 @@ export default function Topbar({
   };
 
   const totalUnreadChats = chatUnreads.reduce((sum, chat) => sum + chat.count, 0);
-  const unreadCount = broadcasts.filter(b => !seenIds.includes(b.id)).length + totalUnreadChats;
+  const unreadCount = broadcasts.filter(b => !seenIds.includes(b.id)).length + totalUnreadChats + friendRequests.length;
 
   return (
     <header className="flex justify-between items-center px-6 w-full h-20 sticky top-0 z-40 bg-background border-b border-outline-variant/20">
@@ -233,7 +254,37 @@ export default function Topbar({
                     </p>
                   </div>
                 ))}
-                {broadcasts.length === 0 && chatUnreads.length === 0 ? (
+                {friendRequests.map(fr => (
+                  <div 
+                    key={fr.id} 
+                    onClick={() => {
+                        setNotificationsOpen(false);
+                        if (onNavigate) {
+                           onNavigate('community');
+                        }
+                    }}
+                    className="p-3.5 rounded-xl border transition-colors bg-secondary/5 border-secondary/20 shadow-sm cursor-pointer hover:bg-secondary/10 flex items-center gap-2.5"
+                  >
+                    <img 
+                      src={fr.senderPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(fr.senderName)}&background=random`} 
+                      alt={fr.senderName} 
+                      className="w-9 h-9 rounded-xl object-cover shrink-0 border border-outline-variant/10" 
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="material-symbols-outlined text-secondary text-[16px]">group_add</span>
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-secondary">
+                          Novo Pedido
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-on-surface leading-tight">
+                        <strong className="font-bold text-on-surface">{fr.senderName}</strong> enviou um pedido de amizade. Toque aqui para decidir na Comunidade!
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {broadcasts.length === 0 && chatUnreads.length === 0 && friendRequests.length === 0 ? (
                   <div className="text-center py-8 px-4 text-on-surface-variant text-xs italic">
                     Nenhuma notificação por enquanto.
                   </div>
