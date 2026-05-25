@@ -13,85 +13,87 @@ export const useTrades = (manualTrades: any[] = []) => {
   const [globalSettings, setGlobalSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. Buscar plano e configurações
+  // 1. Buscar plano e configurações em tempo real
   useEffect(() => {
     if (!auth.currentUser) {
       setLoading(false);
       return;
     }
     
-    const fetchData = async () => {
-      const defaultPlan = { 
-        plan_type: 'Iniciante', 
-        account_limit: 2,
-        role: auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user'
-      };
-      
-      const defaultSettings = {
-        whatsappNumber: '244921319200',
-        iban: 'AO06 0000 0000 0000 0000 0',
-        multicaixaEntity: '12345',
-        multicaixaReference: '000 000 000',
-        showIban: true,
-        showMulticaixa: true,
-        multicaixaLogoUrl: 'https://i.ibb.co/vz6W1fN/mcx-logo.png'
-      };
-
-      try {
-        let userDoc = null;
-        try {
-          // Tentar primeiro no novo caminho 'usuarios' (SaaS)
-          userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
-          
-          // Se não encontrar, tenta no antigo 'users'
-          if (!userDoc.exists()) {
-            userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
-          }
-        } catch (innerErr) {
-          console.warn("Operating in offline/cached mode for user document:", innerErr);
-        }
-
-        if (userDoc && userDoc.exists()) {
-          const data = userDoc.data();
-          let limit = data.account_limit || 2;
-          if (data.plan_type === 'mensal_6' || data.plan_type === 'mensal_2') limit = 12; // 6 OB + 6 Forex
-          if (data.plan_type === 'trimestral_6') limit = 12; // 6 OB + 6 Forex
-          if (data.plan_type === 'semestral_8' || data.plan_type === 'semestral_6') limit = 16; // 8 OB + 8 Forex
-          if (data.plan_type === 'anual_16') limit = 32; // 16 OB + 16 Forex
-          if (data.plan_type === 'ilimitado' || data.role === 'admin') limit = 999; 
-
-          setUserPlan({
-            plan_type: data.plan_type || 'Iniciante',
-            account_limit: limit,
-            expiry_date: data.expiry_date || null,
-            role: data.role || (auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user')
-          });
-        } else {
-          setUserPlan(defaultPlan);
-        }
-
-        // Fetch Global Settings
-        let settingsDoc = null;
-        try {
-          settingsDoc = await getDoc(doc(db, 'settings', 'global'));
-        } catch (innerErr) {
-          console.warn("Operating in offline/cached mode for global settings:", innerErr);
-        }
-
-        if (settingsDoc && settingsDoc.exists()) {
-          setGlobalSettings(settingsDoc.data());
-        } else {
-          setGlobalSettings(defaultSettings);
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        setUserPlan(defaultPlan);
-        setGlobalSettings(defaultSettings);
-      }
+    const uid = auth.currentUser.uid;
+    const defaultPlan = { 
+      plan_type: 'Iniciante', 
+      account_limit: 2,
+      role: auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user'
     };
     
-    fetchData();
-  }, []);
+    const defaultSettings = {
+      whatsappNumber: '244921319200',
+      iban: 'AO06 0000 0000 0000 0000 0',
+      multicaixaEntity: '12345',
+      multicaixaReference: '000 000 000',
+      showIban: true,
+      showMulticaixa: true,
+      multicaixaLogoUrl: 'https://i.ibb.co/vz6W1fN/mcx-logo.png'
+    };
+
+    // Subscrição em tempo real aos dados do utilizador ('usuarios')
+    const unsubUser = onSnapshot(doc(db, 'usuarios', uid), (userDoc) => {
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        let limit = data.account_limit || 2;
+        if (data.plan_type === 'mensal_6' || data.plan_type === 'mensal_2') limit = 12; // 6 OB + 6 Forex
+        if (data.plan_type === 'trimestral_6') limit = 12; // 6 OB + 6 Forex
+        if (data.plan_type === 'semestral_8' || data.plan_type === 'semestral_6') limit = 16; // 8 OB + 8 Forex
+        if (data.plan_type === 'anual_16') limit = 32; // 16 OB + 16 Forex
+        if (data.plan_type === 'ilimitado' || data.plan_type === 'Unlimited Elite' || data.role === 'admin') limit = 999; 
+
+        setUserPlan({
+          plan_type: data.plan_type || 'Iniciante',
+          account_limit: limit,
+          expiry_date: data.expiry_date || null,
+          role: data.role || (auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user')
+        });
+      } else {
+        // Fallback para caminho antigo 'users'
+        const unsubOldUser = onSnapshot(doc(db, 'users', uid), (oldUserDoc) => {
+          if (oldUserDoc.exists()) {
+            const data = oldUserDoc.data();
+            let limit = data.account_limit || 2;
+            if (data.plan_type === 'mensal_6' || data.plan_type === 'mensal_2') limit = 12;
+            if (data.plan_type === 'trimestral_6') limit = 12;
+            if (data.plan_type === 'semestral_8' || data.plan_type === 'semestral_6') limit = 16;
+            if (data.plan_type === 'anual_16') limit = 32;
+            if (data.plan_type === 'ilimitado' || data.plan_type === 'Unlimited Elite' || data.role === 'admin') limit = 999; 
+
+            setUserPlan({
+              plan_type: data.plan_type || 'Iniciante',
+              account_limit: limit,
+              expiry_date: data.expiry_date || null,
+              role: data.role || (uid === 'exportacoes.extras@gmail.com' ? 'admin' : 'user')
+            });
+          } else {
+            setUserPlan(defaultPlan);
+          }
+        });
+        return unsubOldUser;
+      }
+    });
+
+    // Subscrição em tempo real às configurações globais
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (settingsDoc) => {
+      if (settingsDoc.exists()) {
+        setGlobalSettings(settingsDoc.data());
+      } else {
+        setGlobalSettings(defaultSettings);
+      }
+    });
+
+    return () => {
+      unsubUser();
+      unsubSettings();
+    };
+  }, [auth.currentUser]);
 
   const isSuperAdmin = useMemo(() => {
     const email = auth.currentUser?.email;

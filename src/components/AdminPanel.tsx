@@ -354,11 +354,21 @@ export default function AdminPanel() {
         userUpdateFields.usedCoupon = payment.usedCoupon;
       }
 
-      await updateDoc(doc(db, 'usuarios', payment.userId), userUpdateFields);
+      let targetUserRef = doc(db, 'usuarios', payment.userId);
+      let userSnap = await getDoc(targetUserRef);
+      
+      if (!userSnap.exists()) {
+        const oldUserRef = doc(db, 'users', payment.userId);
+        const oldUserSnap = await getDoc(oldUserRef);
+        if (oldUserSnap.exists()) {
+          targetUserRef = oldUserRef;
+          userSnap = oldUserSnap;
+        }
+      }
+
+      await setDoc(targetUserRef, userUpdateFields, { merge: true });
 
       // 3. Referral check (affiliate commission)
-      const userRef = doc(db, 'usuarios', payment.userId);
-      const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
         const userData = userSnap.data();
         if (userData.referredBy) {
@@ -2219,7 +2229,7 @@ export default function AdminPanel() {
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10 text-xs text-on-surface select-none">
                   {adminReferrals.filter(r => r.status === 'pending_approval' && (!affilSearch || r.referredName?.toLowerCase().includes(affilSearch.toLowerCase()) || r.referredEmail?.toLowerCase().includes(affilSearch.toLowerCase()))).map(ref => {
-                    const referrerUser = users.find(u => u.id === ref.referrerId);
+                    const referrerUser = users.find(u => u.id === ref.referrerId || u.refCode === ref.referrerId || (u.id && u.id.substring(0,6).toUpperCase() === ref.referrerId));
                     return (
                       <tr key={ref.id} className="hover:bg-surface-container/20 transition-colors">
                         <td className="p-4">
@@ -2391,9 +2401,9 @@ export default function AdminPanel() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant/10 text-xs text-on-surface">
-                       {adminReferrals.filter(r => r.status === 'approved' && r.rewardType === 'free_month' && r.paymentAmount === 0)
+                       {adminReferrals.filter(r => r.status === 'approved' && r.rewardType === 'free_month' && r.paymentAmount === 0 && (!affilSearch || r.referredName?.toLowerCase().includes(affilSearch.toLowerCase()) || r.referredEmail?.toLowerCase().includes(affilSearch.toLowerCase())))
                           .map(ref => {
-                            const referrerUser = users.find(u => u.id === ref.referrerId);
+                            const referrerUser = users.find(u => u.id === ref.referrerId || u.refCode === ref.referrerId || (u.id && u.id.substring(0,6).toUpperCase() === ref.referrerId));
                             return (
                                <tr key={ref.id} className="hover:bg-surface-container/20 transition-colors">
                                  <td className="p-4">

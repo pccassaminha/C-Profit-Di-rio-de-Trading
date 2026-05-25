@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTrades } from '../hooks/useTrades';
 import { db, auth } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, orderBy, getDocs, getDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, orderBy, getDocs, getDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { CreditCard, Check, ShieldCheck, Zap, Star, LayoutGrid, Smartphone, MessageSquare, History, Upload, Landmark, X, FileText } from 'lucide-react';
 import Modal from './Modal';
 
@@ -134,6 +134,20 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
   const plans = [
     {
+      id: 'trial_30',
+      name: 'Plano Trial Grátis',
+      oldPrice: '5.000',
+      discount: '100% OFF',
+      savingsText: 'Totalmente Grátis por 30 dias',
+      price: '0',
+      period: 'por 30 dias',
+      days: 30,
+      limits: '2 Contas Forex + 2 Contas OB',
+      totalLimit: 4,
+      features: ['Suporte via WhatsApp', 'Importação MT5, HTML e CSV', 'Diário de Trades Ilimitado', 'Relatórios de Performance', 'Acesso à Comunidade', 'Válido para novos registros'],
+      current: userPlan?.plan_type === 'trial_30' || userPlan?.plan_type === 'trial_15'
+    },
+    {
       id: 'mensal_6',
       name: 'Plano Mensal',
       oldPrice: '7.500',
@@ -196,6 +210,9 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
   // Aplicar Desconto do Cupão
   const getDiscountedPrice = (plan: any) => {
+     if (plan.id === 'trial_30') {
+        return '0';
+     }
      let discountPercentage = 0;
      let discountFixed = 0;
 
@@ -295,6 +312,29 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const handleCloseModal = () => {
     setShowPaymentModal(null);
     setPaymentSubmitted(false);
+  };
+
+  const handleActivateFreeTrial = async () => {
+    if (!auth.currentUser) return;
+    setIsSubmitting(true);
+    try {
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 30);
+      
+      const userRef = doc(db, 'usuarios', auth.currentUser.uid);
+      await setDoc(userRef, {
+        plan_type: 'trial_30',
+        expiry_date: expiryDate.toISOString(),
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      alert('Plano Trial Grátis (30 Dias) ativado com sucesso! Aproveite.');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao ativar Plano Grátis.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -471,7 +511,11 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                 if (!auth.currentUser && onAuthRequired) {
                   onAuthRequired();
                 } else if (!plan.current) {
-                  setShowPaymentModal(plan);
+                  if (plan.id === 'trial_30') {
+                    handleActivateFreeTrial();
+                  } else {
+                    setShowPaymentModal(plan);
+                  }
                 }
               }}
               disabled={plan.current}

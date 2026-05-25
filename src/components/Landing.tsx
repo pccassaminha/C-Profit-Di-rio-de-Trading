@@ -915,19 +915,31 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
               </div>
 
               {/* Action buttons footer */}
-              <div className="mt-8 flex flex-col sm:flex-row items-center gap-3">
+              <div className="mt-8 flex flex-col sm:flex-row items-center gap-4">
                 <button
                   onClick={() => {
                     closePromoPopup();
                     onRegisterClick();
                   }}
-                  className="w-full py-4 rounded-xl bg-[#00f5a0] text-background text-xs font-black uppercase tracking-wider hover:opacity-90 transition-all text-center cursor-pointer shadow-[0_10px_30px_rgba(0,245,160,0.2)]"
+                  className="w-full py-4 rounded-xl bg-[#00f5a0] text-background text-xs font-black uppercase tracking-wider hover:opacity-95 transition-all text-center cursor-pointer shadow-[0_10px_30px_rgba(0,245,160,0.25)] flex items-center justify-center gap-2"
                 >
-                  REGISTAR &amp; APLICAR DESCONTO
+                  <Wallet size={14} /> ASSINATURA (50% OFF)
                 </button>
                 <button
+                  onClick={() => {
+                    closePromoPopup();
+                    onRegisterClick();
+                  }}
+                  className="w-full py-4 rounded-xl bg-transparent hover:bg-cyan-500/10 border border-cyan-500/60 text-cyan-400 hover:text-white hover:border-cyan-500 text-xs font-black uppercase tracking-wider transition-all text-center cursor-pointer flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(6,182,212,0.15)]"
+                >
+                  <Zap size={14} className="text-cyan-400 animate-pulse" /> INSTALAR TRIAL (30 DIAS)
+                </button>
+              </div>
+
+              <div className="mt-4 text-center">
+                <button
                   onClick={closePromoPopup}
-                  className="w-full py-4 rounded-xl bg-transparent hover:bg-white/5 text-on-surface-variant hover:text-white text-xs font-bold uppercase tracking-wider transition-all text-center cursor-pointer"
+                  className="text-on-surface-variant/50 hover:text-white text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer bg-transparent border-none"
                 >
                   Talvez mais tarde
                 </button>

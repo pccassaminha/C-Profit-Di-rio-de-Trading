@@ -41,6 +41,8 @@ interface UserProfile {
 
 export default function UserAffiliate() {
   const currentUser = auth.currentUser;
+  const [activeTab, setActiveTab] = useState<'overview' | 'network' | 'payouts'>('overview');
+  const [networkSearch, setNetworkSearch] = useState('');
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [msgCopied, setMsgCopied] = useState(false);
@@ -74,7 +76,7 @@ export default function UserAffiliate() {
     // Load user's referrals
     const qReferrals = query(
       collection(db, 'referrals'),
-      where('referrerId', '==', currentUser.uid)
+      where('referrerId', 'in', [currentUser.uid, myRefCode])
     );
     const unsubReferrals = onSnapshot(qReferrals, (snapshot) => {
       setReferrals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReferralRecord)));
@@ -299,13 +301,26 @@ export default function UserAffiliate() {
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Main Container */}
+      <div className="space-y-6">
         
-        {/* Left column: Link generation and current stats */}
-        <div className="lg:col-span-2 space-y-8">
-          
-          {/* Link Box */}
+        {/* Affiliate Sub-Tabs */}
+        <div className="flex flex-wrap gap-2 p-2 bg-surface-container rounded-2xl border border-outline-variant/20 sticky top-[72px] z-20 backdrop-blur-md shadow-sm">
+          <button onClick={() => setActiveTab('overview')} className={`px-4 py-2 flex items-center gap-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'overview' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>
+            <span className="material-symbols-outlined text-[18px]">dashboard</span> Início do Programa
+          </button>
+          <button onClick={() => { setActiveTab('network'); setNetworkSearch(''); }} className={`px-4 py-2 flex items-center gap-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'network' ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>
+            <span className="material-symbols-outlined text-[18px]">lan</span> Minha Rede de Indicados
+          </button>
+          <button onClick={() => setActiveTab('payouts')} className={`px-4 py-2 flex items-center gap-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'payouts' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>
+            <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span> Receitas & Saques
+          </button>
+        </div>
+
+        {/* Tab 1: Overview */}
+        {activeTab === 'overview' && (
+          <div className="space-y-8 animate-in fade-in duration-200">
+            {/* Link Box */}
           <div className="bg-gradient-to-br from-surface-container-low to-surface-container border border-outline-variant/30 rounded-[32px] p-6 md:p-8 space-y-6 shadow-2xl relative overflow-hidden">
             <div className="absolute top-[-20%] right-[-10%] w-[35%] h-[55%] bg-primary/5 rounded-full blur-[80px]"></div>
             
@@ -542,17 +557,34 @@ export default function UserAffiliate() {
               </div>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Referral table list */}
-          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
-            <div className="p-5 border-b border-outline-variant/15 flex justify-between items-center bg-surface-container/20">
-              <h4 className="text-sm font-black uppercase tracking-widest text-on-surface-variant">Minhas Recomendações</h4>
-              <span className="text-xs font-mono font-bold bg-surface-container px-2 py-0.5 rounded text-on-surface-variant">{referrals.length} Registados</span>
+        {/* Tab 2: Network / Referrals List */}
+        {activeTab === 'network' && (
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl animate-in fade-in duration-200">
+            {/* Referral table list */}
+            <div className="p-5 border-b border-outline-variant/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container/20">
+              <h4 className="text-sm font-black uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
+                <span className="material-symbols-outlined text-cyan-500">lan</span> Minhas Recomendações
+              </h4>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <input 
+                  type="text" 
+                  placeholder="Pesquisar por nome ou e-mail..."
+                  value={networkSearch}
+                  onChange={(e) => setNetworkSearch(e.target.value)}
+                  className="w-full sm:w-auto bg-surface-container-high border border-outline-variant/20 rounded-xl px-4 py-2 text-xs text-on-surface outline-none focus:border-cyan-500"
+                />
+                <span className="text-xs font-mono font-bold bg-surface-container px-2 py-1 rounded text-on-surface-variant whitespace-nowrap">
+                  {referrals.filter(r => !networkSearch || r.referredName?.toLowerCase().includes(networkSearch.toLowerCase()) || r.referredEmail?.toLowerCase().includes(networkSearch.toLowerCase())).length} Registados
+                </span>
+              </div>
             </div>
 
-            {referrals.length === 0 ? (
+            {referrals.filter(r => !networkSearch || r.referredName?.toLowerCase().includes(networkSearch.toLowerCase()) || r.referredEmail?.toLowerCase().includes(networkSearch.toLowerCase())).length === 0 ? (
               <div className="text-center py-10 px-4 text-xs text-on-surface-variant/75 italic">
-                Nenhum utilizador registou-se ainda através do seu link exclusivo.
+                Nenhum utilizador encontrado na sua rede.
               </div>
             ) : (
               <table className="w-full text-left border-collapse">
@@ -565,7 +597,7 @@ export default function UserAffiliate() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10 text-xs">
-                  {referrals.map((ref) => (
+                  {referrals.filter(r => !networkSearch || r.referredName?.toLowerCase().includes(networkSearch.toLowerCase()) || r.referredEmail?.toLowerCase().includes(networkSearch.toLowerCase())).map((ref) => (
                     <tr key={ref.id} className="hover:bg-surface-container/20 transition-colors">
                       <td className="p-4">
                         <p className="font-bold text-on-surface">{ref.referredName}</p>
@@ -591,12 +623,13 @@ export default function UserAffiliate() {
               </table>
             )}
           </div>
-        </div>
+        )}
 
-        {/* Right column: Withdrawal area */}
-        <div className="space-y-8">
-          
-          {/* Withdrawal request box */}
+        {/* Tab 3: Payouts */}
+        {activeTab === 'payouts' && (
+          <div className="space-y-8 animate-in fade-in duration-200">
+            
+            {/* Withdrawal request box */}
           {activeMode === 'commission_30' && (
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-[32px] p-6 shadow-xl space-y-6">
               <div className="flex items-center gap-3">
@@ -712,6 +745,7 @@ export default function UserAffiliate() {
             </ul>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
