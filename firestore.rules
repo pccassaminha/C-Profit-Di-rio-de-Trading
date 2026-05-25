@@ -32,8 +32,19 @@ service cloud.firestore {
       );
     }
 
+    function isPartner(userId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/usuarios/$(userId)) && 
+        get(/databases/$(database)/documents/usuarios/$(userId)).data.partnerEmail == request.auth.token.email;
+    }
+
     function canReadData() {
-      return isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      return isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin() || 
+        (exists(/databases/$(database)/documents/usuarios/$(resource.data.userId)) && 
+         get(/databases/$(database)/documents/usuarios/$(resource.data.userId)).data.partnerEmail == request.auth.token.email)
+      );
     }
 
     // ===============================================================
@@ -146,15 +157,15 @@ service cloud.firestore {
       allow get: if isAuthenticated();
       allow list: if isAuthenticated();
       allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) || isAdmin() || isPartner(userId);
       allow delete: if isAdmin();
 
       // SaaS Subcollections
       match /trades/{tradeId} {
-        allow read, write: if isOwner(userId) || isAdmin();
+        allow read, write: if isOwner(userId) || isAdmin() || isPartner(userId);
       }
       match /accounts/{accountId} {
-        allow read, write: if isOwner(userId) || isAdmin();
+        allow read, write: if isOwner(userId) || isAdmin() || isPartner(userId);
       }
       match /followers/{followerId} {
         allow read: if isAuthenticated();

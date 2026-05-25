@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 import Modal from './Modal';
-import { db, auth } from '../firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs, addDoc } from 'firebase/firestore';
+import { db, auth, registerPartnerAuth } from '../firebase';
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs, getDoc, addDoc } from 'firebase/firestore';
 import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -71,6 +71,10 @@ export default function Settings() {
   const [billingEmail, setBillingEmail] = useState('');
   const [billingPhone, setBillingPhone] = useState('');
   const [registrationId, setRegistrationId] = useState('');
+  const [partnerEmail, setPartnerEmail] = useState('');
+  const [partnerPassword, setPartnerPassword] = useState('');
+  const [partnerSaved, setPartnerSaved] = useState(false);
+  const [isSavingPartner, setIsSavingPartner] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     billing: false,
     regional: true,
@@ -79,6 +83,7 @@ export default function Settings() {
     sessions: true,
     platforms: true,
     accounts: true,
+    partner: true,
     dangerZone: true,
   });
 
@@ -132,6 +137,19 @@ export default function Settings() {
           setBillingName(auth.currentUser?.displayName || '');
           setBillingEmail(auth.currentUser?.email || '');
           setRegistrationId(getNumericId(auth.currentUser?.uid || ''));
+        }
+
+        // Load Maestro/User doc from usuarios collection
+        if (auth.currentUser) {
+          const uDoc = await getDoc(doc(db, 'usuarios', auth.currentUser.uid));
+          if (uDoc.exists()) {
+            const uData = uDoc.data();
+            setPartnerEmail(uData.partnerEmail || '');
+            setPartnerPassword(uData.partnerPassword || '');
+            if (uData.partnerEmail) {
+              setPartnerSaved(true);
+            }
+          }
         }
       } catch (error) {
         console.error("Error loading profile:", error);
@@ -204,8 +222,18 @@ export default function Settings() {
           const profileDocId = profileSnapshot.docs[0].id;
           await updateDoc(doc(db, 'user_profiles', profileDocId), profileData);
         }
+
+        // Save Partner settings in usuarios doc
+        await updateDoc(doc(db, 'usuarios', auth.currentUser.uid), {
+          partnerEmail: partnerEmail.trim(),
+          partnerPassword: partnerPassword.trim()
+        });
+
+        if (partnerEmail.trim() && partnerPassword.trim()) {
+          await registerPartnerAuth(partnerEmail.trim(), partnerPassword.trim());
+        }
       } catch (error) {
-        console.error("Error saving profile:", error);
+        console.error("Error saving profile or partner settings:", error);
       }
     }
 
@@ -1342,6 +1370,75 @@ export default function Settings() {
               ))
             )}
                   </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Parceiro de Conta & Portfólio (Acesso Total) */}
+        <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl overflow-hidden">
+          <button 
+            type="button"
+            onClick={() => toggleSection('partner')}
+            className="w-full flex justify-between items-center p-6 hover:bg-surface-container-highest transition-colors text-left"
+          >
+            <h3 className="text-on-surface font-bold text-lg font-headline flex items-center gap-2">
+              <ShieldCheck className="text-[#00f5a0]" size={24} />
+              Minhas Definições de Maestro - Parceiro de Portfólio / Conta (Acesso Total)
+            </h3>
+            <span className={`material-symbols-outlined transition-transform duration-300 ${collapsedSections.partner ? '' : 'rotate-180'}`}>
+              expand_more
+            </span>
+          </button>
+          
+          <AnimatePresence>
+            {!collapsedSections.partner && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+              >
+                <div className="px-6 pb-6 pt-0 border-t border-outline-variant/10 mt-6 font-normal">
+                  <div className="mb-4 bg-primary/10 border border-primary/20 p-4 rounded-xl flex items-start gap-3 mt-4">
+                    <ShieldCheck className="text-primary mt-0.5 shrink-0" size={20} />
+                    <div className="text-sm text-on-surface-variant space-y-1">
+                      <p className="font-bold text-on-surface mb-1">Como funciona o Parceiro de Conta/Portfólio?</p>
+                      <p>Ao registrar outro e-mail e uma senha de parceiro, você concede <strong>acesso total</strong> à sua conta e ao seu portfólio completo de operações, diários e métricas.</p>
+                      <p>O seu parceiro de portfólio poderá fazer login usando estes dados para acompanhar e cooperar na sua conta em tempo real!</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div className="space-y-2">
+                      <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">E-mail do Parceiro</label>
+                      <input 
+                        type="email"
+                        value={partnerEmail}
+                        onChange={(e) => setPartnerEmail(e.target.value)}
+                        placeholder="parceiro@email.com"
+                        className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none focus:border-primary transition-colors lowercase"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Senha Secreta do Parceiro</label>
+                      <input 
+                        type="password"
+                        value={partnerPassword}
+                        onChange={(e) => setPartnerPassword(e.target.value)}
+                        placeholder="Escolha uma senha para o parceiro"
+                        className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none focus:border-primary transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {partnerSaved && partnerEmail && (
+                    <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-[#00f5a0] flex items-center gap-2">
+                      <Check className="text-[#00f5a0]" size={16} />
+                      <span>Ativo: O parceiro <strong>{partnerEmail}</strong> possui acesso total ao seu portfólio.</span>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

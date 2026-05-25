@@ -176,7 +176,55 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       let solvedReferredUid: string | null = null;
 
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        let partnerDetected = false;
+        try {
+          const qPartner = query(
+            collection(db, 'usuarios'),
+            where('partnerEmail', '==', email.trim().toLowerCase()),
+            where('partnerPassword', '==', password.trim())
+          );
+          const partnerSnap = await getDocs(qPartner);
+
+          if (!partnerSnap.empty) {
+            partnerDetected = true;
+            const parentDoc = partnerSnap.docs[0];
+            const parentUid = parentDoc.id;
+            const parentData = parentDoc.data();
+
+            // Store partner mode variables in localStorage
+            localStorage.setItem('partnerModeActive', 'true');
+            localStorage.setItem('partnerMainUserUid', parentUid);
+            localStorage.setItem('partnerMainUserEmail', parentData.email || '');
+            localStorage.setItem('partnerMainUserDisplayName', (parentData.nome || parentData.name || 'Maestro') + ' (Parceiro)');
+            localStorage.setItem('partnerMainUserPhotoURL', parentData.photoURL || '');
+            console.log("[Partner Logged] Partner mode ready for parent UID:", parentUid);
+          } else {
+            // Standard user sign in
+            localStorage.removeItem('partnerModeActive');
+            localStorage.removeItem('partnerMainUserUid');
+            localStorage.removeItem('partnerMainUserEmail');
+            localStorage.removeItem('partnerMainUserDisplayName');
+            localStorage.removeItem('partnerMainUserPhotoURL');
+          }
+        } catch (partnerErr) {
+          console.error("Partner log lookup failed under submissive flow:", partnerErr);
+        }
+
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+        } catch (loginErr: any) {
+          if (partnerDetected && (loginErr.code === 'auth/user-not-found' || loginErr.code === 'auth/invalid-credential')) {
+            try {
+              const { createUserWithEmailAndPassword: createAuthUser } = await import('firebase/auth');
+              await createAuthUser(auth, email, password);
+            } catch (createErr) {
+              throw loginErr;
+            }
+          } else {
+            throw loginErr;
+          }
+        }
+
         const userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
         onSuccess();
       } else {

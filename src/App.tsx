@@ -173,6 +173,21 @@ export default function App() {
           onPlansClick={() => setActiveTab('plans')}
           onNavigate={(tab) => setActiveTab(tab)}
         />
+        {localStorage.getItem('partnerModeActive') === 'true' && (
+          <div className="bg-[#00f5a0]/15 border-b border-[#00f5a0]/30 px-6 py-2.5 flex items-center justify-between text-[#00f5a0] text-xs font-semibold select-none animate-in fade-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px]">handshake</span>
+              <span>Sessão de Parceiro de Portfólio Ativa: Você está acessando a conta e dados de <strong>{auth.currentUser?.displayName}</strong></span>
+            </div>
+            <button 
+              type="button"
+              onClick={() => auth.signOut()}
+              className="hover:underline flex items-center gap-1 font-bold"
+            >
+              Excluir Sessão <span className="material-symbols-outlined text-xs">logout</span>
+            </button>
+          </div>
+        )}
         <main className="flex-1 overflow-y-auto">
           {renderContent()}
         </main>
