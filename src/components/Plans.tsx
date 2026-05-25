@@ -281,6 +281,14 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       alert('Por favor, insira o Código da Transação do Express.');
       return;
     }
+
+    // Smart duplicate prevention: check if there's already a pending payment request
+    const pendingPayment = payments.find(p => p.status === 'pending');
+    if (pendingPayment) {
+      alert(`Você já tem uma solicitação de upgrade pendente de análise pelos Maestros (Código: ${pendingPayment.expressCode || pendingPayment.transactionCode}). Não é necessário duplicar o envio!`);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const numericId = generateNumericId();
@@ -741,20 +749,34 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
-                    <ShieldCheck size={20} className="text-amber-500 shrink-0" />
-                    <p className="text-[10px] text-amber-500/90 font-medium leading-relaxed italic">
-                      Após realizar o pagamento, clique no botão abaixo para confirmar. Você deverá enviar o comprovante via WhatsApp em seguida.
-                    </p>
-                  </div>
+                  {payments.some(p => p.status === 'pending') ? (
+                    <div className="flex flex-col gap-2 p-5 bg-error/10 border border-error/20 rounded-2xl">
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-error text-xl">warning</span>
+                        <p className="text-xs font-black text-error uppercase tracking-wider">
+                          Solicitação Pendente Detectada
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                        Você já enviou um pedido de upgrade que está sob análise dos Maestros. Para evitar duplicidades, o envio de uma nova solicitação está suspenso.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                      <ShieldCheck size={20} className="text-amber-500 shrink-0" />
+                      <p className="text-[10px] text-amber-500/90 font-medium leading-relaxed italic">
+                        Após realizar o pagamento, clique no botão abaixo para confirmar. Você deverá enviar o comprovante via WhatsApp em seguida.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <button 
                   onClick={handleRequestPayment}
-                  disabled={isSubmitting}
-                  className="w-full bg-primary text-on-primary py-6 rounded-[24px] font-black hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-primary/30 uppercase tracking-[0.2em] disabled:opacity-50 flex items-center justify-center gap-3 text-sm"
+                  disabled={isSubmitting || payments.some(p => p.status === 'pending')}
+                  className="w-full bg-primary text-on-primary py-6 rounded-[24px] font-black hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-primary/30 uppercase tracking-[0.2em] disabled:opacity-40 disabled:hover:scale-100 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-sm"
                 >
-                  {isSubmitting ? 'A processar...' : 'Confirmar Pagamento'}
+                  {isSubmitting ? 'A processar...' : payments.some(p => p.status === 'pending') ? '⚠️ Aguardando Validação' : 'Confirmar Pagamento'}
                 </button>
               </>
             ) : (

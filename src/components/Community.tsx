@@ -2047,41 +2047,83 @@ export default function Community() {
                           {/* Amigos card (collaboration gallery block) */}
                           <div className="bg-surface border border-outline-variant/10 rounded-2xl p-4 space-y-3 shadow-sm">
                             <div className="flex items-center justify-between">
-                              <h3 className="font-extrabold text-sm text-on-surface uppercase tracking-wide">Amigos da Comunidade</h3>
+                              <h3 className="font-extrabold text-sm text-on-surface uppercase tracking-wide">
+                                {selectedProfileUser.id === auth.currentUser?.uid ? 'Meus Amigos' : `Amigos de ${selectedUserDetailedProfile?.nome || selectedProfileUser.name}`}
+                              </h3>
                               <button onClick={() => setActiveProfileTab('amigos')} className="text-xs text-primary font-bold hover:underline">Ver todos</button>
                             </div>
 
-                            {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id).length === 0 ? (
-                              <div className="py-6 text-center text-[11px] text-on-surface-variant opacity-60 border border-dashed border-outline-variant/10 rounded-xl">
-                                Nenhum outro membro sugerido.
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-3 gap-x-2 gap-y-3">
-                                {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id).slice(0, 6).map((userItem, index) => (
-                                  <div 
-                                    key={index} 
-                                    onClick={() => {
-                                      setSelectedProfileUser({
-                                        id: userItem.id,
-                                        name: userItem.nome || userItem.username || 'Membro C Profit',
-                                        photo: userItem.photoURL || ''
-                                      });
-                                    }}
-                                    className="flex flex-col items-center gap-1 cursor-pointer group"
-                                  >
-                                    <img 
-                                      src={userItem.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(userItem.nome || userItem.username || 'U')}&background=random`} 
-                                      alt={userItem.nome}
-                                      className="w-14 h-14 rounded-xl object-cover group-hover:opacity-85 transition-opacity bg-black/10"
-                                      referrerPolicy="no-referrer"
-                                    />
-                                    <span className="text-[10px] text-on-surface font-semibold max-w-full truncate text-center leading-normal">
-                                      {userItem.nome || userItem.username}
-                                    </span>
+                            {(() => {
+                              const isOwnProfile = selectedProfileUser.id === auth.currentUser?.uid;
+                              
+                              if (isOwnProfile) {
+                                const myFriends = allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && friendsList.includes(u.id));
+                                if (myFriends.length === 0) {
+                                  return (
+                                    <div className="py-6 text-center text-[11px] text-on-surface-variant opacity-60 border border-dashed border-outline-variant/10 rounded-xl px-2">
+                                      Nenhum amigo adicionado ainda. Adicione investidores no separador "Amigos"!
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div className="grid grid-cols-3 gap-x-2 gap-y-3">
+                                    {myFriends.slice(0, 6).map((userItem, index) => (
+                                      <div 
+                                        key={index} 
+                                        onClick={() => {
+                                          setSelectedProfileUser({
+                                            id: userItem.id,
+                                            name: userItem.nome || userItem.username || 'Membro C Profit',
+                                            photo: userItem.photoURL || ''
+                                          });
+                                        }}
+                                        className="flex flex-col items-center gap-1 cursor-pointer group"
+                                      >
+                                        <img 
+                                          src={userItem.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(userItem.nome || userItem.username || 'U')}&background=random`} 
+                                          alt={userItem.nome}
+                                          className="w-14 h-14 rounded-xl object-cover group-hover:opacity-85 transition-opacity bg-black/10"
+                                          referrerPolicy="no-referrer"
+                                        />
+                                        <span className="text-[10px] text-on-surface font-semibold max-w-full truncate text-center leading-normal">
+                                          {(userItem.nome || userItem.username || '').split(' ')[0]}
+                                        </span>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
-                              </div>
-                            )}
+                                );
+                              } else {
+                                const isFriend = friendsList.includes(selectedProfileUser.id);
+                                return (
+                                  <div className="py-4 px-3 text-center border border-dashed border-outline-variant/10 rounded-xl bg-surface-container/20 space-y-2">
+                                    <p className="text-[11px] text-on-surface-variant/85 leading-relaxed">
+                                      Por motivos de privacidade, a lista de amigos de {selectedProfileUser.name} é restrita.
+                                    </p>
+                                    {isFriend ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#00f5a0]/10 text-[#00f5a0] text-[10px] font-bold">
+                                        <span className="material-symbols-outlined text-[12px]">done</span>
+                                        Você e {selectedProfileUser.name.split(' ')[0]} são amigos
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={async () => {
+                                          const incoming = incomingRequests.find(r => r.senderId === selectedProfileUser.id);
+                                          const outgoing = outgoingRequests.find(r => r.receiverId === selectedProfileUser.id);
+                                          if (incoming) {
+                                            await handleAcceptFriendRequest(incoming);
+                                          } else if (!outgoing) {
+                                            await sendFriendRequest(selectedProfileUser.id, selectedProfileUser.name, selectedProfileUser.photo);
+                                          }
+                                        }}
+                                        className="text-[10px] bg-primary text-on-primary font-bold px-3 py-1 rounded-lg hover:opacity-90 active:scale-95 transition-all text-center mx-auto block"
+                                      >
+                                        {outgoingRequests.some(r => r.receiverId === selectedProfileUser.id && r.status === 'pending') ? 'Pedido Enviado' : 'Adicionar Amigo'}
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              }
+                            })()}
                           </div>
                         </div>
 
@@ -2412,158 +2454,277 @@ export default function Community() {
                     {/* TAB 3: FRIENDS / AMIGOS List Grid */}
                     {activeProfileTab === 'amigos' && (
                       <div className="bg-surface border border-outline-variant/10 rounded-2xl p-6 text-left space-y-8 shadow-sm">
-                        
-                        {/* Section 1: Amigos */}
-                        <div className="space-y-4">
-                          <h3 className="font-extrabold text-md text-on-surface tracking-wide flex items-center gap-2">
-                            <Users size={18} className="text-primary" />
-                            Amigos já adicionados
-                          </h3>
-                          
-                          {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && friendsList.includes(u.id)).length === 0 ? (
-                            <div className="py-8 border border-dashed border-outline-variant/10 rounded-xl text-center text-xs text-on-surface-variant opacity-70">
-                              Nenhum amigo adicionado ainda.
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && friendsList.includes(u.id)).map((friendUser) => (
-                                <div 
-                                  key={friendUser.id}
-                                  className="flex items-center gap-3 p-3 bg-surface-container/30 border border-outline-variant/10 rounded-xl hover:border-primary/20 hover:bg-surface-container/50 transition-all group"
-                                >
-                                  <img 
-                                    src={friendUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(friendUser.nome || friendUser.username || 'F')}&background=random`} 
-                                    alt={friendUser.nome}
-                                    className="w-12 h-12 rounded-xl object-cover shrink-0 bg-black/10 cursor-pointer"
-                                    referrerPolicy="no-referrer"
-                                    onClick={() => {
-                                      setSelectedProfileUser({
-                                        id: friendUser.id,
-                                        name: friendUser.nome || friendUser.username || 'Membro C Profit',
-                                        photo: friendUser.photoURL || ''
-                                      });
-                                    }}
-                                  />
-                                  <div 
-                                    className="flex-1 min-w-0 cursor-pointer"
-                                    onClick={() => {
-                                      setSelectedProfileUser({
-                                        id: friendUser.id,
-                                        name: friendUser.nome || friendUser.username || 'Membro C Profit',
-                                        photo: friendUser.photoURL || ''
-                                      });
-                                    }}
-                                  >
-                                    <h4 className="text-xs font-bold text-on-surface truncate group-hover:underline">{friendUser.nome || friendUser.username}</h4>
-                                    <span className="text-[10px] text-on-surface-variant block truncate">Amigo</span>
-                                  </div>
-                                  <button
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      if (!auth.currentUser) return;
-                                      const friendRef = doc(db, 'users', auth.currentUser.uid, 'friends', friendUser.id);
-                                      try {
-                                        await deleteDoc(friendRef);
-                                        // Also delete any existing mutual requests
-                                        const qReq = query(
-                                          collection(db, 'friend_requests'),
-                                          where('senderId', 'in', [auth.currentUser.uid, friendUser.id]),
-                                          where('receiverId', 'in', [auth.currentUser.uid, friendUser.id])
-                                        );
-                                        const reqSnap = await getDocs(qReq);
-                                        for (const d of reqSnap.docs) {
-                                          await deleteDoc(doc(db, 'friend_requests', d.id));
-                                        }
-                                      } catch (err) { }
-                                    }}
-                                    className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
-                                    title="Remover Amigo"
-                                  >
-                                    <UserMinus size={16} />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        {(() => {
+                          const isOwnProfile = selectedProfileUser.id === auth.currentUser?.uid;
 
-                        {/* Section 2: Investidores C Profit */}
-                        <div className="space-y-4 pt-4 border-t border-outline-variant/10">
-                          <h3 className="font-extrabold text-md text-on-surface tracking-wide flex items-center gap-2">
-                            <Globe size={18} className="text-primary" />
-                            Investidores da Comunidade C Profit
-                          </h3>
-                          <p className="text-xs text-on-surface-variant max-w-lg mb-2">
-                            Descubra outros membros da comunidade e adicione-os como amigos.
-                          </p>
-                          
-                          {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && !friendsList.includes(u.id)).length === 0 ? (
-                            <div className="py-8 border border-dashed border-outline-variant/10 rounded-xl text-center text-xs text-on-surface-variant opacity-70">
-                              Nenhum outro membro encontrado.
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && !friendsList.includes(u.id)).map((friendUser) => (
-                                <div 
-                                  key={friendUser.id}
-                                  className="flex items-center gap-3 p-3 bg-surface-container/30 border border-outline-variant/10 rounded-xl hover:border-primary/20 hover:bg-surface-container/50 transition-all group"
-                                >
-                                  <img 
-                                    src={friendUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(friendUser.nome || friendUser.username || 'F')}&background=random`} 
-                                    alt={friendUser.nome}
-                                    className="w-12 h-12 rounded-xl object-cover shrink-0 bg-black/10 cursor-pointer"
-                                    referrerPolicy="no-referrer"
-                                    onClick={() => {
-                                      setSelectedProfileUser({
-                                        id: friendUser.id,
-                                        name: friendUser.nome || friendUser.username || 'Membro C Profit',
-                                        photo: friendUser.photoURL || ''
-                                      });
-                                    }}
-                                  />
-                                  <div 
-                                    className="flex-1 min-w-0 cursor-pointer"
-                                    onClick={() => {
-                                      setSelectedProfileUser({
-                                        id: friendUser.id,
-                                        name: friendUser.nome || friendUser.username || 'Membro C Profit',
-                                        photo: friendUser.photoURL || ''
-                                      });
-                                    }}
-                                  >
-                                    <h4 className="text-xs font-bold text-on-surface truncate group-hover:underline">{friendUser.nome || friendUser.username}</h4>
-                                    <span className="text-[10px] text-on-surface-variant block truncate">Investidor Registado</span>
-                                  </div>
-                                  {outgoingRequests.some(r => r.receiverId === friendUser.id && r.status === 'pending') ? (
-                                    <span className="text-[10px] font-bold text-on-surface-variant/60 bg-surface-container px-2 py-1 rounded-lg">Enviado</span>
-                                  ) : incomingRequests.some(r => r.senderId === friendUser.id && r.status === 'pending') ? (
-                                    <button
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        const req = incomingRequests.find(r => r.senderId === friendUser.id && r.status === 'pending');
-                                        if (req) await handleAcceptFriendRequest(req);
-                                      }}
-                                      className="p-1 px-2.5 bg-primary text-on-primary rounded-lg text-[10px] font-black hover:opacity-90 cursor-pointer transition-colors"
-                                    >
-                                      Aceitar
-                                    </button>
+                          if (isOwnProfile) {
+                            return (
+                              <>
+                                {/* Section 1: Amigos */}
+                                <div className="space-y-4">
+                                  <h3 className="font-extrabold text-md text-on-surface tracking-wide flex items-center gap-2">
+                                    <Users size={18} className="text-primary" />
+                                    Amigos já adicionados
+                                  </h3>
+                                  
+                                  {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && friendsList.includes(u.id)).length === 0 ? (
+                                    <div className="py-8 border border-dashed border-outline-variant/10 rounded-xl text-center text-xs text-on-surface-variant opacity-70">
+                                      Nenhum amigo adicionado ainda. Adicione membros abaixo para os tornar seus amigos!
+                                    </div>
                                   ) : (
-                                    <button
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        await sendFriendRequest(friendUser.id, friendUser.nome || friendUser.username || '', friendUser.photoURL || '');
-                                      }}
-                                      className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
-                                      title="Adicionar Amigo"
-                                    >
-                                      <UserPlus size={16} />
-                                    </button>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                      {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && friendsList.includes(u.id)).map((friendUser) => (
+                                        <div 
+                                          key={friendUser.id}
+                                          className="flex items-center gap-3 p-3 bg-surface-container/30 border border-outline-variant/10 rounded-xl hover:border-primary/20 hover:bg-surface-container/50 transition-all group"
+                                        >
+                                          <img 
+                                            src={friendUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(friendUser.nome || friendUser.username || 'F')}&background=random`} 
+                                            alt={friendUser.nome}
+                                            className="w-12 h-12 rounded-xl object-cover shrink-0 bg-black/10 cursor-pointer"
+                                            referrerPolicy="no-referrer"
+                                            onClick={() => {
+                                              setSelectedProfileUser({
+                                                id: friendUser.id,
+                                                name: friendUser.nome || friendUser.username || 'Membro C Profit',
+                                                photo: friendUser.photoURL || ''
+                                              });
+                                            }}
+                                          />
+                                          <div 
+                                            className="flex-1 min-w-0 cursor-pointer"
+                                            onClick={() => {
+                                              setSelectedProfileUser({
+                                                id: friendUser.id,
+                                                name: friendUser.nome || friendUser.username || 'Membro C Profit',
+                                                photo: friendUser.photoURL || ''
+                                              });
+                                            }}
+                                          >
+                                            <h4 className="text-xs font-bold text-on-surface truncate group-hover:underline">{friendUser.nome || friendUser.username}</h4>
+                                            <span className="text-[10px] text-[#00f5a0] font-semibold block truncate">Amigo</span>
+                                          </div>
+                                          <button
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              if (!auth.currentUser) return;
+                                              const friendRef = doc(db, 'users', auth.currentUser.uid, 'friends', friendUser.id);
+                                              try {
+                                                await deleteDoc(friendRef);
+                                                // Also delete any existing mutual requests
+                                                const qReq = query(
+                                                  collection(db, 'friend_requests'),
+                                                  where('senderId', 'in', [auth.currentUser.uid, friendUser.id]),
+                                                  where('receiverId', 'in', [auth.currentUser.uid, friendUser.id])
+                                                );
+                                                const reqSnap = await getDocs(qReq);
+                                                for (const d of reqSnap.docs) {
+                                                  await deleteDoc(doc(db, 'friend_requests', d.id));
+                                                }
+                                              } catch (err) { }
+                                            }}
+                                            className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
+                                            title="Remover Amigo"
+                                          >
+                                            <UserMinus size={16} />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+
+                                {/* Section 2: Outros Investidores da Comunidade */}
+                                <div className="space-y-4 pt-4 border-t border-outline-variant/10">
+                                  <h3 className="font-extrabold text-md text-on-surface tracking-wide flex items-center gap-2">
+                                    <Globe size={18} className="text-[#00f5a0]" />
+                                    Outros Investidores da Comunidade
+                                  </h3>
+                                  <p className="text-xs text-on-surface-variant max-w-lg mb-2">
+                                    Conecte-se com novos traders da comunidade enviando um pedido de amizade.
+                                  </p>
+                                  
+                                  {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && !friendsList.includes(u.id)).length === 0 ? (
+                                    <div className="py-8 border border-dashed border-outline-variant/10 rounded-xl text-center text-xs text-on-surface-variant opacity-70">
+                                      Nenhum outro membro disponível de momento.
+                                    </div>
+                                  ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                      {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && !friendsList.includes(u.id)).map((friendUser) => (
+                                        <div 
+                                          key={friendUser.id}
+                                          className="flex items-center gap-3 p-3 bg-surface-container/30 border border-outline-variant/10 rounded-xl hover:border-primary/20 hover:bg-surface-container/50 transition-all group"
+                                        >
+                                          <img 
+                                            src={friendUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(friendUser.nome || friendUser.username || 'F')}&background=random`} 
+                                            alt={friendUser.nome}
+                                            className="w-12 h-12 rounded-xl object-cover shrink-0 bg-black/10 cursor-pointer"
+                                            referrerPolicy="no-referrer"
+                                            onClick={() => {
+                                              setSelectedProfileUser({
+                                                id: friendUser.id,
+                                                name: friendUser.nome || friendUser.username || 'Membro C Profit',
+                                                photo: friendUser.photoURL || ''
+                                              });
+                                            }}
+                                          />
+                                          <div 
+                                            className="flex-1 min-w-0 cursor-pointer"
+                                            onClick={() => {
+                                              setSelectedProfileUser({
+                                                id: friendUser.id,
+                                                name: friendUser.nome || friendUser.username || 'Membro C Profit',
+                                                photo: friendUser.photoURL || ''
+                                              });
+                                            }}
+                                          >
+                                            <h4 className="text-xs font-bold text-on-surface truncate group-hover:underline">{friendUser.nome || friendUser.username}</h4>
+                                            <span className="text-[10px] text-on-surface-variant block truncate">Investidor Registado</span>
+                                          </div>
+                                          {outgoingRequests.some(r => r.receiverId === friendUser.id && r.status === 'pending') ? (
+                                            <span className="text-[10px] font-bold text-on-surface-variant/60 bg-surface-container px-2 py-1 rounded-lg">Enviado</span>
+                                          ) : incomingRequests.some(r => r.senderId === friendUser.id && r.status === 'pending') ? (
+                                            <button
+                                              onClick={async (e) => {
+                                                e.stopPropagation();
+                                                const req = incomingRequests.find(r => r.senderId === friendUser.id && r.status === 'pending');
+                                                if (req) await handleAcceptFriendRequest(req);
+                                              }}
+                                              className="p-1 px-2.5 bg-primary text-on-primary rounded-lg text-[10px] font-black hover:opacity-90 cursor-pointer transition-colors"
+                                            >
+                                              Aceitar
+                                            </button>
+                                          ) : (
+                                            <button
+                                              onClick={async (e) => {
+                                                e.stopPropagation();
+                                                await sendFriendRequest(friendUser.id, friendUser.nome || friendUser.username || '', friendUser.photoURL || '');
+                                              }}
+                                              className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+                                              title="Adicionar Amigo"
+                                            >
+                                              <UserPlus size={16} />
+                                            </button>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            );
+                          } else {
+                            const isFriend = friendsList.includes(selectedProfileUser.id);
+                            return (
+                              <div className="space-y-6">
+                                <div className="p-6 border border-dashed border-outline-variant/15 rounded-2xl bg-surface-container/20 text-center max-w-xl mx-auto space-y-4">
+                                  <Users size={48} className="text-primary mx-auto opacity-70" />
+                                  <div className="space-y-1">
+                                    <h4 className="font-bold text-on-surface text-sm">Privacidade de Amizades</h4>
+                                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                                      Por motivos de segurança e integridade das contas do C Profit, a lista completa de amigos de {selectedProfileUser.name} é privada.
+                                    </p>
+                                  </div>
+
+                                  {isFriend ? (
+                                    <div className="pt-2">
+                                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#00f5a0]/10 text-[#00f5a0] text-xs font-bold shadow-sm">
+                                        <span className="material-symbols-outlined text-[14px]">done</span>
+                                        Você e {selectedProfileUser.name} são amigos
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className="pt-2">
+                                      <button
+                                        onClick={async () => {
+                                          const incoming = incomingRequests.find(r => r.senderId === selectedProfileUser.id);
+                                          const outgoing = outgoingRequests.find(r => r.receiverId === selectedProfileUser.id);
+                                          if (incoming) {
+                                            await handleAcceptFriendRequest(incoming);
+                                          } else if (!outgoing) {
+                                            await sendFriendRequest(selectedProfileUser.id, selectedProfileUser.name, selectedProfileUser.photo);
+                                          }
+                                        }}
+                                        className="text-xs bg-primary text-on-primary font-bold px-4 py-2 rounded-xl hover:opacity-90 active:scale-95 transition-all inline-flex items-center gap-2"
+                                      >
+                                        <UserPlus size={14} />
+                                        {outgoingRequests.some(r => r.receiverId === selectedProfileUser.id && r.status === 'pending') ? 'Pedido de Amizade Enviado' : 'Adicionar como Amigo'}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* List of other traders they can add */}
+                                <div className="space-y-4 pt-6 border-t border-outline-variant/10">
+                                  <h3 className="font-extrabold text-sm text-on-surface tracking-wide flex items-center gap-2">
+                                    <Globe size={16} className="text-primary" />
+                                    Mais Investidores Recomendados
+                                  </h3>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {allCommunityUsers.filter(u => u.id !== selectedProfileUser.id && u.id !== auth.currentUser?.uid && !friendsList.includes(u.id)).map((friendUser) => (
+                                      <div 
+                                        key={friendUser.id}
+                                        className="flex items-center gap-3 p-3 bg-surface-container/30 border border-outline-variant/10 rounded-xl hover:border-primary/20 hover:bg-surface-container/50 transition-all group"
+                                      >
+                                        <img 
+                                          src={friendUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(friendUser.nome || friendUser.username || 'F')}&background=random`} 
+                                          alt={friendUser.nome}
+                                          className="w-12 h-12 rounded-xl object-cover shrink-0 bg-black/10 cursor-pointer"
+                                          referrerPolicy="no-referrer"
+                                          onClick={() => {
+                                            setSelectedProfileUser({
+                                              id: friendUser.id,
+                                              name: friendUser.nome || friendUser.username || 'Membro C Profit',
+                                              photo: friendUser.photoURL || ''
+                                            });
+                                          }}
+                                        />
+                                        <div 
+                                          className="flex-1 min-w-0 cursor-pointer"
+                                          onClick={() => {
+                                            setSelectedProfileUser({
+                                              id: friendUser.id,
+                                              name: friendUser.nome || friendUser.username || 'Membro C Profit',
+                                              photo: friendUser.photoURL || ''
+                                            });
+                                          }}
+                                        >
+                                          <h4 className="text-xs font-bold text-on-surface truncate group-hover:underline">{friendUser.nome || friendUser.username}</h4>
+                                          <span className="text-[10px] text-on-surface-variant block truncate">Investidor Registado</span>
+                                        </div>
+                                        {outgoingRequests.some(r => r.receiverId === friendUser.id && r.status === 'pending') ? (
+                                          <span className="text-[10px] font-bold text-on-surface-variant/60 bg-surface-container px-2 py-1 rounded-lg">Enviado</span>
+                                        ) : incomingRequests.some(r => r.senderId === friendUser.id && r.status === 'pending') ? (
+                                          <button
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              const req = incomingRequests.find(r => r.senderId === friendUser.id && r.status === 'pending');
+                                              if (req) await handleAcceptFriendRequest(req);
+                                            }}
+                                            className="p-1 px-2.5 bg-primary text-on-primary rounded-lg text-[10px] font-black hover:opacity-90 cursor-pointer transition-colors"
+                                          >
+                                            Aceitar
+                                          </button>
+                                        ) : (
+                                          <button
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              await sendFriendRequest(friendUser.id, friendUser.nome || friendUser.username || '', friendUser.photoURL || '');
+                                            }}
+                                            className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+                                            title="Adicionar Amigo"
+                                          >
+                                            <UserPlus size={16} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                        })()}
                       </div>
                     )}
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, auth, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
-import { Send, Users, UserPlus, Settings, Info, Lock, Key, Edit2, Trash2, X, ShieldCheck, MessageSquare, Maximize2, Minimize2 } from 'lucide-react';
+import { Send, Users, UserPlus, Settings, Info, Lock, Key, Edit2, Trash2, X, ShieldCheck, MessageSquare, Maximize2, Minimize2, MoreHorizontal, Image, ExternalLink } from 'lucide-react';
 
 interface Chat {
   id: string;
@@ -55,6 +55,16 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
   // Realtime contacts/blocks
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
   
+  // Image Link features
+  const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
+  const [imageUrlInput, setImageUrlInput] = useState('');
+  const [attachedImageUrl, setAttachedImageUrl] = useState<string | null>(null);
+  const [selectedFullscreenImage, setSelectedFullscreenImage] = useState<string | null>(null);
+
+  const isImageUrlStr = (url: string) => {
+    return !!(url.match(/\.(jpeg|jpg|gif|png|webp|svg|bmp)/i) || url.startsWith('data:image/') || url.includes('images.unsplash.com') || url.includes('images.pexels.com'));
+  };
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,8 +108,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     // Load chats where user is participant
     const q = query(
       collection(db, 'chats'),
-      where('participants', 'array-contains', uid),
-      orderBy('updatedAt', 'desc')
+      where('participants', 'array-contains', uid)
     );
 
     const unsubChats = onSnapshot(q, async (snapshot) => {
@@ -124,8 +133,41 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
            unread += data.unreadCount[uid];
         }
       }));
+
+      // Sort chats in-memory securely by updatedAt desc (fallback to createdAt or 0)
+      chatsData.sort((a, b) => {
+        const getTs = (chat: Chat) => {
+          if (!chat) return 0;
+          const up = chat.updatedAt;
+          if (up) {
+            if (up.toMillis) return up.toMillis();
+            if (up.seconds) return up.seconds * 1000;
+            return new Date(up).getTime() || 0;
+          }
+          const cr = (chat as any).createdAt;
+          if (cr) {
+            if (cr.toMillis) return cr.toMillis();
+            if (cr.seconds) return cr.seconds * 1000;
+            return new Date(cr).getTime() || 0;
+          }
+          return 0;
+        };
+        return getTs(b) - getTs(a);
+      });
+
       setChats(chatsData);
       setTotalUnread(unread);
+
+      const autoId = localStorage.getItem('autoSelectChatId');
+      if (autoId) {
+        const found = chatsData.find(c => c.id === autoId);
+        if (found) {
+          setActiveChat(found);
+          localStorage.removeItem('autoSelectChatId');
+        }
+      }
+    }, (err) => {
+      console.error("Error listening to chats: ", err);
     });
 
     return () => {
@@ -133,6 +175,21 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
       unsubChats();
     };
   }, []);
+
+  useEffect(() => {
+    const handleSelectChat = (e: Event) => {
+      const customVal = (e as CustomEvent).detail;
+      if (customVal && chats.length > 0) {
+        const found = chats.find(c => c.id === customVal);
+        if (found) {
+          setActiveChat(found);
+          localStorage.removeItem('autoSelectChatId');
+        }
+      }
+    };
+    window.addEventListener('selectChatRoom', handleSelectChat);
+    return () => window.removeEventListener('selectChatRoom', handleSelectChat);
+  }, [chats]);
 
   useEffect(() => {
     if (!activeChat) return;
@@ -199,7 +256,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !activeChat || !auth.currentUser) return;
+    if ((!newMessage.trim() && !attachedImageUrl) || !activeChat || !auth.currentUser) return;
 
     // Check if direct chat user is blocked
     if (activeChat.type === 'direct' && activeChat.otherUserId && blockedUsers.includes(activeChat.otherUserId)) {
@@ -208,13 +265,20 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     }
 
     try {
-      await addDoc(collection(db, 'chats', activeChat.id, 'messages'), {
-        text: newMessage,
+      const msgText = newMessage.trim();
+      const messageObj: any = {
+        text: msgText || (attachedImageUrl ? "📷 Imagem" : ""),
         senderId: auth.currentUser.uid,
         senderName: auth.currentUser.displayName || 'Usuário',
         senderPhoto: auth.currentUser.photoURL || '',
         createdAt: serverTimestamp()
-      });
+      };
+
+      if (attachedImageUrl) {
+        messageObj.imageUrl = attachedImageUrl;
+      }
+
+      await addDoc(collection(db, 'chats', activeChat.id, 'messages'), messageObj);
 
       const unreadUpdates: any = {};
       activeChat.participants.forEach(p => {
@@ -224,12 +288,13 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
       });
 
       await updateDoc(doc(db, 'chats', activeChat.id), {
-        lastMessage: newMessage,
+        lastMessage: attachedImageUrl ? "📷 Imagem Enviada" : msgText,
         lastSenderName: auth.currentUser.displayName || 'Usuário',
         updatedAt: serverTimestamp(),
         ...unreadUpdates
       });
       setNewMessage('');
+      setAttachedImageUrl(null);
     } catch (err) {
       console.error('Error sending message', err);
     }
@@ -561,6 +626,31 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                           <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">
                             {renderMessageText(msg.text)}
                           </p>
+                          
+                          {/* Dedicated Image Attachment */}
+                          {msg.imageUrl && (
+                            <div className="mt-2 rounded-xl overflow-hidden border border-outline-variant/10 max-w-full cursor-pointer hover:opacity-95 active:scale-[0.98] transition-all bg-black/10 flex items-center justify-center max-h-60" onClick={() => setSelectedFullscreenImage(msg.imageUrl)}>
+                              <img src={msg.imageUrl} alt="Anexo" className="max-w-full max-h-56 object-contain rounded-xl" referrerPolicy="no-referrer" />
+                            </div>
+                          )}
+
+                          {/* Auto-detected inline image URLs */}
+                          {(() => {
+                            if (msg.imageUrl) return null;
+                            if (!msg.text) return null;
+                            const urlRegex = /(https?:\/\/[^\s]+)/g;
+                            const urls = msg.text.match(urlRegex) || [];
+                            const inlineImageUrl = urls.find(u => isImageUrlStr(u));
+                            if (inlineImageUrl) {
+                              return (
+                                <div className="mt-2 rounded-xl overflow-hidden border border-outline-variant/10 max-w-full cursor-pointer hover:opacity-95 active:scale-[0.98] transition-all bg-black/10 flex items-center justify-center max-h-60" onClick={() => setSelectedFullscreenImage(inlineImageUrl)}>
+                                  <img src={inlineImageUrl} alt="Preview Anexo" className="max-w-full max-h-56 object-contain rounded-xl" referrerPolicy="no-referrer" />
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+
                           <div className={`flex items-center justify-end gap-1 mt-1 ${isMine ? 'text-on-primary/70' : 'text-on-surface-variant'}`}>
                             <span className="text-[9px] font-medium">
                               {msg.createdAt ? new Date(msg.createdAt.toDate ? msg.createdAt.toDate() : msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -574,7 +664,22 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                   <div ref={messagesEndRef} />
                 </div>
 
-                <form onSubmit={handleSendMessage} className="p-4 bg-surface-container-lowest border-t border-outline-variant/10 flex gap-2 shrink-0">
+                {attachedImageUrl && (
+                  <div className="px-4 py-2 bg-surface-container-low border-t border-outline-variant/10 flex items-center justify-between gap-2 shrink-0 animate-in slide-in-from-bottom duration-200">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <img src={attachedImageUrl} alt="Anexo" className="w-10 h-10 object-cover rounded-lg border border-outline-variant/15 shrink-0 bg-black/10" referrerPolicy="no-referrer" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[10px] bg-[#00f5a0]/15 text-[#00f5a0] font-black px-1.5 py-0.5 rounded uppercase tracking-wide block w-fit mb-0.5 text-xs">Imagem Anexada</span>
+                        <span className="text-[10px] text-on-surface-variant truncate block">{attachedImageUrl}</span>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => setAttachedImageUrl(null)} className="p-1 text-on-surface-variant hover:text-error hover:bg-surface-container rounded-full transition-colors cursor-pointer shrink-0">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
+                <form onSubmit={handleSendMessage} className="p-4 bg-surface-container-lowest border-t border-outline-variant/10 flex gap-2 shrink-0 items-center relative">
                   <input
                     type="text"
                     value={newMessage}
@@ -582,7 +687,69 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                     placeholder="Mensagem..."
                     className="flex-1 bg-surface-container border border-outline-variant/10 rounded-full px-5 py-2.5 text-sm text-on-surface focus:outline-none focus:border-primary transition-colors"
                   />
-                  <button type="submit" disabled={!newMessage.trim()} className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center disabled:opacity-50 hover:bg-primary/90 transition-all hover:scale-105 shrink-0">
+                  
+                  {/* Three Dots Button for more options (Image Link) */}
+                  <div className="relative shrink-0 flex items-center">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsImageMenuOpen(!isImageMenuOpen)} 
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${isImageMenuOpen ? 'bg-primary/20 text-primary' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}
+                      title="Mais opções (Link de Imagem)"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+
+                    {isImageMenuOpen && (
+                      <div className="absolute bottom-12 right-0 bg-surface border border-outline-variant/20 shadow-2xl rounded-2xl p-4 w-72 z-40 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                        <div className="flex justify-between items-center pb-1 border-b border-outline-variant/10">
+                          <span className="text-[10px] font-black uppercase text-on-surface tracking-wider flex items-center gap-1">
+                            <Image size={10} className="text-primary" />
+                            Link da Imagem
+                          </span>
+                          <button type="button" onClick={() => setIsImageMenuOpen(false)} className="text-on-surface-variant hover:text-on-surface p-0.5 rounded-full hover:bg-surface-container transition-colors">
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] text-on-surface-variant leading-relaxed">Insira o link direto de uma imagem para pré-visualizar no bate-papo.</p>
+                          <div className="flex gap-1.5 focus-within:z-10">
+                            <input
+                              type="text"
+                              placeholder="https://exemplo.com/imagem.png"
+                              value={imageUrlInput}
+                              onChange={e => setImageUrlInput(e.target.value)}
+                              className="flex-1 bg-surface-container text-[11px] rounded-lg px-2.5 py-1.5 focus:outline-none border border-outline-variant/10 focus:border-primary text-on-surface"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (imageUrlInput.trim()) {
+                                    setAttachedImageUrl(imageUrlInput.trim());
+                                    setImageUrlInput('');
+                                    setIsImageMenuOpen(false);
+                                  }
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (imageUrlInput.trim()) {
+                                  setAttachedImageUrl(imageUrlInput.trim());
+                                  setImageUrlInput('');
+                                  setIsImageMenuOpen(false);
+                                }
+                              }}
+                              className="px-2.5 py-1.5 bg-primary text-on-primary rounded-lg text-[10px] font-black hover:opacity-90 active:scale-95 transition-all text-center shrink-0 cursor-pointer"
+                            >
+                              Anexar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button type="submit" disabled={!newMessage.trim() && !attachedImageUrl} className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center disabled:opacity-50 hover:bg-primary/90 transition-all hover:scale-105 shrink-0">
                     <Send size={16} className="ml-0.5" />
                   </button>
                 </form>
@@ -947,6 +1114,48 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                   );
                 })}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox component for visual previewing */}
+      {selectedFullscreenImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedFullscreenImage(null)}
+        >
+          <button 
+            onClick={() => setSelectedFullscreenImage(null)} 
+            className="absolute top-4 right-4 text-white hover:text-white/80 p-2.5 rounded-full bg-white/10 hover:bg-white/20 transition-all cursor-pointer z-[110]"
+            title="Fechar"
+          >
+            <X size={24} />
+          </button>
+          
+          <div className="max-w-4xl max-h-[85vh] relative flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={selectedFullscreenImage} 
+              alt="Visualização Principal" 
+              className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl border border-white/5 animate-in zoom-in-95 duration-200" 
+              referrerPolicy="no-referrer"
+            />
+            <div className="mt-4 flex gap-4 z-50">
+              <a 
+                href={selectedFullscreenImage} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="px-4 py-2 bg-[#00f5a0]/15 hover:bg-[#00f5a0]/30 text-[#00f5a0] border border-[#00f5a0]/20 hover:border-[#00f5a0]/40 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+              >
+                <ExternalLink size={14} />
+                Abrir em Nova Guia
+              </a>
+              <button 
+                onClick={() => setSelectedFullscreenImage(null)}
+                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-750 text-white/90 border border-neutral-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Voltar
+              </button>
             </div>
           </div>
         </div>

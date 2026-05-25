@@ -2,14 +2,14 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { DateRangePicker } from './DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Download, MoreVertical, AlertTriangle } from 'lucide-react';
+import { Download, MoreVertical, AlertTriangle, Users, MessageSquare, Check, ChevronRight } from 'lucide-react';
 
 // --- COMPONENTES AUXILIARES ---
 function CalendarCell({ date, muted, trades, pnl, isWin, isLoss, active }: any) {
@@ -203,6 +203,56 @@ export default function Dashboard() {
     
     return () => unsub();
   }, []);
+
+  const [dashboardChats, setDashboardChats] = useState<any[]>([]);
+  const [dashboardInvites, setDashboardInvites] = useState<any[]>([]);
+
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const qChats = query(
+      collection(db, 'chats'),
+      where('participants', 'array-contains', currentUser.uid)
+    );
+
+    const unsubChats = onSnapshot(qChats, (snap) => {
+      const list = snap.docs.map(d => {
+        const data = d.data();
+        let name = data.name || 'Sala de Chat';
+        if (data.type === 'direct') {
+          const otherId = data.participants?.find((p: string) => p !== currentUser.uid);
+          name = data.otherUserName || data.name || 'Conversa Privada';
+        }
+        return {
+          id: d.id,
+          name,
+          ...data
+        };
+      });
+      setDashboardChats(list);
+    }, (err) => {
+      console.error("Dashboard chats sub failed:", err);
+    });
+
+    const qInvites = query(
+      collection(db, 'room_invites'),
+      where('receiverId', '==', currentUser.uid),
+      where('status', '==', 'pending')
+    );
+
+    const unsubInvites = onSnapshot(qInvites, (snap) => {
+      setDashboardInvites(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.error("Dashboard invites sub failed:", err);
+    });
+
+    return () => {
+      unsubChats();
+      unsubInvites();
+    };
+  }, []);
+
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const dashboardRef = React.useRef<HTMLDivElement>(null);
   const exportDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -1138,6 +1188,165 @@ export default function Dashboard() {
       <div ref={dashboardRef} className="space-y-8 bg-background pt-4 pb-8 max-w-full overflow-hidden">
         {activeDashboardTab === 'objectives' && (
           <>
+            {/* Salas de Bate-papo & Conversas Ativas */}
+            {(dashboardChats.length > 0 || dashboardInvites.length > 0) && (
+              <div id="dashboard-chats-preview-panel" className="bg-[#0f192b]/60 backdrop-blur-md border border-[#00f5a0]/15 rounded-3xl p-6 shadow-xl relative overflow-hidden animate-in fade-in duration-500">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-[#00f5a0]/5 blur-3xl rounded-full pointer-events-none" />
+                
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5 pb-4 border-b border-outline-variant/10 relative z-10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#00f5a0]/10 rounded-2xl flex items-center justify-center text-[#00f5a0]">
+                      <span className="material-symbols-outlined text-[22px]">groups</span>
+                    </div>
+                    <div>
+                      <h3 className="text-on-surface font-black text-lg font-headline tracking-tight">Comunidade & Atividades das Salas</h3>
+                      <p className="text-on-surface-variant text-xs mt-0.5">Sua central de interação, acompanhamento e conversas em tempo real.</p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'community' }))}
+                    className="text-xs font-black text-[#00f5a0] uppercase tracking-widest hover:underline flex items-center gap-1.5 self-end sm:self-auto px-4 py-2 bg-[#00f5a0]/5 rounded-xl border border-[#00f5a0]/15 hover:bg-[#00f5a0]/10 transition-all cursor-pointer"
+                  >
+                    <span>Ver Todas</span>
+                    <ChevronRight size={14} className="stroke-[3]" />
+                  </button>
+                </div>
+
+                {/* Real-time Pending Room Invites inside Dashboard */}
+                {dashboardInvites.length > 0 && (
+                  <div className="mb-6 space-y-3 p-4 bg-primary/10 border border-primary/20 rounded-2xl animate-in fade-in zoom-in-95 duration-300 relative z-10">
+                    <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider">
+                      <span className="material-symbols-outlined text-[18px]">handshake</span>
+                      <span>Novos Convites de Sala ({dashboardInvites.length})</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+                      {dashboardInvites.map(invite => (
+                        <div 
+                          key={invite.id}
+                          className="bg-surface-container border border-outline-variant/15 p-4 rounded-xl flex flex-col justify-between gap-3 shadow-md"
+                        >
+                          <div>
+                            <p className="text-xs text-on-surface leading-snug">
+                              O trader <strong className="text-primary">{invite.senderName}</strong> convidou você para:
+                            </p>
+                            <p className="text-sm font-bold text-[#00f5a0] mt-1.5 flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[16px]">forum</span>
+                              {invite.roomName}
+                            </p>
+                          </div>
+                          <div className="flex gap-2 justify-end pt-1">
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await updateDoc(doc(db, 'room_invites', invite.id), { status: 'accepted' });
+                                  await updateDoc(doc(db, 'chats', invite.roomId), {
+                                    participants: arrayUnion(auth.currentUser?.uid)
+                                  });
+                                } catch (err) {
+                                  console.error("Error accepting invite:", err);
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-[#00f5a0] text-black text-[10px] font-black uppercase tracking-wider rounded-lg hover:brightness-115 active:scale-95 transition-all flex items-center gap-1"
+                            >
+                              <Check size={12} className="stroke-[3]" /> Aceitar
+                            </button>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await updateDoc(doc(db, 'room_invites', invite.id), { status: 'declined' });
+                                } catch (err) {
+                                  console.error("Error declining invite:", err);
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-error/15 text-error text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-error/25 active:scale-95 transition-all"
+                            >
+                              Recusar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Joined Chat Rooms Previews */}
+                {dashboardChats.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 relative z-10">
+                    {dashboardChats.map(chat => {
+                      const unread = chat.unreadCount?.[auth.currentUser?.uid || ''] || 0;
+                      const hasUnread = unread > 0;
+                      const defaultAvatar = chat.type === 'group'
+                        ? `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name || 'G')}&background=00f5a0&color=0d1425`
+                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.otherUserName || 'U')}&background=random`;
+                      
+                      const chatPhoto = chat.photoURL || defaultAvatar;
+
+                      return (
+                        <div
+                          key={chat.id}
+                          onClick={() => {
+                            localStorage.setItem('autoSelectChatId', chat.id);
+                            window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'community' }));
+                          }}
+                          className={`relative p-4 rounded-2xl bg-surface-container-low border hover:bg-surface-container-highest cursor-pointer transition-all duration-300 group flex flex-col justify-between gap-3 ${
+                            hasUnread ? 'border-[#00f5a0]/40 shadow-lg shadow-[#00f5a0]/5 scale-[1.01]' : 'border-outline-variant/15 hover:border-[#00f5a0]/30'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            {/* Avatar */}
+                            <div className="w-10 h-10 rounded-full bg-surface-container shrink-0 overflow-hidden relative border border-outline-variant/10">
+                              <img src={chatPhoto} alt="Group Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              {chat.type === 'group' && (
+                                <div className="absolute -bottom-1 -right-1 bg-surface rounded-full p-0.5 border border-outline-variant/30">
+                                  <Users size={10} className="text-[#00f5a0]"/>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Chat Info */}
+                            <div className="flex-1 min-w-0 font-normal">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-bold text-sm text-on-surface truncate group-hover:text-[#00f5a0] transition-colors">
+                                  {chat.name}
+                                </h4>
+                                {hasUnread && (
+                                  <span className="w-5 h-5 bg-[#00f5a0] text-black text-[9px] font-black rounded-full flex items-center justify-center shrink-0 shadow-md">
+                                    {unread > 9 ? '9+' : unread}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-on-surface-variant font-medium mt-1 truncate">
+                                {chat.lastSenderName ? (
+                                  <span className="text-[#00f5a0]/80 font-bold">{chat.lastSenderName.split(' ')[0]}: </span>
+                                ) : null}
+                                <span className="opacity-90">{chat.lastMessage || 'Nenhuma mensagem recente'}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center text-[10px] text-on-surface-variant/40 pt-1 border-t border-outline-variant/5 mt-1">
+                            <span className="flex items-center gap-1 font-semibold">
+                              <span className="material-symbols-outlined text-[12px]">forum</span>
+                              {chat.type === 'group' ? 'Sala de Grupo' : 'Bate-papo'}
+                            </span>
+                            <span className="text-[#00f5a0]/60 font-black group-hover:underline flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-wider">
+                              Abrir <ChevronRight size={10} />
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-on-surface-variant/60 font-semibold italic">Você ainda não faz parte de nenhuma sala de bate-papo.</p>
+                )}
+              </div>
+            )}
+
             {/* Statistics */}
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
         <h3 className="text-on-surface font-bold mb-6 md:mb-8 text-base md:text-xl font-headline">Estatísticas Globais</h3>
