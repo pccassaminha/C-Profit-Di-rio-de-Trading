@@ -64,6 +64,37 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
+      const loggedInEmail = result.user.email?.trim().toLowerCase();
+      let partnerDetected = false;
+      if (loggedInEmail) {
+        const qPartner = query(
+          collection(db, 'usuarios'),
+          where('partnerEmail', '==', loggedInEmail)
+        );
+        const partnerSnap = await getDocs(qPartner);
+        if (!partnerSnap.empty) {
+          partnerDetected = true;
+          const parentDoc = partnerSnap.docs[0];
+          const parentUid = parentDoc.id;
+          const parentData = parentDoc.data();
+
+          // Store partner mode variables in localStorage
+          localStorage.setItem('partnerModeActive', 'true');
+          localStorage.setItem('partnerMainUserUid', parentUid);
+          localStorage.setItem('partnerMainUserEmail', parentData.email || '');
+          localStorage.setItem('partnerMainUserDisplayName', (parentData.nome || parentData.name || 'Maestro') + ' (Parceiro)');
+          localStorage.setItem('partnerMainUserPhotoURL', parentData.photoURL || '');
+          console.log("[Partner Google Logged] Partner mode ready for parent UID:", parentUid);
+        } else {
+          // Standard Google login - make sure partner mode is cleared
+          localStorage.removeItem('partnerModeActive');
+          localStorage.removeItem('partnerMainUserUid');
+          localStorage.removeItem('partnerMainUserEmail');
+          localStorage.removeItem('partnerMainUserDisplayName');
+          localStorage.removeItem('partnerMainUserPhotoURL');
+        }
+      }
+
       const userRef = doc(db, 'usuarios', result.user.uid);
       const userDoc = await getDoc(userRef);
       
