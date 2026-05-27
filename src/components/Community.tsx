@@ -26,6 +26,7 @@ export default function Community() {
   const [showFilter, setShowFilter] = useState(true);
   const [viewingPost, setViewingPost] = useState<Post | null>(null);
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  const [globalSettings, setGlobalSettings] = useState<any>(null);
   const [selectedProfileUser, setSelectedProfileUser] = useState<{ id: string, name: string, photo: string } | null>(null);
   const [friendsList, setFriendsList] = useState<string[]>([]);
   const [distancedList, setDistancedList] = useState<string[]>([]);
@@ -53,7 +54,20 @@ export default function Community() {
   const [profileIsFollowing, setProfileIsFollowing] = useState(false);
   const [isEditingProfileDetails, setIsEditingProfileDetails] = useState(false);
   const [isSavingProfileEdits, setIsSavingProfileEdits] = useState(false);
-  const [editFormFields, setEditFormFields] = useState({
+  const [editFormFields, setEditFormFields] = useState<{
+    nome: string;
+    phoneNumber: string;
+    email: string;
+    bio: string;
+    liveIn: string;
+    homeTown: string;
+    relationship: string;
+    birthday: string;
+    school: string;
+    isPrivate: boolean;
+    coverURL: string;
+    socialLinks: Array<{ platform: string; url: string; mask: string }>;
+  }>({
     nome: '',
     phoneNumber: '',
     email: '',
@@ -62,10 +76,10 @@ export default function Community() {
     homeTown: '',
     relationship: '',
     birthday: '',
-    work: '',
     school: '',
     isPrivate: false,
-    coverURL: ''
+    coverURL: '',
+    socialLinks: [{ platform: 'Instagram', url: '', mask: '' }]
   });
   
   const [allCommunityUsers, setAllCommunityUsers] = useState<any[]>([]);
@@ -175,7 +189,15 @@ export default function Community() {
     const unsubAll = onSnapshot(collection(db, 'usuarios'), (snap) => {
       setAllCommunityUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return unsubAll;
+    const unsubGlobalSettings = onSnapshot(doc(db, 'settings', 'global'), (snap) => {
+      if (snap.exists()) {
+        setGlobalSettings(snap.data());
+      }
+    });
+    return () => {
+      unsubAll();
+      unsubGlobalSettings();
+    };
   }, []);
 
   useEffect(() => {
@@ -233,10 +255,10 @@ export default function Community() {
             homeTown: data.homeTown || '',
             relationship: data.relationship || 'Solteiro',
             birthday: data.birthday || '',
-            work: data.work || '',
             school: data.school || '',
             isPrivate: data.isPrivate || false,
-            coverURL: data.coverURL || ''
+            coverURL: data.coverURL || '',
+            socialLinks: data.socialLinks || [{ platform: 'Instagram', url: '', mask: '' }]
           });
         } else {
           setSelectedUserDetailedProfile({});
@@ -249,10 +271,10 @@ export default function Community() {
             homeTown: '',
             relationship: 'Solteiro',
             birthday: '',
-            work: '',
             school: '',
             isPrivate: false,
-            coverURL: ''
+            coverURL: '',
+            socialLinks: [{ platform: 'Instagram', url: '', mask: '' }]
           });
         }
       } catch (err) {
@@ -737,10 +759,10 @@ export default function Community() {
         homeTown: editFormFields.homeTown,
         relationship: editFormFields.relationship,
         birthday: editFormFields.birthday,
-        work: editFormFields.work,
         school: editFormFields.school,
         isPrivate: editFormFields.isPrivate,
         coverURL: editFormFields.coverURL,
+        socialLinks: editFormFields.socialLinks || [],
         updatedAt: serverTimestamp()
       };
       await setDoc(userDocRef, updatedData, { merge: true });
@@ -748,7 +770,7 @@ export default function Community() {
       setSelectedUserDetailedProfile(prev => prev ? {
         ...prev,
         ...updatedData
-      } : updatedData);
+      } : updatedData as any);
       
       setIsEditingProfileDetails(false);
       alert('Perfil editado com sucesso!');
@@ -757,6 +779,38 @@ export default function Community() {
       alert('Erro ao guardar alterações.');
     } finally {
       setIsSavingProfileEdits(false);
+    }
+  };
+
+  const handleAddSocialLink = () => {
+    const current = editFormFields.socialLinks || [];
+    if (current.length >= 3) {
+      alert("Você pode adicionar no máximo 3 contas de redes sociais.");
+      return;
+    }
+    setEditFormFields({
+      ...editFormFields,
+      socialLinks: [...current, { platform: 'Instagram', url: '', mask: '' }]
+    });
+  };
+
+  const handleRemoveSocialLink = (index: number) => {
+    const current = editFormFields.socialLinks || [];
+    const updated = current.filter((_, idx) => idx !== index);
+    setEditFormFields({
+      ...editFormFields,
+      socialLinks: updated.length === 0 ? [{ platform: 'Instagram', url: '', mask: '' }] : updated
+    });
+  };
+
+  const handleSocialLinkChange = (index: number, key: 'platform' | 'url' | 'mask', value: string) => {
+    const current = [...(editFormFields.socialLinks || [])];
+    if (current[index]) {
+      current[index] = { ...current[index], [key]: value };
+      setEditFormFields({
+        ...editFormFields,
+        socialLinks: current
+      });
     }
   };
 
@@ -1325,6 +1379,53 @@ export default function Community() {
       {/* Right Sidebar Column (Col span: 1) */}
       <div className="space-y-6 lg:sticky lg:top-24">
         
+        {/* COMUNIDADE OFICIAL BANNER */}
+        {(() => {
+          const platform = globalSettings?.communityPlatform || 'Telegram';
+          const link = globalSettings?.communityLink;
+          
+          if (!link) return null;
+          
+          return (
+            <div className="bg-gradient-to-br from-[#00f5a0]/10 via-[#00f5a0]/5 to-transparent border border-[#00f5a0]/25 rounded-[32px] p-6 shadow-xl relative overflow-hidden group hover:shadow-2xl hover:scale-[1.01] transition-all duration-300">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#00f5a0]/10 blur-2xl rounded-full pointer-events-none group-hover:scale-125 transition-all duration-500" />
+              
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#00f5a0]/10 flex items-center justify-center text-[#00f5a0] border border-[#00f5a0]/20 shrink-0 group-hover:scale-110 transition-transform duration-300 font-normal">
+                  {platform === 'Telegram' && <span className="material-symbols-outlined text-[24px]">send</span>}
+                  {platform === 'WhatsApp' && <span className="material-symbols-outlined text-[24px]">chat</span>}
+                  {platform === 'Discord' && <span className="material-symbols-outlined text-[24px]">forum</span>}
+                  {platform !== 'Telegram' && platform !== 'WhatsApp' && platform !== 'Discord' && (
+                    <span className="material-symbols-outlined text-[24px]">globe</span>
+                  )}
+                </div>
+                
+                <div className="space-y-1 flex-1 text-left">
+                  <span className="text-[10px] font-black tracking-widest text-[#00f5a0] bg-[#00f5a0]/10 px-2.5 py-1 rounded-full uppercase">Comunidade Oficial</span>
+                  <h4 className="font-extrabold text-sm text-white pt-2 leading-snug">
+                    Faça parte da comunidade: <span className="text-[#00f5a0]">{platform}</span>
+                  </h4>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    Conecte-se com outros membros premium, compartilhe análises e receba novidades exclusivas.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-outline-variant/10 flex gap-2">
+                <a 
+                  href={link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3 px-5 bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-xs tracking-wider shadow-lg shadow-[#00f5a0]/15 hover:scale-[1.01] active:scale-95 transition-all cursor-pointer"
+                >
+                  <span>Entrar no {platform}</span>
+                  <span className="material-symbols-outlined text-[16px] font-black">arrow_forward</span>
+                </a>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* FRIEND REQUESTS CARD & WIDGET (PENDING ACTIONS) */}
         <div className="bg-surface-container-low border border-outline-variant/10 rounded-[32px] p-6 shadow-xl space-y-4">
            <div className="flex items-center gap-2 pb-2 border-b border-outline-variant/10">
@@ -1959,12 +2060,28 @@ export default function Community() {
                             <h3 className="font-extrabold text-sm text-on-surface uppercase tracking-wide">Apresentação</h3>
                             
                             <div className="space-y-3.5 text-xs text-on-surface-variant font-medium">
-                              {!selectedUserDetailedProfile?.isWorkPrivate && selectedUserDetailedProfile?.work ? (
-                                <div className="flex items-center gap-2.5">
-                                  <Briefcase size={16} className="text-on-surface-variant opacity-60" />
-                                  <span>Trabalha como <strong className="text-on-surface">{selectedUserDetailedProfile.work}</strong></span>
-                                </div>
-                              ): null}
+                              {selectedUserDetailedProfile?.socialLinks && selectedUserDetailedProfile.socialLinks.filter((l: any) => l.url || l.mask).map((link: any, idx: number) => {
+                                let href = link.url || '#';
+                                if (href !== '#' && !/^https?:\/\//i.test(href)) {
+                                  href = 'https://' + href;
+                                }
+                                return (
+                                  <div key={idx} className="flex items-center gap-2.5">
+                                    <Globe size={16} className="text-[#00f5a0]/85 shrink-0" />
+                                    <span>
+                                      {link.platform}:{' '}
+                                      <a
+                                        href={href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[#00f5a0] hover:underline font-bold"
+                                      >
+                                        {link.mask || 'Ver Perfil'}
+                                      </a>
+                                    </span>
+                                  </div>
+                                );
+                              })}
 
                               {!selectedUserDetailedProfile?.isLiveInPrivate && selectedUserDetailedProfile?.liveIn ? (
                                 <div className="flex items-center gap-2.5">
@@ -2265,15 +2382,84 @@ export default function Community() {
                                   onChange={(e) => setEditFormFields({ ...editFormFields, homeTown: e.target.value })}
                                 />
                               </div>
-                              <div className="space-y-1">
-                                <label className="text-xs text-on-surface-variant font-bold uppercase">Trabalho (Profissão)</label>
-                                <input 
-                                  type="text" 
-                                  placeholder="Ex: Criador de Conteúdos"
-                                  className="w-full bg-surface-container border border-outline-variant/30 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
-                                  value={editFormFields.work}
-                                  onChange={(e) => setEditFormFields({ ...editFormFields, work: e.target.value })}
-                                />
+                              {/* REDES SOCIAIS DYNAMIC AREA */}
+                              <div className="col-span-1 sm:col-span-2 bg-surface-container/20 border border-outline-variant/10 rounded-2xl p-4 space-y-4">
+                                <div className="flex items-center justify-between border-b border-outline-variant/10 pb-2">
+                                  <div>
+                                    <h4 className="text-xs font-black uppercase text-[#00f5a0]">Redes Sociais</h4>
+                                    <p className="text-[10px] text-on-surface-variant">Configure até 3 links para apresentar aos outros traders</p>
+                                  </div>
+                                  {(editFormFields.socialLinks || []).length < 3 && (
+                                    <button
+                                      type="button"
+                                      onClick={handleAddSocialLink}
+                                      className="py-1 px-3 bg-[#00f5a0]/10 hover:bg-[#00f5a0]/20 text-[#00f5a0] rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <span>+ Adicionar</span>
+                                    </button>
+                                  )}
+                                </div>
+                                
+                                <div className="space-y-4">
+                                  {(editFormFields.socialLinks || []).map((link, idx) => (
+                                    <div key={idx} className="bg-surface-container/50 p-3 rounded-xl border border-outline-variant/10 space-y-3 relative group">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Rede Social #{idx + 1}</span>
+                                        {(editFormFields.socialLinks || []).length > 1 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveSocialLink(idx)}
+                                            className="text-red-400 hover:text-red-500 text-[10px] font-bold uppercase transition-colors px-1 cursor-pointer"
+                                          >
+                                            Remover
+                                          </button>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                        {/* Plataforma */}
+                                        <div className="space-y-1">
+                                          <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Plataforma</label>
+                                          <select
+                                            value={link.platform}
+                                            onChange={(e) => handleSocialLinkChange(idx, 'platform', e.target.value)}
+                                            className="w-full bg-surface-container-high border border-outline-variant/20 rounded-lg px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
+                                          >
+                                            <option value="Instagram">Instagram</option>
+                                            <option value="Facebook">Facebook</option>
+                                            <option value="TikTok">TikTok</option>
+                                            <option value="Canal YouTube">Canal YouTube</option>
+                                            <option value="Outros">Outros</option>
+                                          </select>
+                                        </div>
+
+                                        {/* Máscara / Nome da Conta */}
+                                        <div className="space-y-1">
+                                          <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Nome da Conta / Máscara</label>
+                                          <input
+                                            type="text"
+                                            placeholder="Ex: @meu_instagram"
+                                            value={link.mask}
+                                            onChange={(e) => handleSocialLinkChange(idx, 'mask', e.target.value)}
+                                            className="w-full bg-surface-container-high border border-outline-variant/20 rounded-lg px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
+                                          />
+                                        </div>
+
+                                        {/* Link URL */}
+                                        <div className="space-y-1">
+                                          <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Link de Perfil / URL</label>
+                                          <input
+                                            type="text"
+                                            placeholder="Ex: https://instagram.com/user"
+                                            value={link.url}
+                                            onChange={(e) => handleSocialLinkChange(idx, 'url', e.target.value)}
+                                            className="w-full bg-surface-container-high border border-outline-variant/20 rounded-lg px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                               <div className="space-y-1">
                                 <label className="text-xs text-on-surface-variant font-bold uppercase">Formação (Escola)</label>
@@ -2393,18 +2579,38 @@ export default function Community() {
 
                             <div className="border-t border-outline-variant/10 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-6">
                               <div className="space-y-4">
-                                <h4 className="text-xs font-extrabold uppercase tracking-wide text-primary">Profissão</h4>
+                                <h4 className="text-xs font-extrabold uppercase tracking-wide text-primary">Redes Sociais</h4>
                                 <ul className="space-y-3.5">
-                                  {!selectedUserDetailedProfile?.isWorkPrivate && selectedUserDetailedProfile?.work ? (
-                                    <li className="flex items-start gap-3">
-                                      <Briefcase className="text-on-surface-variant opacity-60 w-4 h-4" />
-                                      <div>
-                                        <span className="text-on-surface font-semibold block">{selectedUserDetailedProfile.work}</span>
-                                        <span className="text-[10px] text-on-surface-variant">Emprego</span>
-                                      </div>
-                                    </li>
+                                  {selectedUserDetailedProfile?.socialLinks && selectedUserDetailedProfile.socialLinks.filter((l: any) => l.url || l.mask).length > 0 ? (
+                                    selectedUserDetailedProfile.socialLinks.map((link: any, idx: number) => {
+                                      if (!link.url && !link.mask) return null;
+                                      let href = link.url || '#';
+                                      if (href !== '#' && !/^https?:\/\//i.test(href)) {
+                                        href = 'https://' + href;
+                                      }
+                                      return (
+                                        <li key={idx} className="flex items-start gap-3">
+                                          <div className="p-1.5 bg-[#00f5a0]/10 rounded-lg text-[#00f5a0] flex items-center justify-center shrink-0 mt-0.5">
+                                            <Globe size={12} />
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <span className="text-[9px] text-[#00f5a0] uppercase tracking-wider font-black block">
+                                              {link.platform || 'Link'}
+                                            </span>
+                                            <a
+                                              href={href}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-white hover:text-[#00f5a0] hover:underline font-bold transition-all text-xs break-all block"
+                                            >
+                                              {link.mask || link.url || 'Aceder'}
+                                            </a>
+                                          </div>
+                                        </li>
+                                      );
+                                    })
                                   ) : (
-                                    <li className="text-[10.5px] italic text-on-surface-variant/50">Nenhuma informação pública de trabalho</li>
+                                    <li className="text-[10.5px] italic text-on-surface-variant/50">Nenhuma rede social configurada</li>
                                   )}
                                 </ul>
                               </div>

@@ -43,6 +43,11 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
   const [groupSettingsPhotoPreview, setGroupSettingsPhotoPreview] = useState<string | null>(null);
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
 
+  // Friends list and direct messaging
+  const [friendsList, setFriendsList] = useState<string[]>([]);
+  const [isFriendSearchOpen, setIsFriendSearchOpen] = useState(false);
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+
   // User search/invite logic inside group chats
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -80,6 +85,70 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     });
     return unsub;
   }, []);
+
+  // Subscribe to real-time friends list from 'users/{uid}/friends'
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    const unsubFriends = onSnapshot(collection(db, 'users', uid, 'friends'), (snap) => {
+      setFriendsList(snap.docs.map(d => d.id));
+    }, (err) => {
+      console.error('Error loading friends list in chat:', err);
+    });
+    return unsubFriends;
+  }, []);
+
+  const handleStartDirectChat = async (otherUserId: string) => {
+    if (!auth.currentUser) return;
+    try {
+      // Find dynamic chat
+      const existing = chats.find(c => c.type === 'direct' && c.participants.includes(otherUserId));
+      if (existing) {
+        setActiveChat(existing);
+        setIsFriendSearchOpen(false);
+        return;
+      }
+
+      // Query database if we don't have it loaded in "chats" state
+      const q = query(
+        collection(db, 'chats'),
+        where('type', '==', 'direct'),
+        where('participants', 'array-contains', auth.currentUser.uid)
+      );
+      const snapshot = await import('firebase/firestore').then(firestore => firestore.getDocs(q));
+      const dbChat = snapshot.docs.find(d => d.data().participants.includes(otherUserId));
+
+      if (dbChat) {
+        const chatData = { id: dbChat.id, ...dbChat.data() } as Chat;
+        setActiveChat(chatData);
+      } else {
+        // Create new direct chat
+        const newChatRef = await addDoc(collection(db, 'chats'), {
+          type: 'direct',
+          participants: [auth.currentUser.uid, otherUserId],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          unreadCount: {
+            [auth.currentUser.uid]: 0,
+            [otherUserId]: 0
+          }
+        });
+        // Set it as active
+        setActiveChat({
+          id: newChatRef.id,
+          type: 'direct',
+          participants: [auth.currentUser.uid, otherUserId],
+          unreadCount: {
+            [auth.currentUser.uid]: 0,
+            [otherUserId]: 0
+          }
+        } as Chat);
+      }
+      setIsFriendSearchOpen(false);
+    } catch (err) {
+      console.error('Error starting direct chat:', err);
+    }
+  };
 
   // Listen for pending room invites for current user
   useEffect(() => {
@@ -121,9 +190,10 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
         if (data.type === 'direct') {
           const otherUid = data.participants.find((p: string) => p !== uid);
           if (otherUid) {
-            const userDoc = await getDoc(doc(db, 'users', otherUid));
+            const userDoc = await getDoc(doc(db, 'usuarios', otherUid));
             displayData.otherUserId = otherUid;
-            displayData.otherUserName = userDoc.exists() ? userDoc.data()?.name || 'Usuário' : 'Usuário';
+            displayData.otherUserName = userDoc.exists() ? userDoc.data()?.nome || userDoc.data()?.displayName || userDoc.data()?.username || 'Usuário' : 'Usuário';
+            displayData.photoURL = userDoc.exists() ? userDoc.data()?.photoURL || '' : '';
           }
         }
         
@@ -266,11 +336,15 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
 
     try {
       const msgText = newMessage.trim();
+      const ourDbUserObj = allUsers.find(u => u.id === auth.currentUser?.uid);
+      const ourPhoto = ourDbUserObj?.photoURL || auth.currentUser?.photoURL || '';
+      const ourName = ourDbUserObj?.nome || ourDbUserObj?.displayName || auth.currentUser?.displayName || 'Usuário';
+
       const messageObj: any = {
         text: msgText || (attachedImageUrl ? "📷 Imagem" : ""),
-        senderId: auth.currentUser.uid,
-        senderName: auth.currentUser.displayName || 'Usuário',
-        senderPhoto: auth.currentUser.photoURL || '',
+        senderId: auth.currentUser?.uid || '',
+        senderName: ourName,
+        senderPhoto: ourPhoto,
         createdAt: serverTimestamp()
       };
 
@@ -289,7 +363,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
 
       await updateDoc(doc(db, 'chats', activeChat.id), {
         lastMessage: attachedImageUrl ? "📷 Imagem Enviada" : msgText,
-        lastSenderName: auth.currentUser.displayName || 'Usuário',
+        lastSenderName: ourName,
         updatedAt: serverTimestamp(),
         ...unreadUpdates
       });
@@ -467,59 +541,54 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
               <h2 className="text-lg font-black font-headline uppercase tracking-widest text-on-surface">Conversas</h2>
             </div>
 
-            {/* Prominent Wide Action CTA for Room Creation, closing the active chat as requested */}
+            {/* Prominent Wide Action CTA for Room Creation and Direct Messaging */}
             <div className="p-3 bg-surface-container-low shrink-0 border-b border-outline-variant/10 space-y-2">
               <button 
                 onClick={() => {
                   setActiveChat(null); // Closes active chat
                   setIsGroupModalOpen(true); // Opens build a room modal
                 }} 
-                className="w-full py-2.5 px-4 bg-primary text-on-primary hover:bg-primary/90 hover:scale-[1.02] active:scale-95 transition-all text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 rounded-2xl shadow-lg shadow-primary/15"
+                className="w-full py-2 px-3 bg-[#00f5a0]/15 text-[#00f5a0] border border-[#00f5a0]/25 hover:bg-[#00f5a0]/25 hover:scale-[1.01] active:scale-95 transition-all text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 rounded-xl shadow-md"
                 title="Criar Sala"
               >
-                <Users size={16} />
+                <Users size={14} />
                 <span>+ Criar Nova Sala</span>
               </button>
 
-              {/* Real-time pending room invites notifications */}
-              {pendingInvites.length > 0 && (
-                <div className="space-y-1.5 pt-1">
-                  <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Convites de Sala ({pendingInvites.length})</p>
-                  {pendingInvites.map(invite => (
-                    <div 
-                      key={invite.id} 
-                      className="p-3 bg-primary/10 border border-primary/20 rounded-2xl animate-in fade-in zoom-in duration-200"
-                    >
-                      <p className="text-[11px] text-on-surface leading-tight">
-                        O trader <strong className="text-primary">{invite.senderName}</strong> convidou-te para fazer parte de sua sala <strong className="text-primary">"{invite.roomName}"</strong>.
-                      </p>
-                      <div className="flex gap-1.5 mt-2 justify-end">
-                        <button 
-                          onClick={() => handleAcceptInvite(invite)}
-                          className="px-2.5 py-1 bg-primary text-on-primary text-[9px] font-bold rounded-lg uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all"
-                        >
-                          Aceitar
-                        </button>
-                        <button 
-                          onClick={() => handleDeclineInvite(invite)}
-                          className="px-2.5 py-1 bg-error/15 text-error text-[9px] font-extrabold rounded-lg uppercase tracking-wider hover:bg-error/25 active:scale-95 transition-all"
-                        >
-                          Recusar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <button 
+                onClick={() => {
+                  setIsFriendSearchOpen(true); // Opens Friend chat modal
+                }} 
+                className="w-full py-2 px-3 bg-primary text-on-primary hover:bg-primary/95 hover:scale-[1.01] active:scale-95 transition-all text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 rounded-xl shadow-md cursor-pointer"
+                title="Conversar com Amigo"
+              >
+                <MessageSquare size={14} />
+                <span>Conversar com Amigo</span>
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               {chats.map(chat => {
                  const unread = chat.unreadCount?.[auth.currentUser?.uid || ''];
+                 
+                 let chatName = chat.name || '';
+                 let chatPhoto = chat.photoURL || '';
+
+                 if (chat.type === 'direct') {
+                   const otherUid = chat.participants?.find(p => p !== auth.currentUser?.uid);
+                   const otherUser = allUsers.find(u => u.id === otherUid || u.uid === otherUid);
+                   if (otherUser) {
+                     chatName = otherUser.nome || otherUser.displayName || otherUser.username || chat.otherUserName || 'Usuário';
+                     chatPhoto = otherUser.photoURL || '';
+                   } else {
+                     chatName = chat.otherUserName || 'Usuário';
+                   }
+                 }
+
                  const defaultAvatar = chat.type === 'group' 
-                   ? `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name || 'G')}&background=random`
-                   : `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.otherUserName || 'U')}&background=random`;
-                 const chatPhoto = chat.photoURL || defaultAvatar;
+                   ? `https://ui-avatars.com/api/?name=${encodeURIComponent(chatName || 'G')}&background=random`
+                   : `https://ui-avatars.com/api/?name=${encodeURIComponent(chatName || 'U')}&background=random`;
+                 const resolvedPhoto = chatPhoto || defaultAvatar;
 
                  return (
                   <div 
@@ -528,7 +597,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                     className={`p-3 lg:p-4 border-b border-outline-variant/5 cursor-pointer flex items-center gap-3 transition-colors relative ${activeChat?.id === chat.id ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-surface-container'}`}
                   >
                     <div className="w-10 h-10 rounded-full bg-surface-container shrink-0 overflow-hidden relative border border-outline-variant/10">
-                      <img src={chatPhoto} alt="Chat" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={resolvedPhoto} alt="Chat" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       {chat.type === 'group' && (
                         <div className="absolute -bottom-1 -right-1 bg-surface rounded-full p-0.5 border border-outline-variant/10">
                            <Users size={10} className="text-primary"/>
@@ -537,7 +606,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                     </div>
                     <div className="flex-1 min-w-0 pr-6">
                       <h3 className="font-bold text-sm text-on-surface truncate">
-                        {chat.type === 'group' ? chat.name : chat.otherUserName}
+                        {chatName}
                       </h3>
                       <p className="text-xs text-on-surface-variant truncate mt-0.5">
                         {chat.lastSenderName && `${chat.lastSenderName.split(' ')[0]}: `}{chat.lastMessage || 'Nenhuma mensagem.'}
@@ -567,26 +636,48 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                        <span className="material-symbols-outlined text-on-surface-variant">arrow_back</span>
                     </button>
                     
-                    {/* Chat Header Avatar */}
-                    <div className="w-10 h-10 rounded-full bg-surface-container overflow-hidden shrink-0 border border-outline-variant/10">
-                      <img 
-                        src={activeChat.photoURL || (activeChat.type === 'group' 
-                          ? `https://ui-avatars.com/api/?name=${encodeURIComponent(activeChat.name || 'G')}&background=random`
-                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(activeChat.otherUserName || 'U')}&background=random`)}
-                        alt="Chat Preview" 
-                        className="w-full h-full object-cover" 
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                    
-                    <div>
-                      <h2 className="text-sm font-bold text-on-surface flex items-center gap-2 truncate">
-                        {activeChat.type === 'group' ? activeChat.name : activeChat.otherUserName}
-                      </h2>
-                      {activeChat.type === 'group' && (
-                        <p className="text-[10px] text-on-surface-variant truncate max-w-[200px]">{activeChat.description}</p>
-                      )}
-                    </div>
+                    {/* Chat Header Avatar/Details Dynamic rendering */}
+                    {(() => {
+                      let headerName = activeChat.name || '';
+                      let headerPhoto = activeChat.photoURL || '';
+
+                      if (activeChat.type === 'direct') {
+                        const otherUid = activeChat.participants?.find(p => p !== auth.currentUser?.uid);
+                        const otherUser = allUsers.find(u => u.id === otherUid || u.uid === otherUid);
+                        if (otherUser) {
+                          headerName = otherUser.nome || otherUser.displayName || otherUser.username || activeChat.otherUserName || 'Usuário';
+                          headerPhoto = otherUser.photoURL || '';
+                        } else {
+                          headerName = activeChat.otherUserName || 'Usuário';
+                        }
+                      }
+
+                      const defaultAvatar = activeChat.type === 'group' 
+                        ? `https://ui-avatars.com/api/?name=${encodeURIComponent(headerName || 'G')}&background=random`
+                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(headerName || 'U')}&background=random`;
+
+                      return (
+                        <>
+                          <div className="w-10 h-10 rounded-full bg-surface-container overflow-hidden shrink-0 border border-outline-variant/10">
+                            <img 
+                              src={headerPhoto || defaultAvatar}
+                              alt="Chat Preview" 
+                              className="w-full h-full object-cover" 
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          
+                          <div>
+                            <h2 className="text-sm font-bold text-on-surface flex items-center gap-2 truncate text-left">
+                              {headerName}
+                            </h2>
+                            {activeChat.type === 'group' && (
+                              <p className="text-[10px] text-on-surface-variant truncate max-w-[200px] text-left">{activeChat.description}</p>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -605,13 +696,18 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                     const isGroup = activeChat.type === 'group';
                     const showAvatarAndName = !isMine && (idx === 0 || messages[idx - 1].senderId !== msg.senderId);
                     
+                    // Dynamically resolve the sender name and picture from general user accounts (Pedro's picture will load perfectly!)
+                    const senderUser = allUsers.find(u => u.id === msg.senderId || u.uid === msg.senderId);
+                    const senderName = senderUser ? (senderUser.nome || senderUser.displayName || senderUser.username || msg.senderName) : msg.senderName;
+                    const senderPhoto = senderUser?.photoURL || msg.senderPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(senderName || 'U')}&background=random`;
+                    
                     return (
                       <div key={msg.id} className={`flex w-full ${isMine ? 'justify-end' : 'justify-start'}`}>
                         {!isMine && showAvatarAndName && (
                           <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mr-2 self-end mb-1">
                             <img 
-                              src={msg.senderPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || 'U')}&background=random`}
-                              alt={msg.senderName}
+                              src={senderPhoto}
+                              alt={senderName}
                               className="w-full h-full object-cover"
                               referrerPolicy="no-referrer"
                             />
@@ -621,7 +717,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
 
                         <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm ${isMine ? 'bg-primary text-on-primary rounded-br-sm' : 'bg-surface-container-highest text-on-surface rounded-bl-sm'}`}>
                           {showAvatarAndName && isGroup && (
-                            <p className="text-[10px] font-black text-primary mb-1 uppercase tracking-wider">{msg.senderName}</p>
+                            <p className="text-[10px] font-black text-primary mb-1 uppercase tracking-wider">{senderName}</p>
                           )}
                           <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">
                             {renderMessageText(msg.text)}
@@ -847,6 +943,93 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                     Criando...
                   </>
                 ) : 'Criar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isFriendSearchOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface border border-outline-variant/10 rounded-3xl p-6 w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-4 shrink-0">
+              <h3 className="text-base font-black font-headline uppercase tracking-wider text-on-surface">Iniciar Conversa</h3>
+              <button 
+                onClick={() => {
+                  setIsFriendSearchOpen(false);
+                  setFriendSearchQuery('');
+                }} 
+                className="text-on-surface-variant hover:text-on-surface p-1 hover:bg-surface-container rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={18}/>
+              </button>
+            </div>
+
+            {/* Friend Search input */}
+            <div className="mb-4 shrink-0 relative">
+              <input
+                type="text"
+                placeholder="Procurar amigo na lista..."
+                value={friendSearchQuery}
+                onChange={e => setFriendSearchQuery(e.target.value)}
+                className="w-full bg-surface-container border border-outline-variant/15 rounded-xl px-4 py-2.5 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              />
+            </div>
+
+            {/* Friends list */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[200px] max-h-[350px]">
+              {(() => {
+                const filteredFriends = allUsers.filter(u => {
+                  const isFriend = friendsList.includes(u.id);
+                  const matchesSearch = (u.nome || u.displayName || u.username || '').toLowerCase().includes(friendSearchQuery.toLowerCase());
+                  return isFriend && matchesSearch && u.id !== auth.currentUser?.uid;
+                });
+
+                if (filteredFriends.length === 0) {
+                  return (
+                    <div className="p-6 text-center text-on-surface-variant/60 font-medium text-xs">
+                      {friendsList.length === 0 
+                        ? 'Sua lista de amigos está vazia. Adicione amigos na aba Comunidade para iniciar conversas!'
+                        : 'Nenhum amigo encontrado com este nome.'}
+                    </div>
+                  );
+                }
+
+                return filteredFriends.map(friend => {
+                  const name = friend.nome || friend.displayName || friend.username || 'Amigo';
+                  const avatar = friend.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+
+                  return (
+                    <div 
+                      key={friend.id}
+                      onClick={() => handleStartDirectChat(friend.id)}
+                      className="flex items-center gap-3 p-2.5 hover:bg-primary/10 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-primary/10 hover:scale-[1.01] group"
+                    >
+                      <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-outline-variant/10">
+                        <img src={avatar} alt={name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-xs text-on-surface text-left truncate group-hover:text-primary transition-colors">{name}</h4>
+                        <p className="text-[10px] text-on-surface-variant text-left truncate">Enviar mensagem directa</p>
+                      </div>
+                      <span className="material-symbols-outlined text-[18px] text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                        chat_bubble
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-outline-variant/10 flex justify-end shrink-0">
+              <button 
+                onClick={() => {
+                  setIsFriendSearchOpen(false);
+                  setFriendSearchQuery('');
+                }} 
+                className="px-4 py-2 rounded-xl text-on-surface-variant hover:bg-surface-container font-black text-xs uppercase tracking-wider cursor-pointer"
+              >
+                Fechar
               </button>
             </div>
           </div>

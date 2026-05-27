@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { auth, db } from '../firebase';
 import { useTrades } from '../hooks/useTrades';
-import { collection, query, onSnapshot, orderBy, where, doc } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, where, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 export default function Topbar({ 
   toggleSidebar, 
@@ -75,6 +75,51 @@ export default function Topbar({
     });
     return () => unsubFr();
   }, [currentUser]);
+
+  const [roomInvites, setRoomInvites] = useState<any[]>([]);
+
+  // Subscribe to real-time pending room invites
+  useEffect(() => {
+    if (!currentUser) return;
+    const qRi = query(
+      collection(db, 'room_invites'),
+      where('receiverId', '==', currentUser.uid),
+      where('status', '==', 'pending')
+    );
+    const unsubRi = onSnapshot(qRi, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRoomInvites(items);
+    }, (error) => {
+      console.error('Error fetching room invites in topbar:', error);
+    });
+    return () => unsubRi();
+  }, [currentUser]);
+
+  const handleAcceptRoomInvite = async (invite: any) => {
+    try {
+      await updateDoc(doc(db, 'room_invites', invite.id), { status: 'accepted' });
+      await updateDoc(doc(db, 'chats', invite.roomId), {
+        participants: arrayUnion(currentUser?.uid)
+      });
+      alert('Entraste na sala de bate-papo com sucesso!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao aceitar convite.');
+    }
+  };
+
+  const handleDeclineRoomInvite = async (invite: any) => {
+    try {
+      await updateDoc(doc(db, 'room_invites', invite.id), { status: 'declined' });
+      alert('Convite recusado.');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao recusar convite.');
+    }
+  };
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLDivElement>(null);
@@ -182,7 +227,7 @@ export default function Topbar({
   };
 
   const totalUnreadChats = chatUnreads.reduce((sum, chat) => sum + chat.count, 0);
-  const unreadCount = broadcasts.filter(b => !seenIds.includes(b.id)).length + totalUnreadChats + friendRequests.length;
+  const unreadCount = broadcasts.filter(b => !seenIds.includes(b.id)).length + totalUnreadChats + friendRequests.length + roomInvites.length;
 
   return (
     <header className="flex justify-between items-center px-6 w-full h-20 sticky top-0 z-40 bg-background border-b border-outline-variant/20">
@@ -284,7 +329,43 @@ export default function Topbar({
                     </div>
                   </div>
                 ))}
-                {broadcasts.length === 0 && chatUnreads.length === 0 && friendRequests.length === 0 ? (
+                {roomInvites.map(invite => (
+                  <div 
+                    key={invite.id} 
+                    className="p-3.5 rounded-xl border transition-colors bg-primary/5 border-primary/25 shadow-sm space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-[18px]">forum</span>
+                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
+                        Convite de Sala
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-on-surface leading-snug">
+                      O trader <strong className="text-primary font-bold">{invite.senderName}</strong> convidou-te para fazer parte de sua sala <strong className="text-primary font-bold">"{invite.roomName}"</strong>.
+                    </p>
+                    <div className="flex gap-2 justify-end">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAcceptRoomInvite(invite);
+                        }}
+                        className="px-2.5 py-1 bg-primary text-on-primary text-[9px] font-bold rounded-lg uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer"
+                      >
+                        Aceitar
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeclineRoomInvite(invite);
+                        }}
+                        className="px-2.5 py-1 bg-error/10 text-error text-[9px] font-bold rounded-lg uppercase tracking-wider hover:bg-error/20 active:scale-95 transition-all cursor-pointer"
+                      >
+                        Recusar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {broadcasts.length === 0 && chatUnreads.length === 0 && friendRequests.length === 0 && roomInvites.length === 0 ? (
                   <div className="text-center py-8 px-4 text-on-surface-variant text-xs italic">
                     Nenhuma notificação por enquanto.
                   </div>

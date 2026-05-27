@@ -46,6 +46,12 @@ export default function AdminPanel() {
   const [paymentEndDate, setPaymentEndDate] = useState('');
   const [paymentSortOrder, setPaymentSortOrder] = useState<'newest' | 'oldest'>('newest');
 
+  // Community settings states inside Maestro panel
+  const [showCommunityModal, setShowCommunityModal] = useState<boolean>(false);
+  const [localPlatform, setLocalPlatform] = useState('');
+  const [localLink, setLocalLink] = useState('');
+  const [isSavingCommunity, setIsSavingCommunity] = useState(false);
+
   // Coupon search and filter states
   const [couponSearchQuery, setCouponSearchQuery] = useState('');
   const [selectedCouponFilter, setSelectedCouponFilter] = useState('');
@@ -476,6 +482,38 @@ export default function AdminPanel() {
     await setDoc(doc(db, 'settings', 'global'), settings);
     alert('Configurações salvas!');
     setShowBillingModal(false);
+  };
+
+  const handleSaveCommunityConfig = async () => {
+    if (!localPlatform.trim()) {
+      alert('Por favor introduza o nome da plataforma (ex: Telegram, WhatsApp, Discord).');
+      return;
+    }
+    if (!localLink.trim()) {
+      alert('Por favor introduza o link da comunidade.');
+      return;
+    }
+    setIsSavingCommunity(true);
+    try {
+      await setDoc(doc(db, 'settings', 'global'), {
+        communityPlatform: localPlatform.trim(),
+        communityLink: localLink.trim()
+      }, { merge: true });
+      
+      setSettings(prev => ({
+        ...prev,
+        communityPlatform: localPlatform.trim(),
+        communityLink: localLink.trim()
+      }));
+      
+      alert('Configuração da comunidade atualizada com sucesso!');
+      setShowCommunityModal(false);
+    } catch (err) {
+      console.error('Erro ao guardar configurações de comunidade:', err);
+      alert('Erro de rede ou permissões ao guardar as configurações.');
+    } finally {
+      setIsSavingCommunity(false);
+    }
   };
 
   const handleSendBroadcast = async () => {
@@ -1247,6 +1285,40 @@ export default function AdminPanel() {
                 />
               </div>
 
+              {/* Canal de Comunidade Configuração */}
+              <div className="border border-[#00f5a0]/10 p-5 rounded-2xl bg-[#00f5a0]/5 space-y-4">
+                <h4 className="text-xs font-black text-[#00f5a0] uppercase tracking-wider font-mono flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px]">groups</span>
+                  Link Oficial da Comunidade (Membros)
+                </h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1 font-mono">Escolha a Plataforma</label>
+                    <select
+                      value={settings.communityPlatform || 'Telegram'}
+                      onChange={(e) => setSettings({ ...settings, communityPlatform: e.target.value })}
+                      className="w-full bg-surface-container-low border border-[#00f5a0]/20 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm"
+                    >
+                      <option value="Telegram" className="bg-surface-container-high text-white">Telegram</option>
+                      <option value="WhatsApp" className="bg-surface-container-high text-white">WhatsApp</option>
+                      <option value="Discord" className="bg-surface-container-high text-white">Discord</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1 font-mono">URL / Link do Canal</label>
+                    <input 
+                      type="text" 
+                      value={settings.communityLink || ''}
+                      onChange={(e) => setSettings({ ...settings, communityLink: e.target.value })}
+                      className="w-full bg-surface-container-low border border-[#00f5a0]/20 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm"
+                      placeholder="Ex: https://t.me/seu_canal ou link do grupo"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Logo Multicaixa Express (URL)</label>
                 <div className="flex gap-4 items-center">
@@ -1467,6 +1539,94 @@ export default function AdminPanel() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showCommunityModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-surface-container border border-outline-variant/30 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl relative my-8 animate-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setShowCommunityModal(false)}
+              className="absolute top-6 right-6 p-2 text-on-surface-variant hover:text-white hover:bg-surface-container-high rounded-full transition-all"
+            >
+              <X size={20} />
+            </button>
+
+            <h3 className="text-xl font-bold text-[#00f5a0] mb-2 font-headline flex items-center gap-3">
+              <span className="material-symbols-outlined text-[24px]">groups</span>
+              Configurar Comunidade Oficial
+            </h3>
+            <p className="text-xs text-on-surface-variant mb-6">Insira os detalhes do grupo ou canal oficial da sua plataforma para os utilizadores se juntarem.</p>
+
+            <div className="space-y-5">
+              {/* Escolha rápida de Plataforma */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">
+                  Plataformas Frequentes
+                </label>
+                <div className="flex gap-2">
+                  {['Telegram', 'WhatsApp', 'Discord'].map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setLocalPlatform(p)}
+                      className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase border transition-all duration-300 ${
+                        localPlatform.toLowerCase() === p.toLowerCase()
+                          ? 'bg-[#00f5a0] text-background border-[#00f5a0] shadow-md shadow-[#00f5a0]/15 font-black'
+                          : 'bg-surface-container border-outline-variant/20 text-on-surface-variant hover:text-white hover:border-outline-variant/50'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nome Customizado */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">
+                  Nome da Plataforma
+                </label>
+                <input
+                  type="text"
+                  value={localPlatform}
+                  onChange={(e) => setLocalPlatform(e.target.value)}
+                  placeholder="Ex: Telegram, Canal VIP, Grupo Privado"
+                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-white focus:outline-none focus:border-[#00f5a0] transition-colors font-medium text-sm text-white"
+                />
+              </div>
+
+              {/* Link da Comunidade */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">
+                  Link da Comunidade
+                </label>
+                <input
+                  type="text"
+                  value={localLink}
+                  onChange={(e) => setLocalLink(e.target.value)}
+                  placeholder="Ex: https://t.me/seu_canal ou link de convite"
+                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-white focus:outline-none focus:border-[#00f5a0] transition-colors font-medium text-sm text-white"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowCommunityModal(false)}
+                  className="flex-1 py-3 px-6 bg-surface-container border border-outline-variant/20 text-on-surface hover:text-white transition-all rounded-xl font-bold uppercase tracking-widest text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveCommunityConfig}
+                  disabled={isSavingCommunity}
+                  className="flex-1 py-3 px-6 bg-[#00f5a0] text-background hover:bg-[#00f5a0]/90 font-black uppercase tracking-wider transition-all rounded-xl text-xs shadow-lg shadow-[#00f5a0]/15 disabled:opacity-50"
+                >
+                  {isSavingCommunity ? 'Guardando...' : 'Guardar Link'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1801,15 +1961,27 @@ export default function AdminPanel() {
                   <h3 className="text-xl font-bold text-on-surface font-headline">Administradores e Maestros</h3>
                   <p className="text-sm text-on-surface-variant mt-2">Os usuários listados abaixo têm controle total sobre as configurações da plataforma e listagem de usuários.</p>
                </div>
-               <button
-                  onClick={() => {
-                    setBroadcastTab('create');
-                    setShowBroadcastModal(true);
-                  }}
-                  className="w-full sm:w-auto bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#00f5a0]/15 hover:scale-[1.02] active:scale-[0.98] transition-all"
-               >
-                  <Megaphone size={14} /> Avisos / Comunicados
-               </button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                   <button
+                      onClick={() => {
+                        setBroadcastTab('create');
+                        setShowBroadcastModal(true);
+                      }}
+                      className="w-full sm:w-auto bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#00f5a0]/15 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                   >
+                      <Megaphone size={14} /> Avisos / Comunicados
+                   </button>
+                   <button
+                      onClick={() => {
+                        setLocalPlatform(settings.communityPlatform || 'Telegram');
+                        setLocalLink(settings.communityLink || '');
+                        setShowCommunityModal(true);
+                      }}
+                      className="w-full sm:w-auto bg-surface-container hover:bg-surface-container-high text-white px-4 py-3 sm:py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-outline-variant/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                   >
+                      <span className="material-symbols-outlined text-[14px]">groups</span> Configurar Comunidade
+                   </button>
+                </div>
             </div>
             <table className="w-full text-left border-collapse">
               <thead className="bg-surface-container text-on-surface-variant text-xs uppercase tracking-widest border-b border-outline-variant/20">

@@ -8,7 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
   Eye, EyeOff, MessageSquare, ThumbsUp, Trash2, Camera, MapPin, 
   Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, 
-  Edit3, Mail, User, Home, Smartphone, KeyRound, Image as ImageIcon, Plus, ShieldCheck, HelpCircle, MoreVertical
+  Edit3, Mail, User, Home, Smartphone, KeyRound, Image as ImageIcon, Plus, ShieldCheck, HelpCircle, MoreVertical, Globe
 } from 'lucide-react';
 import Modal from './Modal';
 
@@ -130,11 +130,12 @@ export default function Profile() {
   // Profile metadata fields (Facebook style)
   const [bio, setBio] = useState('');
   const [coverURL, setCoverURL] = useState('');
-  const [work, setWork] = useState('');
+  const [socialLinks, setSocialLinks] = useState<Array<{ platform: string; url: string; mask: string }>>([
+    { platform: 'Instagram', url: '', mask: '' }
+  ]);
   const [liveIn, setLiveIn] = useState('');
 
   // Individual visibility toggles
-  const [isWorkPrivate, setIsWorkPrivate] = useState(false);
   const [isLiveInPrivate, setIsLiveInPrivate] = useState(false);
   const [isPhoneNumberPrivate, setIsPhoneNumberPrivate] = useState(false);
   const [isEmailPrivate, setIsEmailPrivate] = useState(false);
@@ -184,10 +185,14 @@ export default function Profile() {
               if (data.isPrivate !== undefined) setIsPrivate(data.isPrivate);
               if (data.bio) setBio(data.bio);
               if (data.coverURL) setCoverURL(data.coverURL);
-              if (data.work) setWork(data.work);
               if (data.liveIn) setLiveIn(data.liveIn);
+              
+              if (data.socialLinks) {
+                setSocialLinks(data.socialLinks);
+              } else {
+                setSocialLinks([{ platform: 'Instagram', url: '', mask: '' }]);
+              }
 
-              if (data.isWorkPrivate !== undefined) setIsWorkPrivate(data.isWorkPrivate);
               if (data.isLiveInPrivate !== undefined) setIsLiveInPrivate(data.isLiveInPrivate);
               if (data.isPhoneNumberPrivate !== undefined) setIsPhoneNumberPrivate(data.isPhoneNumberPrivate);
               if (data.isEmailPrivate !== undefined) setIsEmailPrivate(data.isEmailPrivate);
@@ -287,11 +292,9 @@ export default function Profile() {
           score += 6;
         }
         
-        // Match profession / work (medium weight)
-        if (u.work && work && u.work.trim().toLowerCase() === work.trim().toLowerCase()) {
-          score += 4;
-        } else if (u.work && work) {
-          score += 1.5; // partial match or both working
+        // Match similarity in social links presence
+        if (u.socialLinks && socialLinks && u.socialLinks.length > 0 && socialLinks.length > 0) {
+          score += 3;
         }
 
         // Active Bio similarity or presence
@@ -525,9 +528,8 @@ export default function Profile() {
         isPrivate,
         bio,
         coverURL,
-        work,
+        socialLinks: socialLinks || [],
         liveIn,
-        isWorkPrivate,
         isLiveInPrivate,
         isPhoneNumberPrivate,
         isEmailPrivate,
@@ -581,6 +583,27 @@ export default function Profile() {
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleAddSocialLink = () => {
+    if (socialLinks.length >= 3) {
+      alert("Você pode adicionar no máximo 3 contas de redes sociais.");
+      return;
+    }
+    setSocialLinks([...socialLinks, { platform: 'Instagram', url: '', mask: '' }]);
+  };
+
+  const handleRemoveSocialLink = (index: number) => {
+    const updated = socialLinks.filter((_, idx) => idx !== index);
+    setSocialLinks(updated.length === 0 ? [{ platform: 'Instagram', url: '', mask: '' }] : updated);
+  };
+
+  const handleSocialLinkChange = (index: number, key: 'platform' | 'url' | 'mask', value: string) => {
+    const updated = [...socialLinks];
+    if (updated[index]) {
+      updated[index] = { ...updated[index], [key]: value };
+      setSocialLinks(updated);
     }
   };
 
@@ -745,13 +768,30 @@ export default function Profile() {
                   <h3 className="font-extrabold text-sm text-on-surface uppercase tracking-wider border-b border-outline-variant/15 pb-2">Apresentação</h3>
                   
                   <div className="space-y-3.5 text-xs text-on-surface-variant font-medium">
-                    <div className="flex items-center justify-between gap-2.5">
-                      <div className="flex items-center gap-3">
-                        <Briefcase size={16} className="text-primary opacity-75" />
-                        <span>Profissão: <strong className="text-on-surface">{work || "Nenhum cargo definido"}</strong></span>
-                      </div>
-                      {isWorkPrivate && <span className="text-[10px] text-error flex items-center gap-0.5 shrink-0"><EyeOff size={11} /> Privado</span>}
-                    </div>
+                    {socialLinks && socialLinks.filter((l: any) => l.url || l.mask).map((link: any, idx: number) => {
+                      let href = link.url || '#';
+                      if (href !== '#' && !/^https?:\/\//i.test(href)) {
+                        href = 'https://' + href;
+                      }
+                      return (
+                        <div key={idx} className="flex items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-3">
+                            <Globe size={16} className="text-[#00f5a0] opacity-85 shrink-0" />
+                            <span>
+                              {link.platform}:{' '}
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#00f5a0] hover:underline font-bold"
+                              >
+                                {link.mask || 'Ver Perfil'}
+                              </a>
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
 
                     <div className="flex items-center justify-between gap-2.5">
                       <div className="flex items-center gap-3">
@@ -1040,26 +1080,84 @@ export default function Profile() {
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center pb-0.5">
-                    <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">Profissão / Trabalho</label>
-                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-semibold text-error">
-                      <input 
-                        type="checkbox" 
-                        checked={isWorkPrivate} 
-                        onChange={(e) => setIsWorkPrivate(e.target.checked)}
-                        className="rounded border-outline-variant text-[#00f5a0] focus:ring-[#00f5a0] bg-[#1a2035] w-3.5 h-3.5"
-                      />
-                      <span>Tornar Privado</span>
-                    </label>
+                {/* REDES SOCIAIS CONFIG BLOCK */}
+                <div className="bg-surface-container/20 border border-outline-variant/10 rounded-2xl p-4 space-y-4">
+                  <div className="flex items-center justify-between border-b border-outline-variant/10 pb-2">
+                    <div>
+                      <h4 className="text-xs font-black uppercase text-[#00f5a0]">Redes Sociais</h4>
+                      <p className="text-[10px] text-on-surface-variant">Configure até 3 links para apresentar aos outros traders</p>
+                    </div>
+                    {socialLinks.length < 3 && (
+                      <button
+                        type="button"
+                        onClick={handleAddSocialLink}
+                        className="py-1 px-3 bg-[#00f5a0]/10 hover:bg-[#00f5a0]/20 text-[#00f5a0] rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>+ Adicionar</span>
+                      </button>
+                    )}
                   </div>
-                  <input 
-                    type="text" 
-                    value={work}
-                    placeholder="Ex: Engenheiro de Software ou Trader Independente"
-                    onChange={(e) => setWork(e.target.value)}
-                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
-                  />
+                  
+                  <div className="space-y-4">
+                    {socialLinks.map((link, idx) => (
+                      <div key={idx} className="bg-surface-container/50 p-3 rounded-xl border border-outline-variant/10 space-y-3 relative group text-left">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Rede Social #{idx + 1}</span>
+                          {socialLinks.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSocialLink(idx)}
+                              className="text-red-400 hover:text-red-500 text-[10px] font-bold uppercase transition-colors px-1 cursor-pointer"
+                            >
+                              Remover
+                            </button>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          {/* Plataforma */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Plataforma</label>
+                            <select
+                              value={link.platform}
+                              onChange={(e) => handleSocialLinkChange(idx, 'platform', e.target.value)}
+                              className="w-full bg-[#1e2330] border border-outline-variant/20 rounded-lg px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
+                            >
+                              <option value="Instagram">Instagram</option>
+                              <option value="Facebook">Facebook</option>
+                              <option value="TikTok">TikTok</option>
+                              <option value="Canal YouTube">Canal YouTube</option>
+                              <option value="Outros">Outros</option>
+                            </select>
+                          </div>
+
+                          {/* Máscara / Nome da Conta */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Nome da Conta / Máscara</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: @meu_instagram"
+                              value={link.mask}
+                              onChange={(e) => handleSocialLinkChange(idx, 'mask', e.target.value)}
+                              className="w-full bg-[#1e2330] border border-outline-variant/20 rounded-lg px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
+                            />
+                          </div>
+
+                          {/* Link URL */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Link de Perfil / URL</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: https://instagram.com/user"
+                              value={link.url}
+                              onChange={(e) => handleSocialLinkChange(idx, 'url', e.target.value)}
+                              className="w-full bg-[#1e2330] border border-outline-variant/20 rounded-lg px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
