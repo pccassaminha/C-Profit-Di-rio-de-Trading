@@ -8,7 +8,8 @@ export const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
-  })
+  }),
+  experimentalAutoDetectLongPolling: true
 }, firebaseConfig.firestoreDatabaseId);
 
 const originalAuth = getAuth(app);
@@ -97,10 +98,28 @@ export async function registerPartnerAuth(email: string, psw: string) {
 
 async function testConnection() {
   try {
+    // Try to perform a query/lookup directly from the server.
+    // If it fails with permission-denied, it means the connection WAS successful,
+    // but the security rules rightly blocked unauthorized reads.
     await getDocFromServer(doc(db, 'test', 'connection'));
+    console.log("Firestore connection check completed successfully!");
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn("Please check your Firebase configuration or network status. (The client is currently operating in offline/resilient cache mode.)");
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const isOffline = 
+      errorMsg.includes('the client is offline') || 
+      errorMsg.includes('Could not reach Cloud Firestore backend') ||
+      errorMsg.includes('Backend didn\'t respond') ||
+      errorMsg.includes('network') ||
+      errorMsg.includes('timeout');
+
+    if (isOffline) {
+      console.warn(
+        "Firestore connection check: Operating in offline/resilient cache mode.\n" +
+        "The SDK will automatically queue operations and synchronize them once a persistent channel is established."
+      );
+    } else {
+      // Permission-denied or document-not-found means we did indeed reach the Firestore backend successfully!
+      console.log("Firestore connection check: Backend reached successfully! (Normal response code returned: " + errorMsg + ")");
     }
   }
 }
