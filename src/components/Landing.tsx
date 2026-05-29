@@ -31,7 +31,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
   };
 
   const copyPopupCoupon = () => {
-    navigator.clipboard.writeText('DESCONTODE50%');
+    navigator.clipboard.writeText('CPROFIT50%OFF');
     setPopupCopied(true);
     setTimeout(() => {
       setPopupCopied(false);
@@ -39,7 +39,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
   };
 
   const copyCouponCode = () => {
-    navigator.clipboard.writeText('DESCONTODE50%');
+    navigator.clipboard.writeText('CPROFIT50%OFF');
     setCouponCopied(true);
     setTimeout(() => {
       setCouponCopied(false);
@@ -85,7 +85,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
         </h1>
 
         <p className="max-w-[560px] text-[17px] text-on-surface-variant leading-[1.7] mb-[48px] animate-in slide-in-from-bottom-6 duration-700 delay-200 fill-mode-both">
-          O diário de trading definitivo para <strong className="text-on-surface font-bold">Forex, Índices e Opções Binárias</strong>. Registe-se agora e receba instantaneamente <strong className="text-primary font-black uppercase bg-primary/10 px-2 py-0.5 rounded-md inline-block">30 dias de teste grátis</strong> para explorar todo o terminal sem barreiras!
+          O diário de trading definitivo para <strong className="text-on-surface font-bold">Forex, Índices e Opções Binárias</strong>. Registe-se agora e <strong className="text-primary font-black uppercase bg-primary/10 px-2 py-0.5 rounded-md inline-block">faça um teste de 30 dias por 500 Kz</strong> para explorar todo o terminal sem barreiras!
         </p>
 
         <div className="flex items-center gap-[24px] flex-wrap justify-center animate-in slide-in-from-bottom-6 duration-700 delay-300 fill-mode-both">
@@ -760,7 +760,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
 
           <div className="mt-6 inline-flex flex-col sm:flex-row items-center gap-3 bg-white/5 border border-outline-variant/15 p-3 rounded-2xl max-w-md mx-auto">
             <div className="flex items-center gap-2 px-4 py-2 bg-black/40 rounded-xl border border-outline-variant/10 font-mono text-xs font-black text-white select-all">
-              🏷️ <span className="text-[#00f5a0]">DESCONTODE50%</span>
+              🏷️ <span className="text-[#00f5a0]">CPROFIT50%OFF</span>
             </div>
             
             <button
@@ -898,7 +898,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
               {/* Coupon Copier Container */}
               <div className="mt-8 p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col sm:flex-row items-center gap-3">
                 <div className="flex-1 flex items-center justify-between w-full px-4 py-3 bg-black/60 border border-outline-variant/10 rounded-xl font-mono text-sm font-black text-white selection:bg-[#00f5a0]/30 select-all">
-                  <span className="text-[#00f5a0]">DESCONTODE50%</span>
+                  <span className="text-[#00f5a0]">CPROFIT50%OFF</span>
                   <span className="text-[10px] text-white/30 uppercase tracking-widest ml-2 font-normal">CUPÃO</span>
                 </div>
                 

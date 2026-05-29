@@ -140,7 +140,7 @@ export default function App() {
       case 'plans': return <Plans />;
       case 'payments': return <Payments />;
       case 'admin': 
-        if (user?.email === 'exportacoes.extras@gmail.com') return <AdminPanel />;
+        if (isAdmin) return <AdminPanel />;
         return <Dashboard />;
       case 'support': return <Support />;
       case 'planner': return <Planner />;
@@ -150,7 +150,7 @@ export default function App() {
   };
 
   const handleCopyCoupon = () => {
-    navigator.clipboard.writeText('DESCONTODE50%');
+    navigator.clipboard.writeText('CPROFIT50%OFF');
     setCopiedCoupon(true);
     setTimeout(() => setCopiedCoupon(false), 3000);
   };
@@ -219,7 +219,7 @@ export default function App() {
             </p>
             
             <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 justify-between">
-              <code className="text-[#00f5a0] font-black tracking-widest text-xs font-mono">DESCONTODE50%</code>
+              <code className="text-[#00f5a0] font-black tracking-widest text-xs font-mono">CPROFIT50%OFF</code>
               <button 
                 onClick={handleCopyCoupon}
                 className="bg-[#00f5a0] hover:bg-[#00f5a0]/80 text-black px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shrink-0"

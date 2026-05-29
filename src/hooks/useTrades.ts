@@ -34,6 +34,10 @@ export const useTrades = (manualTrades: any[] = []) => {
       multicaixaReference: '000 000 000',
       showIban: true,
       showMulticaixa: true,
+      showExpress: true,
+      showKwik: true,
+      kwikKey: '',
+      kwikName: '',
       multicaixaLogoUrl: 'https://i.ibb.co/vz6W1fN/mcx-logo.png'
     };
 
@@ -52,7 +56,8 @@ export const useTrades = (manualTrades: any[] = []) => {
           plan_type: data.plan_type || 'Iniciante',
           account_limit: limit,
           expiry_date: data.expiry_date || null,
-          role: data.role || (auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user')
+          role: data.role || (auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user'),
+          hadTrial30: !!data.hadTrial30
         });
       } else {
         // Fallback para caminho antigo 'users'
@@ -70,7 +75,8 @@ export const useTrades = (manualTrades: any[] = []) => {
               plan_type: data.plan_type || 'Iniciante',
               account_limit: limit,
               expiry_date: data.expiry_date || null,
-              role: data.role || (uid === 'exportacoes.extras@gmail.com' ? 'admin' : 'user')
+              role: data.role || (uid === 'exportacoes.extras@gmail.com' ? 'admin' : 'user'),
+              hadTrial30: !!data.hadTrial30
             });
           } else {
             setUserPlan(defaultPlan);

@@ -14,11 +14,19 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const [payerName, setPayerName] = useState(auth.currentUser?.displayName || '');
   const [payerPhone, setPayerPhone] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'iban' | 'multicaixa' | 'express'>('iban');
+  const [paymentMethod, setPaymentMethod] = useState<'iban' | 'multicaixa' | 'express' | 'kwik'>('iban');
   const [expressCode, setExpressCode] = useState('');
   const [activeCouponsList, setActiveCouponsList] = useState<any[]>([]);
   const [typedCoupon, setTypedCoupon] = useState('');
   const [validationMsg, setValidationMsg] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+  const [hadTrial30, setHadTrial30] = useState(false);
+
+  const hasUsedTrial = !!(
+    userPlan?.hadTrial30 || 
+    userPlan?.plan_type === 'trial_30' || 
+    userPlan?.plan_type === 'trial_15' || 
+    payments.some(p => p.planId === 'trial_30' && (p.status === 'approved' || p.status === 'pending'))
+  );
 
   // Load active master coupons
   useEffect(() => {
@@ -52,17 +60,17 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         return;
       }
       
-      // Fallback for DESCONTODE50% if not yet in database (e.g., initial seed)
-      if (cleanCode === 'DESCONTODE50%') {
+      // Fallback for CPROFIT50%OFF if not yet in database (e.g., initial seed)
+      if (cleanCode === 'CPROFIT50%OFF') {
         setAppliedCoupon({
           id: 'descontode50_static',
-          code: 'DESCONTODE50%',
+          code: 'CPROFIT50%OFF',
           active: true,
           discountType: 'percentage',
           discountValue: 50,
           targetPlan: 'all'
         });
-        setValidationMsg({ text: 'Cupom "DESCONTODE50%" de 50% de DESCONTO aplicado com sucesso!', type: 'success' });
+        setValidationMsg({ text: 'Cupom "CPROFIT50%OFF" de 50% de DESCONTO aplicado com sucesso!', type: 'success' });
         return;
       }
 
@@ -80,8 +88,10 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         setPaymentMethod('iban');
       } else if (globalSettings.showExpress !== false) {
          setPaymentMethod('express');
-      } else {
+      } else if (globalSettings.showMulticaixa !== false) {
          setPaymentMethod('multicaixa');
+      } else {
+         setPaymentMethod('kwik');
       }
     }
   }, [globalSettings]);
@@ -135,11 +145,11 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const plans = [
     {
       id: 'trial_30',
-      name: 'Plano Trial Grátis',
+      name: 'Plano Teste 30 Dias',
       oldPrice: '5.000',
-      discount: '100% OFF',
-      savingsText: 'Totalmente Grátis por 30 dias',
-      price: '0',
+      discount: '90% OFF',
+      savingsText: 'Apenas Kz 500 por 30 dias',
+      price: '500',
       period: 'por 30 dias',
       days: 30,
       limits: '2 Contas Forex + 2 Contas OB',
@@ -210,8 +220,9 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
   // Aplicar Desconto do Cupão
   const getDiscountedPrice = (plan: any) => {
-     if (plan.id === 'trial_30') {
-        return '0';
+     const priceNum = Number(plan.price.replace(/\./g, ''));
+     if (priceNum < 5000) {
+        return plan.price; // O cupão afetará apenas os planos a partir de 5.000 Kz para cima
      }
      let discountPercentage = 0;
      let discountFixed = 0;
@@ -275,6 +286,11 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const handleRequestPayment = async () => {
     if (!showPaymentModal || !payerName) {
       alert('Por favor, preencha o seu nome completo.');
+      return;
+    }
+    
+    if (showPaymentModal.id === 'trial_30' && hasUsedTrial) {
+      alert('O plano de teste de 500 Kz só pode ser usufruído uma única vez por usuário. Por favor, escolha outra opção de plano a partir de 5.000 Kz.');
       return;
     }
     if (paymentMethod === 'express' && !expressCode.trim()) {
@@ -449,96 +465,121 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 xl:gap-3 overflow-visible">
-        {finalPlans.map((plan) => (
-          <div 
-            key={plan.id}
-            className={`relative p-[24px_16px] rounded-[24px] border transition-all flex flex-col hover:-translate-y-[6px] hover:z-20 hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] ${
-              plan.featured 
-                ? 'bg-surface-container-high border-primary/40 shadow-[0_0_30px_rgba(0,245,160,0.06)] z-10' 
-                : 'bg-surface-container border-outline hover:border-outline-variant shadow-lg z-0'
-            }`}
-          >
-            {plan.featured && (
-              <div className="absolute -top-[12px] left-1/2 -translate-x-1/2 bg-primary text-background text-[9px] font-black py-[4px] px-[16px] rounded-[100px] uppercase tracking-[0.15em] border border-primary/20 shadow-lg shadow-primary/20">
-                Best Choice
-              </div>
-            )}
+      <div className="plans-ticker-container select-none">
+        <div className="plans-ticker-track">
+          {[...finalPlans, ...finalPlans].map((plan, idx) => {
+            const hasUsedTrial = !!(
+              userPlan?.hadTrial30 || 
+              userPlan?.plan_type === 'trial_30' || 
+              userPlan?.plan_type === 'trial_15' || 
+              payments.some(p => p.planId === 'trial_30' && (p.status === 'approved' || p.status === 'pending'))
+            );
+            const isTrialBlocked = plan.id === 'trial_30' && hasUsedTrial;
 
-            <div className="mb-4">
-              <h3 className="text-[9px] font-bold tracking-[0.15em] uppercase text-on-surface-variant/70 mb-[12px]">{plan.name}</h3>
-              <div className="flex items-center gap-[6px] text-[11px] text-on-surface-variant/60 line-through mb-[2px]">
-                {plan.oldPrice}
-                {plan.discount && (
-                  <span className="inline-block bg-[#ff4b6e]/15 border border-[#ff4b6e]/30 text-[#ff4b6e] text-[8px] font-black tracking-[0.08em] uppercase px-[5px] py-[1px] rounded-[4px] no-underline">
-                    {plan.discount}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-baseline gap-1 mb-[4px] overflow-visible">
-                <span className="text-[20px] xl:text-[24px] font-black font-headline tracking-tighter leading-none text-primary flex items-baseline drop-shadow-[0_4px_12px_rgba(0,245,160,0.15)]">
-                  {plan.price}
-                  <span className="text-[10px] font-black tracking-widest ml-1 opacity-50 text-on-surface uppercase align-baseline">Kz</span>
-                </span>
-                {appliedCoupon && appliedCoupon.targetPlan === 'all' || appliedCoupon?.targetPlan === plan.id ? (
-                   <span className="text-[9px] text-on-surface-variant font-bold ml-1 line-through opacity-25 whitespace-nowrap">{plan.originalPriceStr}</span>
-                ) : null}
-              </div>
-              <div className="text-[11px] font-medium text-on-surface-variant/60 mb-[18px] uppercase tracking-widest">
-                {plan.period}
-              </div>
-              <div className="inline-flex items-center gap-[4px] bg-[#00f5a0]/10 border border-[#00f5a0]/20 text-[#00f5a0] text-[10px] font-bold px-[8px] py-[3px] rounded-[5px] mb-[12px]">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                {plan.savingsText}
-              </div>
-              <div className="flex items-center gap-[6px] text-[12px] text-on-surface-variant bg-[#00f5a0]/10 border border-[#00f5a0]/15 rounded-[8px] px-[12px] py-[8px] mb-[20px]">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#00f5a0] shrink-0"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                <span className="text-on-surface-variant leading-tight">{plan.limits}</span>
-              </div>
-            </div>
-
-            <hr className="border-t border-outline/30 my-[20px]" />
-
-            <ul className="flex flex-col gap-[10px] mb-[30px] flex-1 list-none">
-              {plan.features.map((feature, idx) => {
-                 const isPrioritySupport = feature === 'Suporte Prioritário via WhatsApp';
-                 return (
-                <li key={idx} className="flex items-center gap-[8px] text-[13px] text-on-surface-variant leading-snug">
-                  <div className={`w-[16px] h-[16px] rounded-full flex items-center justify-center shrink-0 border ${isPrioritySupport ? 'bg-[#00f5a0]/25 border-[#00f5a0]/50' : 'bg-[#00f5a0]/10 border-[#00f5a0]/30'}`}>
-                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke={isPrioritySupport ? "var(--color-primary)" : "currentColor"} strokeWidth={isPrioritySupport ? "2.5" : "2"} className={isPrioritySupport ? "" : "text-[#00f5a0]"}>
-                      <polyline points="2 6 5 9 10 3"/>
-                    </svg>
+            return (
+              <div 
+                key={`${plan.id}-${idx}`}
+                className={`relative p-[24px_16px] rounded-[24px] border transition-all flex flex-col hover:-translate-y-[6px] hover:z-20 hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] w-[280px] shrink-0 ${
+                  plan.featured 
+                    ? 'bg-surface-container-high border-primary/40 shadow-[0_0_30px_rgba(0,245,160,0.06)] z-10' 
+                    : 'bg-surface-container border-outline hover:border-outline-variant shadow-lg z-0'
+                }`}
+              >
+                {/* Visual blocking overlay for used trial */}
+                {isTrialBlocked && (
+                  <div className="absolute inset-0 bg-[#080e1a]/85 rounded-[24px] z-[60] flex flex-col items-center justify-center p-6 text-center select-none backdrop-blur-[2px] transition-all">
+                    <span className="material-symbols-outlined text-rose-500 text-3xl mb-3 animate-pulse">lock</span>
+                    <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Teste Já Utilizado</h4>
+                    <p className="text-[10px] text-on-surface-variant font-medium leading-relaxed max-w-[200px]">
+                      O plano de 30 dias por 500 Kz é de uso único. Selecione uma opção a partir de 5.000 Kz.
+                    </p>
                   </div>
-                  {isPrioritySupport ? <span className="text-[#00f5a0] font-semibold">{feature}</span> : feature}
-                </li>
-              )})}
-            </ul>
+                )}
 
-            <button 
-              onClick={() => {
-                if (!auth.currentUser && onAuthRequired) {
-                  onAuthRequired();
-                } else if (!plan.current) {
-                  if (plan.id === 'trial_30') {
-                    handleActivateFreeTrial();
-                  } else {
-                    setShowPaymentModal(plan);
-                  }
-                }
-              }}
-              disabled={plan.current}
-              className={`w-full py-[12px] rounded-[8px] font-headline text-[12px] font-bold tracking-[0.08em] uppercase transition-all flex items-center justify-center border ${
-                plan.current
-                  ? 'bg-[#00f5a0]/10 text-[#00f5a0] border-[#00f5a0]/20 cursor-default'
-                  : plan.featured
-                    ? 'bg-primary text-background border-transparent hover:bg-primary-fixed-dim shadow-[0_8px_20px_rgba(0,245,160,0.25)]'
-                    : 'bg-transparent text-on-surface border-outline-variant hover:bg-white/5'
-              }`}
-            >
-              {plan.current ? 'Plano Ativo' : 'Adquirir Plano'}
-            </button>
-          </div>
-        ))}
+                {plan.featured && (
+                  <div className="absolute -top-[12px] left-1/2 -translate-x-1/2 bg-primary text-background text-[9px] font-black py-[4px] px-[16px] rounded-[100px] uppercase tracking-[0.15em] border border-primary/20 shadow-lg shadow-primary/20 z-20">
+                    Best Choice
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <h3 className="text-[9px] font-bold tracking-[0.15em] uppercase text-on-surface-variant/70 mb-[12px]">{plan.name}</h3>
+                  <div className="flex items-center gap-[6px] text-[11px] text-on-surface-variant/60 line-through mb-[2px]">
+                    {plan.oldPrice}
+                    {plan.discount && (
+                      <span className="inline-block bg-[#ff4b6e]/15 border border-[#ff4b6e]/30 text-[#ff4b6e] text-[8px] font-black tracking-[0.08em] uppercase px-[5px] py-[1px] rounded-[4px] no-underline">
+                        {plan.discount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-baseline gap-1 mb-[4px] overflow-visible">
+                    <span className="text-[20px] xl:text-[24px] font-black font-headline tracking-tighter leading-none text-primary flex items-baseline drop-shadow-[0_4px_12px_rgba(0,245,160,0.15)]">
+                      {plan.price}
+                      <span className="text-[10px] font-black tracking-widest ml-1 opacity-50 text-on-surface uppercase align-baseline">Kz</span>
+                    </span>
+                    {(appliedCoupon && (appliedCoupon.targetPlan === 'all' || appliedCoupon?.targetPlan === plan.id)) ? (
+                       <span className="text-[9px] text-on-surface-variant font-bold ml-1 line-through opacity-25 whitespace-nowrap">{plan.originalPriceStr}</span>
+                    ) : null}
+                  </div>
+                  <div className="text-[11px] font-medium text-on-surface-variant/60 mb-[18px] uppercase tracking-widest">
+                    {plan.period}
+                  </div>
+                  <div className="inline-flex items-center gap-[4px] bg-[#00f5a0]/10 border border-[#00f5a0]/20 text-[#00f5a0] text-[10px] font-bold px-[8px] py-[3px] rounded-[5px] mb-[12px]">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    {plan.savingsText}
+                  </div>
+                  <div className="flex items-center gap-[6px] text-[12px] text-on-surface-variant bg-[#00f5a0]/10 border border-[#00f5a0]/15 rounded-[8px] px-[12px] py-[8px] mb-[20px]">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#00f5a0] shrink-0"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    <span className="text-on-surface-variant leading-tight">{plan.limits}</span>
+                  </div>
+                </div>
+
+                <hr className="border-t border-outline/30 my-[20px]" />
+
+                <ul className="flex flex-col gap-[10px] mb-[30px] flex-1 list-none">
+                  {plan.features.map((feature, idx) => {
+                     const isPrioritySupport = feature === 'Suporte Prioritário via WhatsApp';
+                     return (
+                    <li key={idx} className="flex items-center gap-[8px] text-[13px] text-on-surface-variant leading-snug">
+                      <div className={`w-[16px] h-[16px] rounded-full flex items-center justify-center shrink-0 border ${isPrioritySupport ? 'bg-[#00f5a0]/25 border-[#00f5a0]/50' : 'bg-[#00f5a0]/10 border-[#00f5a0]/30'}`}>
+                        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke={isPrioritySupport ? "var(--color-primary)" : "currentColor"} strokeWidth={isPrioritySupport ? "2.5" : "2"} className={isPrioritySupport ? "" : "text-[#00f5a0]"}>
+                          <polyline points="2 6 5 9 10 3"/>
+                        </svg>
+                      </div>
+                      {isPrioritySupport ? <span className="text-[#00f5a0] font-semibold">{feature}</span> : feature}
+                    </li>
+                  )})}
+                </ul>
+
+                <button 
+                  onClick={() => {
+                    if (plan.id === 'trial_30' && hasUsedTrial) {
+                      alert('O plano de teste de 500 Kz só pode ser usufruído uma única vez por usuário. Por favor, selecione um plano a partir de 5.000 Kz.');
+                      return;
+                    }
+                    if (!auth.currentUser && onAuthRequired) {
+                      onAuthRequired();
+                    } else if (!plan.current) {
+                      setShowPaymentModal(plan);
+                    }
+                  }}
+                  disabled={plan.current || (plan.id === 'trial_30' && hasUsedTrial)}
+                  className={`w-full py-[12px] rounded-[8px] font-headline text-[12px] font-bold tracking-[0.08em] uppercase transition-all flex items-center justify-center border ${
+                    plan.current
+                      ? 'bg-[#00f5a0]/10 text-[#00f5a0] border-[#00f5a0]/20 cursor-default'
+                      : (plan.id === 'trial_30' && hasUsedTrial)
+                        ? 'bg-neutral-800/10 text-neutral-600 border-neutral-800 cursor-not-allowed'
+                        : plan.featured
+                          ? 'bg-primary text-background border-transparent hover:bg-primary-fixed-dim shadow-[0_8px_20px_rgba(0,245,160,0.25)]'
+                          : 'bg-transparent text-on-surface border-outline-variant hover:bg-white/5'
+                  }`}
+                >
+                  {plan.current ? 'Plano Ativo' : (plan.id === 'trial_30' && hasUsedTrial) ? 'Plano Bloqueado' : 'Adquirir Plano'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Link para Faturamentos */}
@@ -615,7 +656,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                     {/* Seleção do Método de Pagamento */}
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Selecione o Método</label>
-                      <div className="grid grid-cols-3 gap-2 bg-surface-container-low rounded-2xl p-1 border border-outline-variant/10">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 bg-surface-container-low rounded-2xl p-1 border border-outline-variant/10">
                         {globalSettings?.showIban !== false && (
                           <button
                             type="button"
@@ -650,10 +691,49 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                             <span className="text-[9px] font-black uppercase tracking-tight">Referência</span>
                           </button>
                         )}
+                        {globalSettings?.showKwik !== false && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('kwik')}
+                            className={`flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'kwik' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                          >
+                            <span className="text-sm">💸</span>
+                            <span className="text-[9px] font-black uppercase tracking-tight">KWIK</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
                     <div className="space-y-6">
+                      {paymentMethod === 'kwik' && globalSettings?.showKwik !== false && (
+                        <div className="space-y-2 group cursor-pointer" onClick={() => {
+                          if (globalSettings?.kwikKey) {
+                            navigator.clipboard.writeText(globalSettings.kwikKey);
+                            alert('Chave KWIK copiada para a área de transferência!');
+                          }
+                        }}>
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+                              <span className="text-xs">💸</span>
+                              Transferência por KWIK
+                            </label>
+                            <span className="text-[8px] font-black text-primary uppercase bg-primary/10 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Clicar para Copiar</span>
+                          </div>
+                          <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col">
+                            {globalSettings?.kwikName && (
+                              <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                                Titular / Favorecido: <span className="text-on-surface">{globalSettings.kwikName}</span>
+                              </span>
+                            )}
+                            <span className="text-base font-black text-primary font-mono tracking-tight break-all">{globalSettings?.kwikKey || 'Chave não configurada'}</span>
+                            <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center gap-1.5 border-t border-outline-variant/10 pt-1.5">
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>
+                              Kwik: <span className="text-on-surface font-semibold">Chave de Transferência Instantânea</span>
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       {paymentMethod === 'iban' && globalSettings?.showIban && (
                         <div className="space-y-2 group cursor-pointer" onClick={() => {
                           navigator.clipboard.writeText(globalSettings.iban);
@@ -673,6 +753,12 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                               </span>
                             )}
                             <span className="text-xl md:text-2xl font-black text-on-surface font-mono tracking-tight break-all">{globalSettings?.iban || 'A carregar...'}</span>
+                            {globalSettings?.ibanBank && (
+                              <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center gap-1.5 border-t border-outline-variant/10 pt-1.5">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>
+                                Banco: <span className="text-on-surface font-semibold">{globalSettings.ibanBank}</span>
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}

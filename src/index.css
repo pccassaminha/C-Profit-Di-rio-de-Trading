@@ -170,6 +170,31 @@ body {
   white-space: nowrap;
 }
 
+@keyframes plansTicker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(-50% - 12px)); }
+}
+
+.plans-ticker-container {
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  padding: 20px 0;
+  mask-image: linear-gradient(to right, transparent, white 10%, white 90%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, white 10%, white 90%, transparent);
+}
+
+.plans-ticker-track {
+  display: flex;
+  gap: 24px;
+  width: max-content;
+  animation: plansTicker 45s linear infinite;
+}
+
+.plans-ticker-track:hover {
+  animation-play-state: paused;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(0.8); }

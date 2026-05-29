@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
+import { db, auth, registerNewMaestroAuth } from '../firebase';
 import { collection, getDocs, doc, getDoc, updateDoc, onSnapshot, query, orderBy, setDoc, addDoc, deleteDoc, where } from 'firebase/firestore';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
-import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, AlertTriangle, Search, Calendar, SlidersHorizontal, ArrowUpDown, Megaphone, History, Plus, Trash2 } from 'lucide-react';
+import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, AlertTriangle, Search, Calendar, SlidersHorizontal, ArrowUpDown, Megaphone, History, Plus, Trash2, Pencil, FileText } from 'lucide-react';
 
 export default function AdminPanel() {
   const { userPlan, globalSettings: initialSettings } = useTrades();
   const currentUser = auth.currentUser;
   
   // Super Admin check
-  const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
+  const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com' || userPlan?.role === 'admin';
 
   const [activeTab, setActiveTab ] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast' | 'maestros' | 'affiliates'>('users');
   const [affiliateTab, setAffiliateTab] = useState<'overview' | 'config' | 'commissions' | 'payouts' | 'trials'>('overview');
   const [affilSearch, setAffilSearch] = useState('');
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingCoupon, setEditingCoupon] = useState<any>(null);
   const [showBillingModal, setShowBillingModal] = useState<boolean>(false);
   const [showBroadcastModal, setShowBroadcastModal] = useState<boolean>(false);
   const [broadcastTab, setBroadcastTab] = useState<'create' | 'history'>('create');
@@ -28,6 +29,10 @@ export default function AdminPanel() {
   const [selectedStatList, setSelectedStatList] = useState<'faturado' | 'descontos' | 'parceiros' | null>(null);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [showDangerZone, setShowDangerZone] = useState(false);
+  const [newMaestroName, setNewMaestroName] = useState('');
+  const [newMaestroEmail, setNewMaestroEmail] = useState('');
+  const [newMaestroPassword, setNewMaestroPassword] = useState('');
+  const [newMaestroSubmitting, setNewMaestroSubmitting] = useState(false);
 
   // Filter & Search states for users tab
   const [userSearch, setUserSearch] = useState('');
@@ -55,18 +60,23 @@ export default function AdminPanel() {
   // Coupon search and filter states
   const [couponSearchQuery, setCouponSearchQuery] = useState('');
   const [selectedCouponFilter, setSelectedCouponFilter] = useState('');
+  const [showReferralsReport, setShowReferralsReport] = useState(false);
 
   const [settings, setSettings] = useState(initialSettings || {
     whatsappNumber: '',
     expressNumber: '',
     iban: '',
     ibanName: '',
+    ibanBank: '',
     multicaixaEntity: '',
     multicaixaReference: '',
     multicaixaName: '',
     showIban: true,
     showMulticaixa: true,
     showExpress: true,
+    showKwik: true,
+    kwikKey: '',
+    kwikName: '',
     multicaixaLogoUrl: ''
   });
 
@@ -75,6 +85,9 @@ export default function AdminPanel() {
       setSettings({
         showExpress: true,
         expressNumber: '',
+        showKwik: true,
+        kwikKey: '',
+        kwikName: '',
         ...initialSettings
       });
     }
@@ -274,17 +287,17 @@ export default function AdminPanel() {
       const fetchedCoupons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCoupons(fetchedCoupons);
       
-      const hasDesconto50 = fetchedCoupons.some((c: any) => c.code === 'DESCONTODE50%');
+      const hasDesconto50 = fetchedCoupons.some((c: any) => c.code === 'CPROFIT50%OFF');
       if (!hasDesconto50) {
         addDoc(collection(db, 'coupons'), {
-          code: 'DESCONTODE50%',
+          code: 'CPROFIT50%OFF',
           discountType: 'percentage',
           discountValue: 50,
           targetPlan: 'all',
           partnerRef: 'Plataforma',
           active: true,
           createdAt: new Date().toISOString()
-        }).catch(err => console.error('Erro ao auto-criar cupão DESCONTODE50%:', err));
+        }).catch(err => console.error('Erro ao auto-criar cupão CPROFIT50%OFF:', err));
       }
     });
 
@@ -354,6 +367,10 @@ export default function AdminPanel() {
         expiry_date: expiryDate.toISOString(),
         updatedAt: new Date().toISOString()
       };
+
+      if (payment.planId === 'trial_30') {
+        userUpdateFields.hadTrial30 = true;
+      }
 
       if (payment.usedCoupon) {
         userUpdateFields.usedCoupon = payment.usedCoupon;
@@ -594,6 +611,24 @@ export default function AdminPanel() {
     }
   };
 
+  const handleUpdateCoupon = async (id: string, updatedData: any) => {
+    if (!updatedData.code || !updatedData.discountValue) return alert('Preencha os campos obrigatórios do cupão.');
+    try {
+      await updateDoc(doc(db, 'coupons', id), {
+        code: updatedData.code.trim().toUpperCase(),
+        discountType: updatedData.discountType,
+        discountValue: Number(updatedData.discountValue),
+        targetPlan: updatedData.targetPlan,
+        partnerRef: updatedData.partnerRef
+      });
+      setEditingCoupon(null);
+      alert('Cupão atualizado com sucesso!');
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao atualizar cupão.');
+    }
+  };
+
   const handleApproveReferral = async (ref: any) => {
     try {
       await updateDoc(doc(db, 'referrals', ref.id), {
@@ -698,6 +733,14 @@ export default function AdminPanel() {
     );
   }
 
+  const totalUsersCount = users.length;
+  const activeUsersCount = users.filter((u: any) => {
+    if (!u.expiry_date) return false;
+    const expiry = u.expiry_date.toDate ? u.expiry_date.toDate() : new Date(u.expiry_date);
+    return expiry > new Date();
+  }).length;
+  const inactiveUsersCount = totalUsersCount - activeUsersCount;
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -740,7 +783,49 @@ export default function AdminPanel() {
       </div>
 
       {activeTab === 'users' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Dashboard Geral de Usuários */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-200">
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#00f5a0]/5 rounded-bl-full pointer-events-none transition-all duration-300 group-hover:scale-110"></div>
+              <p className="text-[10px] font-black uppercase text-on-surface-variant tracking-widest flex items-center gap-1.5 font-mono">
+                <Users size={14} className="text-[#00f5a0]" />
+                TOTAL REGISTADOS
+              </p>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-3xl font-black text-on-surface">{totalUsersCount}</span>
+                <span className="text-xs text-[#00f5a0] font-bold uppercase font-mono tracking-wider">Traders</span>
+              </div>
+              <p className="text-[11px] text-on-surface-variant mt-2 font-medium">Contagem total de contas de trading criadas na plataforma.</p>
+            </div>
+
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-full pointer-events-none transition-all duration-300 group-hover:scale-110"></div>
+              <p className="text-[10px] font-black uppercase text-on-surface-variant tracking-widest flex items-center gap-1.5 font-mono">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                PLANOS ATIVOS
+              </p>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-3xl font-black text-emerald-400">{activeUsersCount}</span>
+                <span className="text-xs text-emerald-400 font-bold uppercase font-mono tracking-wider font-extrabold">Ativos</span>
+              </div>
+              <p className="text-[11px] text-on-surface-variant mt-2 font-medium">Contas com subscrição ativa ou período experimental (Trial) válido.</p>
+            </div>
+
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full pointer-events-none transition-all duration-300 group-hover:scale-110"></div>
+              <p className="text-[10px] font-black uppercase text-on-surface-variant tracking-widest flex items-center gap-1.5 font-mono">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                PLANOS INATIVOS / EXPIRADOS
+              </p>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-3xl font-black text-amber-500">{inactiveUsersCount}</span>
+                <span className="text-xs text-amber-500 font-bold uppercase font-mono tracking-wider font-extrabold">Inativos</span>
+              </div>
+              <p className="text-[11px] text-on-surface-variant mt-2 font-medium">Traders sem acesso ativo no momento (Iniciantes, Trial Expirado ou Plano Vencido), descontando os que tiverem ativos na plataforma.</p>
+            </div>
+          </div>
+
           {/* Polished Controls Bar with Search & Filters */}
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl space-y-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -797,7 +882,7 @@ export default function AdminPanel() {
                 >
                   <option value="">Filtro: Todos Planos</option>
                   <option value="Iniciante">Iniciante / Gratuito</option>
-                  <option value="trial_30">Trial 30 dias (Grátis)</option>
+                  <option value="trial_30">Plano Teste 30 Dias (500 Kz)</option>
                   <option value="mensal_6">Mensal (6 Contas)</option>
                   <option value="trimestral_6">Trimestral (6 Contas)</option>
                   <option value="semestral_8">Semestral (8 Contas)</option>
@@ -1057,6 +1142,7 @@ export default function AdminPanel() {
                   <option value="">Filtro: Todo Método</option>
                   <option value="express">Express</option>
                   <option value="iban">IBAN</option>
+                  <option value="kwik">KWIK</option>
                   <option value="mcx">MCX / Referência</option>
                 </select>
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
@@ -1129,61 +1215,78 @@ export default function AdminPanel() {
           </div>
 
           {filteredPayments.length > 0 ? filteredPayments.map(p => (
-            <div key={p.id} className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                    p.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 
-                    p.status === 'rejected' ? 'bg-error/20 text-error' : 'bg-amber-500/20 text-amber-400'
-                  }`}>
-                    {p.status || 'Pendente'}
-                  </span>
-                  <span className="text-xs text-on-surface-variant font-medium">#{getPaymentDisplayId(p.id)}</span>
-                </div>
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div>
-                    <h4 className="text-lg font-bold text-[#00f5a0]">
-                      Upgrade solicitado por {p.userName || users.find(u => u.id === p.userId)?.name || users.find(u => u.id === p.userId)?.nome || `Trader ${getUserDisplayId(p.userId)}`}
-                    </h4>
-                    <p className="text-sm text-on-surface-variant mt-1.5">Plano: <span className="text-on-surface font-bold uppercase tracking-widest">{p.planId?.replace('_', ' ')}</span></p>
-                    <p className="text-sm text-on-surface-variant">Método: <span className="text-on-surface font-bold uppercase tracking-wider">{
-                      p.paymentMethod === 'express' ? 'Express 📱' : 
-                      p.paymentMethod === 'iban' ? 'IBAN 🏛️' : 'MCX Referência 💳'
-                    }</span></p>
-                    {p.paymentMethod === 'express' && p.expressCode && (
-                      <p className="text-xs text-amber-500 font-extrabold mt-1.5 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl w-fit">
-                        CÓDIGO EXPRESS: {p.expressCode}
-                      </p>
-                    )}
-                    <p className="text-sm font-black text-primary mt-1">{p.amount?.toLocaleString()} Kz</p>
-                    <p className="text-[10px] text-on-surface-variant mt-2 font-mono opacity-50">ID Usuário: {getUserDisplayId(p.userId)}</p>
+            <div key={p.id} className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-xl">
+              {/* Left side details: 3 beautiful structured columns to distribute the info perfectly and avoid squeezing */}
+              <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                
+                {/* Col 1: Status & General Identifier */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                      p.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 
+                      p.status === 'rejected' ? 'bg-error/20 text-error' : 'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      {p.status || 'Pendente'}
+                    </span>
+                    <span className="text-xs text-on-surface-variant font-mono font-bold">#{getPaymentDisplayId(p.id)}</span>
                   </div>
-                  <p className="text-[10px] text-on-surface-variant mt-1 text-right">{new Date(p.createdAt).toLocaleString()}</p>
+                  <div>
+                    <p className="text-lg font-black text-primary">{p.amount?.toLocaleString()} Kz</p>
+                    <p className="text-[10px] text-on-surface-variant/70 font-mono mt-0.5">{new Date(p.createdAt).toLocaleString()}</p>
+                  </div>
                 </div>
+
+                {/* Col 2: User Detail */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest block opacity-60">Solicitado Por</span>
+                  <h4 className="text-sm font-black text-white hover:text-[#00f5a0] transition-colors leading-snug">
+                    {p.userName || users.find(u => u.id === p.userId)?.name || users.find(u => u.id === p.userId)?.nome || `Trader ${getUserDisplayId(p.userId)}`}
+                  </h4>
+                  <p className="text-[11px] text-[#00f5a0] font-mono break-all">{users.find(u => u.id === p.userId)?.email || 'Sem e-mail'}</p>
+                  <p className="text-[10px] text-on-surface-variant font-mono opacity-50">ID: {getUserDisplayId(p.userId)}</p>
+                </div>
+
+                {/* Col 3: Plan & Payment Method Detail */}
+                <div className="space-y-1 border-t md:border-t-0 md:border-l border-outline-variant/10 md:pl-6 pt-3 md:pt-0">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs text-on-surface-variant font-medium">
+                      Plano: <span className="text-on-surface font-black uppercase tracking-widest text-[#00f5a0]">{p.planId?.replace('_', ' ')}</span>
+                    </p>
+                    <p className="text-xs text-on-surface-variant font-medium">
+                      Método: <span className="text-on-surface font-extrabold">{
+                        p.paymentMethod === 'express' ? 'Express 📱' : 
+                        p.paymentMethod === 'iban' ? 'IBAN 🏛️' : 
+                        p.paymentMethod === 'kwik' ? 'KWIK 💸' : 'MCX Referência 💳'
+                      }</span>
+                    </p>
+                    {p.paymentMethod === 'express' && p.expressCode && (
+                      <div className="mt-1 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl w-fit">
+                        <span className="text-[9px] text-amber-500 font-black tracking-wider uppercase font-mono block">CÓD V-REDE</span>
+                        <span className="text-xs text-on-surface font-mono font-bold">{p.expressCode}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </div>
 
-              <div className="flex items-center gap-4">
-                {p.proofUrl && (
-                  <button 
-                    onClick={() => window.open(p.proofUrl, '_blank')}
-                    className="flex items-center gap-2 bg-surface-container hover:bg-surface-container-high px-4 py-2 rounded-xl text-xs font-bold transition-all border border-outline-variant/20"
-                  >
-                    Ver Comprovativo
-                  </button>
-                )}
+              {/* Actions Column (Right Side - clean spacing) */}
+              <div className="flex flex-wrap items-center gap-3 shrink-0 border-t lg:border-t-0 pt-4 lg:pt-0 border-outline-variant/10 justify-end w-full lg:w-auto">
                 {p.status === 'pending' && (
                   <div className="flex gap-2">
                     <button 
                       onClick={() => handleRejectPayment(p.id)}
-                      className="p-2 rounded-xl bg-error/10 text-error hover:bg-error/20 transition-all"
+                      className="p-2.5 rounded-xl bg-error/10 text-error hover:bg-error/20 hover:scale-105 transition-all text-sm"
+                      title="Negar"
                     >
-                      <X size={20} />
+                      <X size={18} />
                     </button>
                     <button 
                       onClick={() => handleApprovePayment(p)}
-                      className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all"
+                      className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:scale-105 transition-all text-sm"
+                      title="Aprovar"
                     >
-                      <Check size={20} />
+                      <Check size={18} />
                     </button>
                   </div>
                 )}
@@ -1201,7 +1304,7 @@ export default function AdminPanel() {
                       className="p-2 rounded-xl bg-error/10 text-error hover:bg-error/20 transition-all opacity-50 hover:opacity-100"
                       title="Apagar Histórico"
                     >
-                      <X size={16} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 )}
@@ -1233,11 +1336,11 @@ export default function AdminPanel() {
             <p className="text-xs text-on-surface-variant mb-6"> Configure as opções de cobrança exibidas aos traders no momento do upgrade de plano.</p>
             
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-surface-container-low p-4 rounded-2xl border border-outline-variant/15">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface-container-low p-4 rounded-2xl border border-outline-variant/15">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="font-bold text-on-surface text-xs">Ativar IBAN</p>
-                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">Transferência bancária</p>
+                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">Bancário</p>
                   </div>
                   <button 
                     onClick={() => setSettings({ ...settings, showIban: !settings.showIban })}
@@ -1249,8 +1352,8 @@ export default function AdminPanel() {
 
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="font-bold text-on-surface text-xs">Ativar Multicaixa</p>
-                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">Entidade / Referência</p>
+                    <p className="font-bold text-on-surface text-xs">Ativar MCX</p>
+                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">Referência</p>
                   </div>
                   <button 
                     onClick={() => setSettings({ ...settings, showMulticaixa: !settings.showMulticaixa })}
@@ -1263,13 +1366,26 @@ export default function AdminPanel() {
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="font-bold text-on-surface text-xs">Ativar Express</p>
-                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">MCX Express</p>
+                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">Express 📱</p>
                   </div>
                   <button 
                     onClick={() => setSettings({ ...settings, showExpress: settings.showExpress !== false ? false : true })}
                     className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showExpress !== false ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
                   >
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showExpress !== false ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-bold text-on-surface text-xs">Ativar KWIK</p>
+                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">KWIK 💸</p>
+                  </div>
+                  <button 
+                    onClick={() => setSettings({ ...settings, showKwik: settings.showKwik !== false ? false : true })}
+                    className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showKwik !== false ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showKwik !== false ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
                   </button>
                 </div>
               </div>
@@ -1283,40 +1399,6 @@ export default function AdminPanel() {
                   className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
                   placeholder="Ex: 244921319200"
                 />
-              </div>
-
-              {/* Canal de Comunidade Configuração */}
-              <div className="border border-[#00f5a0]/10 p-5 rounded-2xl bg-[#00f5a0]/5 space-y-4">
-                <h4 className="text-xs font-black text-[#00f5a0] uppercase tracking-wider font-mono flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">groups</span>
-                  Link Oficial da Comunidade (Membros)
-                </h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1 font-mono">Escolha a Plataforma</label>
-                    <select
-                      value={settings.communityPlatform || 'Telegram'}
-                      onChange={(e) => setSettings({ ...settings, communityPlatform: e.target.value })}
-                      className="w-full bg-surface-container-low border border-[#00f5a0]/20 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm"
-                    >
-                      <option value="Telegram" className="bg-surface-container-high text-white">Telegram</option>
-                      <option value="WhatsApp" className="bg-surface-container-high text-white">WhatsApp</option>
-                      <option value="Discord" className="bg-surface-container-high text-white">Discord</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1 font-mono">URL / Link do Canal</label>
-                    <input 
-                      type="text" 
-                      value={settings.communityLink || ''}
-                      onChange={(e) => setSettings({ ...settings, communityLink: e.target.value })}
-                      className="w-full bg-surface-container-low border border-[#00f5a0]/20 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm"
-                      placeholder="Ex: https://t.me/seu_canal ou link do grupo"
-                    />
-                  </div>
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -1347,13 +1429,13 @@ export default function AdminPanel() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div className="space-y-2 col-span-1 md:col-span-2">
                   <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">IBAN de Depósito</label>
                   <input 
                     type="text" 
                     value={settings.iban}
                     onChange={(e) => setSettings({ ...settings, iban: e.target.value })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1363,6 +1445,16 @@ export default function AdminPanel() {
                     value={settings.ibanName || ''}
                     onChange={(e) => setSettings({ ...settings, ibanName: e.target.value })}
                     className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Nome do Banco (IBAN)</label>
+                  <input 
+                    type="text" 
+                    value={settings.ibanBank || ''}
+                    onChange={(e) => setSettings({ ...settings, ibanBank: e.target.value })}
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
+                    placeholder="Ex: BFA - Banco Fomento Angola"
                   />
                 </div>
               </div>
@@ -1397,6 +1489,29 @@ export default function AdminPanel() {
                   className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
                   placeholder="Nome da Empresa / Negócio"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-outline-variant/10 pt-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Chave KWIK</label>
+                  <input 
+                    type="text" 
+                    value={settings.kwikKey || ''}
+                    onChange={(e) => setSettings({ ...settings, kwikKey: e.target.value })}
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
+                    placeholder="Ex: Nº de Telemóvel ou Chave KWIK"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Titular da Conta (KWIK)</label>
+                  <input 
+                    type="text" 
+                    value={settings.kwikName || ''}
+                    onChange={(e) => setSettings({ ...settings, kwikName: e.target.value })}
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
+                    placeholder="Ex: Nome Completo do Titular"
+                  />
+                </div>
               </div>
 
               <div className="flex gap-4 pt-6 border-t border-outline-variant/10">
@@ -1632,255 +1747,298 @@ export default function AdminPanel() {
       )}
 
       {activeTab === 'coupons' && (
-        <div className="space-y-8">
-          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 shadow-xl">
-            <h3 className="text-xl font-bold text-on-surface mb-6 font-headline flex items-center gap-3">
-              <Ticket className="text-primary" />
-              Novo Cupão de Desconto / Parceria
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <input type="text" value={newCoupon.code} onChange={e => setNewCoupon({...newCoupon, code: e.target.value.toUpperCase()})} placeholder="Código (Ex: VIP20)" className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary uppercase font-mono" />
-              
-              <select value={newCoupon.discountType} onChange={e => setNewCoupon({...newCoupon, discountType: e.target.value})} className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
-                <option value="percentage">Percentagem %</option>
-                <option value="fixed">Valor Fixo (Kz)</option>
-              </select>
-              
-              <input type="number" value={newCoupon.discountValue} onChange={e => setNewCoupon({...newCoupon, discountValue: e.target.value})} placeholder={newCoupon.discountType === 'percentage' ? "Ex: 20" : "Ex: 5000"} className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary" />
-              
-              <select value={newCoupon.targetPlan} onChange={e => setNewCoupon({...newCoupon, targetPlan: e.target.value})} className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
-                <option value="all">Todos os Planos</option>
-                <option value="mensal_6">Mensal</option>
-                <option value="trimestral_6">Trimestral</option>
-                <option value="semestral_8">Semestral</option>
-                <option value="anual_16">Anual</option>
-              </select>
-              
-              <input type="text" value={newCoupon.partnerRef} onChange={e => setNewCoupon({...newCoupon, partnerRef: e.target.value})} placeholder="Referência (Parceiro)" className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary" />
-            </div>
-            
-            <button onClick={handleCreateCoupon} className="mt-6 bg-primary text-background px-6 py-3 rounded-xl font-black text-sm uppercase tracking-widest hover:scale-[1.02] transition-all">
-              Criar Cupão
-            </button>
-          </div>
+        <div className="space-y-8 animate-in fade-in duration-200">
 
-          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-surface-container text-on-surface-variant text-xs uppercase tracking-widest border-b border-outline-variant/20">
-                <tr>
-                  <th className="p-6 font-black">Código</th>
-                  <th className="p-6 font-black">Desconto</th>
-                  <th className="p-6 font-black">Plano Alvo</th>
-                  <th className="p-6 font-black">Referência</th>
-                  <th className="p-6 font-black text-center">Registos / Usos</th>
-                  <th className="p-6 font-black">Status</th>
-                  <th className="p-6 font-black">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/10">
-                {coupons.map(c => {
-                  const usagesCount = users.filter(u => u.usedCoupon === c.code).length;
-                  return (
-                    <tr key={c.id} className="hover:bg-surface-container/30 transition-colors">
-                      <td className="p-6 font-mono font-bold">
-                        <button
-                          onClick={() => {
-                            setSelectedCouponFilter(c.code);
-                            const element = document.getElementById('coupon-referrals-section');
-                            if (element) {
-                              element.scrollIntoView({ behavior: 'smooth' });
-                            }
-                          }}
-                          className="bg-primary/10 hover:bg-[#00f5a0]/15 hover:text-[#00f5a0] text-[#00f5a0] px-3.5 py-1.5 rounded-xl text-sm font-black tracking-widest uppercase border border-[#00f5a0]/20 hover:border-[#00f5a0]/40 transition-all"
-                        >
-                          {c.code}
-                        </button>
-                      </td>
-                      <td className="p-6 text-on-surface font-black">
-                        {c.discountType === 'percentage' ? `${c.discountValue}%` : `Kz ${c.discountValue}`}
-                      </td>
-                      <td className="p-6 text-sm text-on-surface-variant">{c.targetPlan === 'all' ? 'Todos' : c.targetPlan}</td>
-                      <td className="p-6 text-sm text-on-surface-variant">{c.partnerRef || '-'}</td>
-                      <td className="p-6 text-center">
-                        <button
-                          onClick={() => {
-                            setSelectedCouponFilter(c.code);
-                            const element = document.getElementById('coupon-referrals-section');
-                            if (element) {
-                              element.scrollIntoView({ behavior: 'smooth' });
-                            }
-                          }}
-                          className="bg-surface-container text-white text-xs px-3 py-1.5 rounded-lg border border-outline-variant/20 font-black hover:bg-surface-container-high transition-colors"
-                        >
-                          {usagesCount} {usagesCount === 1 ? 'membro' : 'membros'}
-                        </button>
-                      </td>
-                      <td className="p-6">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${c.active ? 'bg-emerald-500/20 text-emerald-500' : 'bg-error/20 text-error'}`}>
-                          {c.active ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </td>
-                      <td className="p-6 flex items-center gap-3">
-                        <button onClick={() => handleToggleCoupon(c.id, c.active)} className="text-xs shrink-0 font-extrabold bg-[#00f5a0]/10 hover:bg-[#00f5a0]/20 text-[#00f5a0] px-3 py-1.5 rounded-lg border border-[#00f5a0]/20 hover:underline">
-                          {c.active ? 'Desativar' : 'Ativar'}
-                        </button>
-                        <button onClick={() => handleDeleteCoupon(c.id)} className="text-xs shrink-0 font-extrabold bg-error/10 hover:bg-error/20 text-error px-3 py-1.5 rounded-lg border border-error/20 hover:underline">Apagar</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {coupons.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="p-12 text-center text-on-surface-variant">Nenhum cupão criado.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div id="coupon-referrals-section" className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 shadow-xl space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <h3 className="text-xl font-bold text-on-surface font-headline flex items-center gap-2">
-                  <Ticket size={22} className="text-[#00f5a0]" /> Relatório de Indicações (Histórico de Cadastro)
-                </h3>
-                <p className="text-xs text-on-surface-variant font-medium mt-0.5">
-                  Mostrando <span className="text-white font-black">{
-                    users.filter(u => u.usedCoupon)
-                         .filter(u => !selectedCouponFilter || u.usedCoupon === selectedCouponFilter)
-                         .filter(u => {
-                           if (!couponSearchQuery) return true;
-                           const term = couponSearchQuery.toLowerCase();
-                           return (u.name || '').toLowerCase().includes(term) ||
-                                  (u.email || '').toLowerCase().includes(term) ||
-                                  (u.usedCoupon || '').toLowerCase().includes(term) ||
-                                  (u.partnerRef || '').toLowerCase().includes(term);
-                         }).length
-                  }</span> de <span className="text-white font-black">{users.filter(u => u.usedCoupon).length}</span> indicações registadas no total.
-                </p>
-              </div>
-
-              {(couponSearchQuery || selectedCouponFilter) && (
+            {/* Menu de Sub-secção */}
+            <div className="flex border-b border-outline-variant/10 pb-4 justify-between items-center">
+              <div className="flex gap-4">
                 <button
-                  onClick={() => {
-                    setCouponSearchQuery('');
-                    setSelectedCouponFilter('');
-                  }}
-                  className="bg-primary/10 hover:bg-[#00f5a0]/15 hover:text-[#00f5a0] text-[#00f5a0] transition-all px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 border border-primary/20 hover:border-[#00f5a0]/30"
+                  onClick={() => setShowReferralsReport(false)}
+                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all border ${
+                    !showReferralsReport 
+                      ? 'bg-primary text-background border-primary shadow-lg shadow-primary/20' 
+                      : 'bg-surface-container-low text-on-surface-variant hover:text-white border-outline-variant/20'
+                  }`}
                 >
-                  <X size={14} /> Limpar Filtro
+                  <Ticket size={16} />
+                  Gestão de Cupões
                 </button>
-              )}
-            </div>
-
-            {/* Controls Filter Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Search Box */}
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40" size={16} />
-                <input
-                  type="text"
-                  placeholder="Pesquisar por nome, e-mail ou cupão..."
-                  value={couponSearchQuery}
-                  onChange={(e) => setCouponSearchQuery(e.target.value)}
-                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-4 py-3.5 text-sm text-on-surface outline-none focus:border-primary transition-all placeholder:text-on-surface-variant/40 font-medium"
-                />
-              </div>
-
-              {/* Coupon Dropdown Filter */}
-              <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none">
-                  <SlidersHorizontal size={16} />
-                </div>
-                <select
-                  value={selectedCouponFilter}
-                  onChange={(e) => setSelectedCouponFilter(e.target.value)}
-                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-10 py-3.5 text-sm text-on-surface outline-none focus:border-primary appearance-none cursor-pointer font-bold"
+                
+                <button
+                  onClick={() => setShowReferralsReport(true)}
+                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all border ${
+                    showReferralsReport 
+                      ? 'bg-primary text-background border-primary shadow-lg shadow-primary/20' 
+                      : 'bg-surface-container-low text-on-surface-variant hover:text-white border-outline-variant/20'
+                  }`}
                 >
-                  <option value="">Filtrar: Todos os Cupões</option>
-                  {coupons.map(cp => (
-                    <option key={cp.id} value={cp.code}>{cp.code} ({cp.active ? 'Ativo' : 'Inativo'})</option>
-                  ))}
-                </select>
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
-                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
-                </div>
+                  <History size={16} />
+                  Histórico de Cadastros ({users.filter(u => u.usedCoupon).length})
+                </button>
               </div>
             </div>
 
-            <div className="overflow-hidden border border-outline-variant/10 rounded-2xl">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-surface-container text-on-surface-variant text-[10px] uppercase tracking-widest">
-                  <tr>
-                    <th className="p-4 font-black">Usuário</th>
-                    <th className="p-4 font-black">Cupão Utilizado</th>
-                    <th className="p-4 font-black">Parceiro / Referência</th>
-                    <th className="p-4 font-black">Status da Conta</th>
-                    <th className="p-4 font-black">Data Registo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/10">
-                  {users
-                    .filter(u => u.usedCoupon)
-                    .filter(u => !selectedCouponFilter || u.usedCoupon === selectedCouponFilter)
-                    .filter(u => {
-                      if (!couponSearchQuery) return true;
-                      const term = couponSearchQuery.toLowerCase();
-                      return (u.name || '').toLowerCase().includes(term) ||
-                             (u.email || '').toLowerCase().includes(term) ||
-                             (u.usedCoupon || '').toLowerCase().includes(term) ||
-                             (u.partnerRef || '').toLowerCase().includes(term);
-                    })
-                    .map(u => (
-                      <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
-                        <td className="p-4">
-                          <p className="font-bold text-sm text-on-surface">{u.name || 'Trader Sem Nome'}</p>
-                          <p className="text-[11px] text-on-surface-variant font-mono">{u.email}</p>
-                        </td>
-                        <td className="p-4">
-                          <button
-                            onClick={() => setSelectedCouponFilter(u.usedCoupon)}
-                            className="text-xs font-mono text-primary font-black bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg border border-primary/20 transition-all uppercase"
-                          >
-                            {u.usedCoupon}
-                          </button>
-                        </td>
-                        <td className="p-4 text-xs text-on-surface-variant font-medium">{u.partnerRef || '-'}</td>
-                        <td className="p-4">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                            (u.plan_type === 'trial_15' || u.plan_type === 'trial_30')
-                              ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' 
-                              : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                          }`}>
-                            {u.plan_type?.replace('_', ' ') || 'Trial'}
-                          </span>
-                        </td>
-                        <td className="p-4 text-xs text-on-surface-variant">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}</td>
+            {!showReferralsReport ? (
+              <>
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 shadow-xl">
+                  <h3 className="text-xl font-bold text-on-surface mb-6 font-headline flex items-center gap-3">
+                    <Ticket className="text-primary" />
+                    Novo Cupão de Desconto / Parceria
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <input type="text" value={newCoupon.code} onChange={e => setNewCoupon({...newCoupon, code: e.target.value.toUpperCase()})} placeholder="Código (Ex: VIP20)" className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary uppercase font-mono" />
+                    
+                    <select value={newCoupon.discountType} onChange={e => setNewCoupon({...newCoupon, discountType: e.target.value})} className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                      <option value="percentage">Percentagem %</option>
+                      <option value="fixed">Valor Fixo (Kz)</option>
+                    </select>
+                    
+                    <input type="number" value={newCoupon.discountValue} onChange={e => setNewCoupon({...newCoupon, discountValue: e.target.value})} placeholder={newCoupon.discountType === 'percentage' ? "Ex: 20" : "Ex: 5000"} className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary" />
+                    
+                    <select value={newCoupon.targetPlan} onChange={e => setNewCoupon({...newCoupon, targetPlan: e.target.value})} className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                      <option value="all">Todos os Planos</option>
+                      <option value="mensal_6">Mensal</option>
+                      <option value="trimestral_6">Trimestral</option>
+                      <option value="semestral_8">Semestral</option>
+                      <option value="anual_16">Anual</option>
+                    </select>
+                    
+                    <input type="text" value={newCoupon.partnerRef} onChange={e => setNewCoupon({...newCoupon, partnerRef: e.target.value})} placeholder="Referência (Parceiro)" className="bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-on-surface outline-none focus:border-primary" />
+                  </div>
+                  
+                  <button onClick={handleCreateCoupon} className="mt-6 bg-primary text-background px-6 py-3 rounded-xl font-black text-sm uppercase tracking-widest hover:scale-[1.02] transition-all">
+                    Criar Cupão
+                  </button>
+                </div>
+
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-surface-container text-on-surface-variant text-xs uppercase tracking-widest border-b border-outline-variant/20">
+                      <tr>
+                        <th className="p-6 font-black">Código</th>
+                        <th className="p-6 font-black">Desconto</th>
+                        <th className="p-6 font-black">Plano Alvo</th>
+                        <th className="p-6 font-black">Referência</th>
+                        <th className="p-6 font-black text-center">Registos / Usos</th>
+                        <th className="p-6 font-black">Status</th>
+                        <th className="p-6 font-black">Ações</th>
                       </tr>
-                    ))}
-                  {users
-                    .filter(u => u.usedCoupon)
-                    .filter(u => !selectedCouponFilter || u.usedCoupon === selectedCouponFilter)
-                    .filter(u => {
-                      if (!couponSearchQuery) return true;
-                      const term = couponSearchQuery.toLowerCase();
-                      return (u.name || '').toLowerCase().includes(term) ||
-                             (u.email || '').toLowerCase().includes(term) ||
-                             (u.usedCoupon || '').toLowerCase().includes(term) ||
-                             (u.partnerRef || '').toLowerCase().includes(term);
-                    }).length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="p-8 text-center text-xs text-on-surface-variant italic">
-                        Nenhum registro encontrado com estes filtros.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/10">
+                      {coupons.map(c => {
+                        const usagesCount = users.filter(u => u.usedCoupon === c.code).length;
+                        return (
+                          <tr key={c.id} className="hover:bg-surface-container/30 transition-colors">
+                            <td className="p-6 font-mono font-bold">
+                              <button
+                                onClick={() => {
+                                  setSelectedCouponFilter(c.code);
+                                  setShowReferralsReport(true);
+                                }}
+                                className="bg-primary/10 hover:bg-[#00f5a0]/15 hover:text-[#00f5a0] text-[#00f5a0] px-3.5 py-1.5 rounded-xl text-sm font-black tracking-widest uppercase border border-[#00f5a0]/20 hover:border-[#00f5a0]/40 transition-all cursor-pointer"
+                              >
+                                {c.code}
+                              </button>
+                            </td>
+                            <td className="p-6 text-on-surface font-black">
+                              {c.discountType === 'percentage' ? `${c.discountValue}%` : `Kz ${c.discountValue}`}
+                            </td>
+                            <td className="p-6 text-sm text-on-surface-variant">{c.targetPlan === 'all' ? 'Todos' : c.targetPlan}</td>
+                            <td className="p-6 text-sm text-on-surface-variant">{c.partnerRef || '-'}</td>
+                            <td className="p-6 text-center">
+                              <button
+                                onClick={() => {
+                                  setSelectedCouponFilter(c.code);
+                                  setShowReferralsReport(true);
+                                }}
+                                className="bg-surface-container text-white text-xs px-3 py-1.5 rounded-lg border border-outline-variant/20 font-black hover:bg-surface-container-high transition-colors cursor-pointer"
+                              >
+                                {usagesCount} {usagesCount === 1 ? 'membro' : 'membros'}
+                              </button>
+                            </td>
+                            <td className="p-6">
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${c.active ? 'bg-emerald-500/20 text-emerald-500' : 'bg-error/20 text-error'}`}>
+                                {c.active ? 'Ativo' : 'Inativo'}
+                              </span>
+                            </td>
+                            <td className="p-6 flex items-center gap-3">
+                              <button 
+                                onClick={() => setEditingCoupon({ ...c })}
+                                className="p-2 bg-surface-container hover:bg-[#00f5a0]/10 text-[#00f5a0] rounded-lg border border-[#00f5a0]/20 hover:border-[#00f5a0]/30 transition-all cursor-pointer flex items-center justify-center shrink-0"
+                                title="Editar Cupão"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button onClick={() => handleToggleCoupon(c.id, c.active)} className="text-xs shrink-0 font-extrabold bg-[#00f5a0]/10 hover:bg-[#00f5a0]/20 text-[#00f5a0] px-3 py-1.5 rounded-lg border border-[#00f5a0]/20 hover:underline">
+                                {c.active ? 'Desativar' : 'Ativar'}
+                              </button>
+                              <button onClick={() => handleDeleteCoupon(c.id)} className="text-xs shrink-0 font-extrabold bg-error/10 hover:bg-error/20 text-error px-3 py-1.5 rounded-lg border border-error/20 hover:underline">Apagar</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {coupons.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="p-12 text-center text-on-surface-variant">Nenhum cupão criado.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <div id="coupon-referrals-section" className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-8 shadow-xl space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-on-surface font-headline flex items-center gap-2">
+                      <Ticket size={22} className="text-[#00f5a0]" /> Relatório de Indicações (Histórico de Cadastro)
+                    </h3>
+                    <p className="text-xs text-on-surface-variant font-medium mt-0.5">
+                      Mostrando <span className="text-white font-black">{
+                        users.filter(u => u.usedCoupon)
+                             .filter(u => !selectedCouponFilter || u.usedCoupon === selectedCouponFilter)
+                             .filter(u => {
+                               if (!couponSearchQuery) return true;
+                               const term = couponSearchQuery.toLowerCase();
+                               return (u.name || '').toLowerCase().includes(term) ||
+                                      (u.email || '').toLowerCase().includes(term) ||
+                                      (u.usedCoupon || '').toLowerCase().includes(term) ||
+                                      (u.partnerRef || '').toLowerCase().includes(term);
+                             }).length
+                      }</span> de <span className="text-white font-black">{users.filter(u => u.usedCoupon).length}</span> indicações registadas no total.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowReferralsReport(false)}
+                      className="bg-surface-container hover:bg-surface-container-high text-white transition-all px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 border border-outline-variant/20"
+                    >
+                      Voltar Gestão
+                    </button>
+                    {(couponSearchQuery || selectedCouponFilter) && (
+                      <button
+                        onClick={() => {
+                          setCouponSearchQuery('');
+                          setSelectedCouponFilter('');
+                        }}
+                        className="bg-primary/10 hover:bg-[#00f5a0]/15 hover:text-[#00f5a0] text-[#00f5a0] transition-all px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 border border-primary/20 hover:border-[#00f5a0]/30"
+                      >
+                        <X size={14} /> Limpar Filtro
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Controls Filter Bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Search Box */}
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Pesquisar por nome, e-mail ou cupão..."
+                      value={couponSearchQuery}
+                      onChange={(e) => setCouponSearchQuery(e.target.value)}
+                      className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-4 py-3.5 text-sm text-on-surface outline-none focus:border-primary transition-all placeholder:text-on-surface-variant/40 font-medium"
+                    />
+                  </div>
+
+                  {/* Coupon Dropdown Filter */}
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none">
+                      <SlidersHorizontal size={16} />
+                    </div>
+                    <select
+                      value={selectedCouponFilter}
+                      onChange={(e) => setSelectedCouponFilter(e.target.value)}
+                      className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-10 pr-10 py-3.5 text-sm text-on-surface outline-none focus:border-primary appearance-none cursor-pointer font-bold"
+                    >
+                      <option value="">Filtrar: Todos os Cupões</option>
+                      {coupons.map((cp: any) => (
+                        <option key={cp.id} value={cp.code}>{cp.code} ({cp.active ? 'Ativo' : 'Inativo'})</option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
+                       <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden border border-outline-variant/10 rounded-2xl">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-surface-container text-on-surface-variant text-[10px] uppercase tracking-widest">
+                      <tr>
+                        <th className="p-4 font-black">Usuário</th>
+                        <th className="p-4 font-black">Cupão Utilizado</th>
+                        <th className="p-4 font-black">Parceiro / Referência</th>
+                        <th className="p-4 font-black">Status da Conta</th>
+                        <th className="p-4 font-black">Data Registo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/10">
+                      {users
+                        .filter(u => u.usedCoupon)
+                        .filter(u => !selectedCouponFilter || u.usedCoupon === selectedCouponFilter)
+                        .filter(u => {
+                          if (!couponSearchQuery) return true;
+                          const term = couponSearchQuery.toLowerCase();
+                          return (u.name || '').toLowerCase().includes(term) ||
+                                 (u.email || '').toLowerCase().includes(term) ||
+                                 (u.usedCoupon || '').toLowerCase().includes(term) ||
+                                 (u.partnerRef || '').toLowerCase().includes(term);
+                        })
+                        .map(u => (
+                          <tr key={u.id} className="hover:bg-surface-container/30 transition-colors">
+                            <td className="p-4">
+                              <p className="font-bold text-sm text-on-surface">{u.name || 'Trader Sem Nome'}</p>
+                              <p className="text-[11px] text-on-surface-variant font-mono">{u.email}</p>
+                            </td>
+                            <td className="p-4">
+                              <button
+                                onClick={() => setSelectedCouponFilter(u.usedCoupon)}
+                                className="text-xs font-mono text-primary font-black bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg border border-primary/20 transition-all uppercase cursor-pointer"
+                              >
+                                {u.usedCoupon}
+                              </button>
+                            </td>
+                            <td className="p-4 text-xs text-on-surface-variant font-medium">{u.partnerRef || '-'}</td>
+                            <td className="p-4">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                                (u.plan_type === 'trial_15' || u.plan_type === 'trial_30')
+                                  ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' 
+                                  : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                              }`}>
+                                {u.plan_type?.replace('_', ' ') || 'Trial'}
+                              </span>
+                            </td>
+                            <td className="p-4 text-xs text-on-surface-variant">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}</td>
+                          </tr>
+                        ))}
+                      {users
+                        .filter(u => u.usedCoupon)
+                        .filter(u => !selectedCouponFilter || u.usedCoupon === selectedCouponFilter)
+                        .filter(u => {
+                          if (!couponSearchQuery) return true;
+                          const term = couponSearchQuery.toLowerCase();
+                          return (u.name || '').toLowerCase().includes(term) ||
+                                 (u.email || '').toLowerCase().includes(term) ||
+                                 (u.usedCoupon || '').toLowerCase().includes(term) ||
+                                 (u.partnerRef || '').toLowerCase().includes(term);
+                        }).length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-xs text-on-surface-variant italic">
+                            Nenhum registro encontrado com estes filtros.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
       )}
       {activeTab === 'maestros' && showDangerZone && isSuperAdmin ? (
         <div className="bg-error/5 border border-error/20 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
@@ -2030,25 +2188,88 @@ export default function AdminPanel() {
             </table>
             
             <div className="p-6 border-t border-outline-variant/20 bg-surface-container">
-              <h4 className="font-bold text-sm mb-4">Adicionar Novo Maestro</h4>
-              <div className="flex gap-4">
-                <select id="newAdminSelect" className="flex-1 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2 focus:outline-none focus:border-primary text-sm">
-                   <option value="">Selecione um usuário...</option>
-                   {users.filter(u => u.role !== 'admin' && u.status !== 'deleted').map(u => (
-                     <option key={u.id} value={u.id}>{u.name || u.email}</option>
-                   ))}
-                </select>
+              <h4 className="font-bold text-sm mb-2 text-[#00f5a0] uppercase tracking-wide">Cadastrar Novo Maestro</h4>
+              <p className="text-xs text-on-surface-variant mb-4">Insira os dados de login para criar uma nova conta de Maestro com acesso total e irrestrito ao painel administrativo.</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1.5">Nome Completo</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ex: Carlos Silva"
+                    value={newMaestroName}
+                    onChange={(e) => setNewMaestroName(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 focus:outline-none focus:border-primary text-sm font-semibold text-on-surface"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1.5">E-mail de Acesso</label>
+                  <input 
+                    type="email" 
+                    placeholder="maestro@cprofit.com"
+                    value={newMaestroEmail}
+                    onChange={(e) => setNewMaestroEmail(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 focus:outline-none focus:border-primary text-sm font-semibold text-on-surface"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1.5">Senha de Acesso</label>
+                  <input 
+                    type="password" 
+                    placeholder="Mínimo 6 caracteres"
+                    value={newMaestroPassword}
+                    onChange={(e) => setNewMaestroPassword(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 focus:outline-none focus:border-primary text-sm font-semibold text-on-surface"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
                 <button 
-                  onClick={() => {
-                    const select = document.getElementById('newAdminSelect') as HTMLSelectElement;
-                    if (select.value) {
-                      handleUpdateUser(select.value, { role: 'admin' });
-                      select.value = '';
+                  onClick={async () => {
+                    if (!newMaestroEmail || !newMaestroPassword) {
+                      alert('Por favor, insira o email e a senha do novo Maestro.');
+                      return;
+                    }
+                    if (newMaestroPassword.length < 6) {
+                      alert('A senha necessita de ter pelo menos 6 caracteres.');
+                      return;
+                    }
+                    setNewMaestroSubmitting(true);
+                    try {
+                      // Call safe creation helper
+                      const uid = await registerNewMaestroAuth(newMaestroEmail, newMaestroPassword);
+                      if (uid) {
+                        // Document user profile fields
+                        await setDoc(doc(db, 'usuarios', uid), {
+                          nome: newMaestroName || newMaestroEmail.split('@')[0],
+                          email: newMaestroEmail,
+                          role: 'admin',
+                          plan_type: 'ilimitado',
+                          account_limit: 999,
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString()
+                        });
+                        alert(`Sucesso! Maestro '${newMaestroEmail}' criado com privilégios de Super Admin.`);
+                        setNewMaestroName('');
+                        setNewMaestroEmail('');
+                        setNewMaestroPassword('');
+                      } else {
+                        alert('Problema ao registrar as credenciais.');
+                      }
+                    } catch (err: any) {
+                      console.error(err);
+                      if (err.code === 'auth/email-already-in-use') {
+                        alert('Este e-mail já está sendo utilizado por outro usuário no sistema.');
+                      } else {
+                        alert(`Erro: ${err.message}`);
+                      }
+                    } finally {
+                      setNewMaestroSubmitting(false);
                     }
                   }}
-                  className="px-6 py-2 bg-primary text-on-primary font-bold rounded-xl hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20"
+                  disabled={newMaestroSubmitting}
+                  className="px-6 py-3 bg-primary text-on-primary font-black text-xs uppercase tracking-widest rounded-xl hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
                 >
-                  Promover a Maestro
+                  {newMaestroSubmitting ? 'A Cadastrar...' : 'Cadastrar Novo Maestro'}
                 </button>
               </div>
             </div>
@@ -2201,7 +2422,7 @@ export default function AdminPanel() {
                             </td>
                             <td className="p-4 font-bold uppercase font-mono">{p.planId?.replace('_', ' ')}</td>
                             <td className="p-4 font-bold uppercase tracking-wider text-[10px]">
-                              {p.paymentMethod === 'express' ? 'Express 📱' : p.paymentMethod === 'iban' ? 'IBAN 🏛️' : 'MCX Ref 💳'}
+                              {p.paymentMethod === 'express' ? 'Express 📱' : p.paymentMethod === 'iban' ? 'IBAN 🏛️' : p.paymentMethod === 'kwik' ? 'KWIK 💸' : 'MCX Ref 💳'}
                             </td>
                             <td className="p-4 text-[10px] text-on-surface-variant">{new Date(p.createdAt || Date.now()).toLocaleDateString()}</td>
                             <td className="p-4 text-right font-black text-emerald-400 font-mono">{p.amount?.toLocaleString()} Kz</td>
@@ -2702,6 +2923,103 @@ export default function AdminPanel() {
                       setEditingUser(null);
                    }}
                    className="flex-1 py-3 bg-primary text-on-primary hover:bg-primary-fixed-dim transition-colors rounded-xl font-bold uppercase tracking-widest text-xs"
+                 >
+                   Salvar Alterações
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {editingCoupon && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
+           <div className="bg-surface-container border border-outline-variant/30 rounded-3xl p-8 max-w-lg w-full shadow-2xl relative animate-in zoom-in-95 duration-200">
+              <button
+                onClick={() => setEditingCoupon(null)}
+                className="absolute top-6 right-6 p-2 text-on-surface-variant hover:text-white hover:bg-surface-container-high rounded-full transition-all cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+
+              <h3 className="text-xl font-bold mb-2 font-headline flex items-center gap-3 text-[#00f5a0]">
+                 <Pencil size={22} className="text-[#00f5a0]" />
+                 Editar Cupão
+              </h3>
+              <p className="text-xs text-on-surface-variant mb-6 font-medium">Altere os detalhes ou corrija o nome deste cupão de desconto / parceria cadastrado.</p>
+              
+              <div className="space-y-4 font-sans">
+                 <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2 font-mono">Código do Cupão</label>
+                    <input 
+                      type="text" 
+                      value={editingCoupon.code}
+                      onChange={e => setEditingCoupon({ ...editingCoupon, code: e.target.value.toUpperCase() })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm font-mono font-bold uppercase text-white"
+                    />
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                       <label className="block text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Tipo de Desconto</label>
+                       <select 
+                         value={editingCoupon.discountType}
+                         onChange={e => setEditingCoupon({ ...editingCoupon, discountType: e.target.value })}
+                         className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm text-white cursor-pointer"
+                       >
+                         <option value="percentage">Percentagem %</option>
+                         <option value="fixed">Valor Fixo (Kz)</option>
+                       </select>
+                    </div>
+
+                    <div>
+                       <label className="block text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Valor</label>
+                       <input 
+                         type="number" 
+                         value={editingCoupon.discountValue}
+                         onChange={e => setEditingCoupon({ ...editingCoupon, discountValue: e.target.value })}
+                         className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm text-white"
+                         placeholder={editingCoupon.discountType === 'percentage' ? "Ex: 20" : "Ex: 5000"}
+                       />
+                    </div>
+                 </div>
+
+                 <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Plano Alvo</label>
+                    <select 
+                      value={editingCoupon.targetPlan}
+                      onChange={e => setEditingCoupon({ ...editingCoupon, targetPlan: e.target.value })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm text-white cursor-pointer"
+                    >
+                      <option value="all">Todos os Planos</option>
+                      <option value="mensal_6">Mensal</option>
+                      <option value="trimestral_6">Trimestral</option>
+                      <option value="semestral_8">Semestral</option>
+                      <option value="anual_16">Anual</option>
+                    </select>
+                 </div>
+
+                 <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Referência (Parceiro)</label>
+                    <input 
+                      type="text" 
+                      value={editingCoupon.partnerRef || ''}
+                      onChange={e => setEditingCoupon({ ...editingCoupon, partnerRef: e.target.value })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm text-white"
+                      placeholder="Identificação do parceiro"
+                    />
+                 </div>
+              </div>
+
+              <div className="flex gap-4 mt-8">
+                 <button 
+                   onClick={() => setEditingCoupon(null)}
+                   className="flex-grow py-3 bg-surface-container border border-outline-variant/20 text-on-surface hover:text-white transition-all rounded-xl font-bold uppercase tracking-widest text-xs cursor-pointer text-center text-white"
+                 >
+                   Cancelar
+                 </button>
+                 <button 
+                   onClick={() => handleUpdateCoupon(editingCoupon.id, editingCoupon)}
+                   className="flex-grow py-3 bg-[#00f5a0] text-background hover:bg-[#00f5a0]/90 transition-colors rounded-xl font-black uppercase tracking-widest text-xs shadow-lg shadow-[#00f5a0]/15 cursor-pointer"
                  >
                    Salvar Alterações
                  </button>

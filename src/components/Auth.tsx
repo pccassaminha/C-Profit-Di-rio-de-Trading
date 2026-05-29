@@ -122,15 +122,15 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         const isTrialQualified = !!(finalReferredUid || referredBy);
-        const resolvedPlanType = 'trial_30';
-        const resolvedExpiryDate = expiryDate.toISOString();
+        const resolvedPlanType = 'Iniciante';
+        const resolvedExpiryDate = new Date().toISOString();
 
         const googleDisplayName = result.user.displayName || 'Usuário Google';
         const parts = googleDisplayName.trim().split(' ');
         const googleFirstName = parts[0] || '';
         const googleLastName = parts.slice(1).join(' ') || '';
 
-        // Create initial profile for Google user with 30 days free trial
+        // Create initial profile for Google user with Iniciante status
         await setDoc(userRef, {
           nome: googleDisplayName,
           firstName: googleFirstName,
@@ -285,11 +285,11 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
             } else {
               console.warn('Cupom de desconto inativo.');
             }
-          } else if (uppercaseCode === 'DESCONTODE50%') {
+          } else if (uppercaseCode === 'CPROFIT50%OFF') {
             // Fallback if coupon collection is not synced or loaded yet
             validCoupon = {
               id: 'descontode50_static',
-              code: 'DESCONTODE50%',
+              code: 'CPROFIT50%OFF',
               discountType: 'percentage',
               discountValue: 50,
               targetPlan: 'all',
@@ -337,8 +337,8 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         }
 
         const isTrialQualified = !!(finalReferredUid || referredBy);
-        const resolvedPlanType = 'trial_30';
-        const resolvedExpiryDate = expiryDate.toISOString();
+        const resolvedPlanType = 'Iniciante';
+        const resolvedExpiryDate = new Date().toISOString();
 
         const newUserData: any = {
           nome: fullName,

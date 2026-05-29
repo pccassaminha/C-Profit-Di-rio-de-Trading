@@ -18,7 +18,7 @@ export default function Topbar({
   const { currency, setCurrency } = useCurrency();
   const { userPlan } = useTrades();
   const currentUser = auth.currentUser;
-  const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com';
+  const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com' || userPlan?.role === 'admin';
 
   const [dbPhoto, setDbPhoto] = useState<string | null>(null);
   const [dbName, setDbName] = useState<string>('');

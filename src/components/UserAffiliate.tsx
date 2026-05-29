@@ -118,7 +118,7 @@ export default function UserAffiliate() {
     setTimeout(() => setCodeCopied(false), 2000);
   };
 
-  const promoMessage = `📈 Conheça o C Profit — o terminal definitivo para traders profissionais! \n\nFaça o diário de todos os seus trades automáticos e manuais de Forex e Opções Binárias, controle limites, drawdown, winrate e analise métricas em tempo real!\n\n🎁 Clique no link para fazer o seu cadastro e ganhe 30 DIAS GRÁTIS de teste completo:\n\nLink: ${referralLink}\nOu use o código de indicação: ${myRefCode} na hora de se registrar!`;
+  const promoMessage = `📈 Conheça o C Profit — o terminal definitivo para traders profissionais! \n\nFaça o diário de todos os seus trades automáticos e manuais de Forex e Opções Binárias, controle limites, drawdown, winrate e analise métricas em tempo real!\n\n🎁 Clique no link para fazer o seu cadastro e ganhe 30 DIAS de teste completo por apenas 500 Kzs:\n\nLink: ${referralLink}\nOu use o código de indicação: ${myRefCode} na hora de se registrar!`;
 
   const handleCopyMsg = () => {
     navigator.clipboard.writeText(promoMessage);
@@ -191,89 +191,89 @@ export default function UserAffiliate() {
   const approvedInvites = referrals.filter(r => r.status === 'approved');
   const approvedInvitedCount = approvedInvites.length;
   
-  // Progress when free month is selected (every 5 invites gets 1 month gratis)
-  const freeMonthProgress = totalInvitedCount % 5;
-  const totalFreeMonthsEarned = Math.floor(totalInvitedCount / 5);
+  // Progress when free month is selected (every 10 invites gets 1 month gratis)
+  const freeMonthProgress = totalInvitedCount % 10;
+  const totalFreeMonthsEarned = Math.floor(totalInvitedCount / 10);
 
   // Dynamic Tier Calculation for user
   const getTier = (count: number) => {
     if (count >= 50) {
       return {
-        level: 6,
-        name: 'Nível 6 (Maestro Elite)',
+        level: 5,
+        name: 'Nível 5 (Maestro Elite)',
         commission: 30,
         payoutType: 'Dinheiro Real (Payout IBAN Directo)',
         color: 'text-[#00f5a0]',
         bgColor: 'border-[#00f5a0]/40 bg-[#00f5a0]/5',
-        badge: '👑 N6',
+        badge: '👑 N5',
         gradient: 'from-[#00f5a0]/20 to-[#00f5a0]/5',
         nextTarget: null,
-        description: 'Parabéns! Payout bancário real de 30% em dinheiro líquido para a primeira assinatura paga por qualquer usuário indicado por si!'
+        description: 'Parabéns! Payout bancário real de 30% em dinheiro líquido para a primeira assinatura paga de convidados ativos!'
       };
     } else if (count >= 40) {
-      return {
-        level: 5,
-        name: 'Nível 5 (Platina)',
-        commission: 0,
-        payoutType: 'Mês Grátis (Bónus 4 Meses)',
-        color: 'text-purple-400',
-        bgColor: 'border-purple-500/20 bg-purple-500/5',
-        badge: '✦ N5',
-        gradient: 'from-purple-500/10 to-transparent',
-        nextTarget: { targetCount: 50, name: 'Nível 6 (Maestro Elite)', needed: 50 - count },
-        description: 'Excelente! Alcançou o Nível 5 e garantiu 4 Meses Gratuitos de assinatura ativa na plataforma!'
-      };
-    } else if (count >= 30) {
       return {
         level: 4,
         name: 'Nível 4 (Diamante)',
         commission: 0,
-        payoutType: 'Mês Grátis (Bónus 3 Meses)',
+        payoutType: 'Mês Grátis (Bónus 4 Meses)',
         color: 'text-cyan-400',
         bgColor: 'border-cyan-500/20 bg-cyan-500/5',
         badge: '♦ N4',
         gradient: 'from-cyan-500/10 to-transparent',
-        nextTarget: { targetCount: 40, name: 'Nível 5 (Platina)', needed: 40 - count },
-        description: 'Excelente! Alcançou o Nível 4 e garantiu 3 Meses Gratuitos de assinatura ativa na plataforma!'
+        nextTarget: { targetCount: 50, name: 'Nível 5 (Maestro Elite)', needed: 50 - count },
+        description: 'Excelente! Alcançou o Nível 4 e garantiu 4 Meses Gratuitos de assinatura na plataforma!'
+      };
+    } else if (count >= 30) {
+      return {
+        level: 3,
+        name: 'Nível 3 (Platina)',
+        commission: 0,
+        payoutType: 'Mês Grátis (Bónus 3 Meses)',
+        color: 'text-purple-400',
+        bgColor: 'border-purple-500/20 bg-purple-500/5',
+        badge: '✦ N3',
+        gradient: 'from-purple-500/10 to-transparent',
+        nextTarget: { targetCount: 40, name: 'Nível 4 (Diamante)', needed: 40 - count },
+        description: 'Excelente! Alcançou o Nível 3 e garantiu 3 Meses Gratuitos de assinatura na plataforma!'
       };
     } else if (count >= 20) {
       return {
-        level: 3,
-        name: 'Nível 3 (Ouro)',
+        level: 2,
+        name: 'Nível 2 (Ouro)',
         commission: 0,
         payoutType: 'Mês Grátis (Bónus 2 Meses)',
         color: 'text-yellow-400',
         bgColor: 'border-yellow-500/20 bg-yellow-500/5',
-        badge: '★ N3',
+        badge: '★ N2',
         gradient: 'from-yellow-500/10 to-transparent',
-        nextTarget: { targetCount: 30, name: 'Nível 4 (Diamante)', needed: 30 - count },
+        nextTarget: { targetCount: 30, name: 'Nível 3 (Platina)', needed: 30 - count },
         description: 'Óptimo trabalho! Garantiu de bónus 2 Meses Completamente Gratuitos de assinatura!'
       };
     } else if (count >= 10) {
       return {
-        level: 2,
-        name: 'Nível 2 (Prata)',
+        level: 1,
+        name: 'Nível 1 (Prata)',
         commission: 0,
         payoutType: 'Mês Grátis (Bónus 1 Mês)',
         color: 'text-slate-300',
         bgColor: 'border-slate-500/20 bg-slate-500/5',
-        badge: '✦ N2',
+        badge: '✦ N1',
         gradient: 'from-slate-500/10 to-transparent',
-        nextTarget: { targetCount: 20, name: 'Nível 3 (Ouro)', needed: 20 - count },
-        description: 'Parabéns! Alcançou o Nível 2 e garantiu 1 Mês Inteiro Gratuito de assinatura na plataforma!'
+        nextTarget: { targetCount: 20, name: 'Nível 2 (Ouro)', needed: 20 - count },
+        description: 'Parabéns! Alcançou o Nível 1 e garantiu 1 Mês Inteiro Gratuito de assinatura na plataforma!'
       };
     } else {
       return {
-        level: 1,
-        name: 'Nível 1 (Bronze)',
+        level: 0,
+        name: 'Bronze (Iniciante)',
         commission: 0,
         payoutType: 'Mês Grátis Progressivo',
         color: 'text-orange-400',
         bgColor: 'border-orange-500/20 bg-orange-500/5',
-        badge: '● N1',
+        badge: '● N0',
         gradient: 'from-orange-500/10 to-transparent',
-        nextTarget: { targetCount: 10, name: 'Nível 2 (Prata)', needed: 10 - count },
-        description: 'A cada 10 convites, ganha 1 mês grátis! Alcance 50 convites para ganhar 30% da receita da primeira mensalidade dos convidados.'
+        nextTarget: { targetCount: 10, name: 'Nível 1 (Prata)', needed: 10 - count },
+        description: 'A cada 10 convites, ganha 1 mês grátis! Alcance 50 convites para ganhar 30% da receita da primeira mensalidade dos convidados ativos.'
       };
     }
   };
@@ -490,12 +490,13 @@ export default function UserAffiliate() {
             </div>
 
             {/* Visual Level indicator cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 pt-2">
               {[
-                { lvl: 1, name: 'Bronze', count: '1-9', reward: 'Mês Progresso', bg: 'from-orange-600/20 to-transparent text-orange-400', minCount: 1 },
-                { lvl: 2, name: 'Prata', count: '10-24', reward: '1 Mês Grátis', bg: 'from-slate-400/20 to-transparent text-slate-300', minCount: 10 },
-                { lvl: 3, name: 'Ouro', count: '25-39', reward: '2 Meses Grátis', bg: 'from-yellow-500/20 to-transparent text-yellow-400', minCount: 25 },
-                { lvl: 4, name: 'Diamante', count: '40-49', reward: '3 Meses Grátis', bg: 'from-cyan-500/20 to-transparent text-cyan-400', minCount: 40 },
+                { lvl: 0, name: 'Bronze', count: '1-9', reward: 'Mês Progresso', bg: 'from-orange-600/20 to-transparent text-orange-400', minCount: 0 },
+                { lvl: 1, name: 'Prata', count: '10-19', reward: '1 Mês Grátis', bg: 'from-slate-400/20 to-transparent text-slate-300', minCount: 10 },
+                { lvl: 2, name: 'Ouro', count: '20-29', reward: '2 Meses Grátis', bg: 'from-yellow-500/20 to-transparent text-yellow-400', minCount: 20 },
+                { lvl: 3, name: 'Platina', count: '30-39', reward: '3 Meses Grátis', bg: 'from-purple-500/20 to-transparent text-purple-400', minCount: 30 },
+                { lvl: 4, name: 'Diamante', count: '40-49', reward: '4 Meses Grátis', bg: 'from-cyan-500/20 to-transparent text-cyan-400', minCount: 40 },
                 { lvl: 5, name: 'Maestro Elite', count: '50+', reward: '30% Dinheiro', bg: 'from-[#00f5a0]/20 to-transparent text-[#00f5a0]', minCount: 50, isMoney: true }
               ].map((tierItem) => {
                 const isCurrent = currentTier.level === tierItem.lvl;
@@ -552,7 +553,7 @@ export default function UserAffiliate() {
               <div>
                 <h5 className="font-bold text-xs text-white uppercase tracking-wider">Regra de Levantamento em Dinheiro Real</h5>
                 <p className="text-[11px] text-on-surface-variant leading-relaxed mt-0.5">
-                  Os afiliados do <strong className="text-[#00f5a0]">Nível 6 (50+ convites ativos)</strong> possuem payout direto. Suas recompensas de <strong className="text-white">30% sobre a primeira assinatura paga por cada usuário indicado</strong> serão pagas 100% em dinheiro líquido no seu IBAN cadastrado!
+                  Os afiliados do <strong className="text-[#00f5a0]">Nível 5 (50+ convites ativos)</strong> possuem payout direto. Suas recompensas de <strong className="text-white">30% da receita da primeira mensalidade dos convidados ativos</strong> serão pagas 100% em dinheiro líquido no seu IBAN cadastrado!
                 </p>
               </div>
             </div>

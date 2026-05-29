@@ -239,6 +239,16 @@ export default function Payments() {
                             <div className="bg-white p-3 rounded-xl border border-slate-200">
                               <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">IBAN para Transferência</p>
                               <p className="text-sm font-black text-slate-900 font-mono italic">{globalSettings?.iban}</p>
+                              {globalSettings?.ibanBank && (
+                                <p className="text-[10px] text-slate-500 font-medium mt-1">
+                                  Banco: <span className="font-bold text-slate-800">{globalSettings?.ibanBank}</span>
+                                </p>
+                              )}
+                              {globalSettings?.ibanName && (
+                                <p className="text-[10px] text-slate-500 font-medium">
+                                  Titular: <span className="font-bold text-slate-800">{globalSettings?.ibanName}</span>
+                                </p>
+                              )}
                             </div>
                           )}
                           {globalSettings?.showMulticaixa && (
@@ -251,6 +261,17 @@ export default function Payments() {
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Referência</p>
                                 <p className="text-lg font-black text-slate-900 font-mono">{globalSettings?.multicaixaReference}</p>
                               </div>
+                            </div>
+                          )}
+                          {globalSettings?.showKwik && (
+                            <div className="bg-white p-3 rounded-xl border border-slate-200">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Chave KWIK</p>
+                              <p className="text-sm font-black text-slate-900 font-mono italic">{globalSettings?.kwikKey}</p>
+                              {globalSettings?.kwikName && (
+                                <p className="text-[10px] text-slate-500 font-medium mt-1">
+                                  Titular: <span className="font-bold text-slate-800">{globalSettings?.kwikName}</span>
+                                </p>
+                              )}
                             </div>
                           )}
                           <p className="text-[9px] text-slate-400 italic text-center leading-tight">

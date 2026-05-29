@@ -197,6 +197,9 @@ function parseMatchTradesCSV(csvText: string, accountId: string) {
 
     // 0=ID 1=Symbol 2=OpenTime 3=Volume 4=Side 5=CloseTime
     // 6=OpenPrice 7=ClosePrice 8=SL 9=TP 10=Swap 11=Commission 12=Profit 13=Reason
+    const size = toFloat(cols[3]);
+    if (size <= 0) continue; // Desconsiderar trades com volume/lotes igual ou inferior a 0
+
     const profit     = toFloat(cols[12]);
     const commission = toFloat(cols[11]);
     const swap       = toFloat(cols[10]);
@@ -206,7 +209,7 @@ function parseMatchTradesCSV(csvText: string, accountId: string) {
       symbol:     cols[1].trim().toUpperCase(),
       openTime:   parseMatchTradesDate(cols[2]),
       closeTime:  parseMatchTradesDate(cols[5]),
-      size:       toFloat(cols[3]),
+      size,
       action:     cols[4].trim().toUpperCase() === 'BUY' ? 'Buy' : 'Sell',
       openPrice:  toFloat(cols[6]),
       closePrice: toFloat(cols[7]),
@@ -290,6 +293,9 @@ function parseMatchTradesHTML(htmlText: string, accountId: string) {
     // 0=ID 1=Symbol 2=OpenTime 3=Volume 4=Side 5=CloseTime
     // 6=OpenPrice 7=ClosePrice 8=SL 9=TP 10=Swap 11=Commission 12=Profit 13=Reason
     const getText    = (i: number) => cells[i]?.textContent?.trim() ?? '';
+    const size       = toFloat(getText(3));
+    if (size <= 0) continue; // Desconsiderar trades com volume/lotes igual ou inferior a 0
+
     const profit     = toFloat(getText(12));
     const commission = toFloat(getText(11));
     const swap       = toFloat(getText(10));
@@ -299,7 +305,7 @@ function parseMatchTradesHTML(htmlText: string, accountId: string) {
       symbol:     getText(1).toUpperCase(),
       openTime:   parseMatchTradesDate(getText(2)),
       closeTime:  parseMatchTradesDate(getText(5)),
-      size:       toFloat(getText(3)),
+      size,
       action:     getText(4).toUpperCase() === 'BUY' ? 'Buy' : 'Sell',
       openPrice:  toFloat(getText(6)),
       closePrice: toFloat(getText(7)),
@@ -405,6 +411,9 @@ async function parseMT5HTML(file: File, accountId: string) {
     // visível[4]=Volume    [5]=OpenPrice   [6]=SL        [7]=TP
     // visível[8]=CloseTime [9]=ClosePrice  [10]=Comm    [11]=Swap  [12]=Profit
 
+    const size = getFloat(4);
+    if (size <= 0) continue; // Desconsiderar trades com volume/lotes igual ou inferior a 0
+
     const profit     = getFloat(12);
     const commission = getFloat(10);
     const swap       = getFloat(11);
@@ -414,7 +423,7 @@ async function parseMT5HTML(file: File, accountId: string) {
       symbol:     getText(2).toUpperCase(),
       openTime:   parseMT5Date(getText(0)),
       closeTime:  parseMT5Date(getText(8)),
-      size:       getFloat(4),
+      size,
       action:     getText(3).toUpperCase() === 'BUY' ? 'Buy' : 'Sell',
       openPrice:  getFloat(5),
       closePrice: getFloat(9),

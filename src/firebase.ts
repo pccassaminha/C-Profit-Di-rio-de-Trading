@@ -96,6 +96,17 @@ export async function registerPartnerAuth(email: string, psw: string) {
   }
 }
 
+// Helper to register new maestro administrative credentials
+export async function registerNewMaestroAuth(email: string, psw: string) {
+  if (!email || !psw) return null;
+  const existingApps = getApps();
+  const adminApp = existingApps.find(app => app.name === 'SecondaryAdmin');
+  const secondApp = adminApp || initializeApp(firebaseConfig, 'SecondaryAdmin');
+  const secondAuth = getAuth(secondApp);
+  const result = await createUserWithEmailAndPassword(secondAuth, email, psw);
+  return result.user.uid;
+}
+
 async function testConnection() {
   try {
     // Try to perform a query/lookup directly from the server.
