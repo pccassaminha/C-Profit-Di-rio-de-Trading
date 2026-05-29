@@ -233,6 +233,47 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
             <p className="text-[14px] text-on-surface-variant leading-[1.7]">Acesse uma comunidade exclusiva dentro da plataforma. Troque análises, tire dúvidas e evolua junto com outros traders sérios.</p>
             <span className="inline-block mt-[20px] text-[11px] font-semibold tracking-[0.08em] uppercase text-secondary px-[10px] py-[4px] rounded-[4px] bg-secondary/10">Comunidade</span>
           </div>
+
+          <div className="md:col-span-3 bg-gradient-to-br from-[#00f5a0]/10 via-surface-container to-surface-container-high p-[48px_40px] relative transition-colors hover:bg-surface-container-high group border-t border-[#00f5a0]/20">
+            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#00f5a0] to-transparent opacity-50"></div>
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+              <div className="space-y-4 max-w-2xl">
+                <div className="w-[52px] h-[52px] rounded-[10px] bg-[#00f5a0]/10 border border-[#00f5a0]/20 flex items-center justify-center text-[#00f5a0]">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10z"/><path d="M2 12h20"/><circle cx="12" cy="12" r="4"/><path d="M12 8v8"/></svg>
+                </div>
+                <div>
+                  <span className="inline-block mb-2 text-[10px] font-black tracking-[0.15em] uppercase text-[#00f5a0] px-[12px] py-[4px] rounded-full bg-[#00f5a0]/10 border border-[#00f5a0]/20 animate-pulse">
+                    NOVO RECURSO INTEGRADO!
+                  </span>
+                  <div className="font-headline text-[22px] font-black tracking-[-0.02em] text-white">
+                    Panorama Económico Global & Calendário em Tempo Real
+                  </div>
+                </div>
+                <p className="text-[14px] text-on-surface-variant leading-[1.7]">
+                  Obtenha uma visão macro completa do mercado sem sair do seu terminal. Acompanhe o <strong className="text-white">Calendário Económico Geral de Eventos</strong> de alta importância com relevância por país, monitore <strong className="text-white">Mapas de Calor FX, Cripto e de Ações (NASDAQ 100 & Dow Jones)</strong> e consulte <strong className="text-white">Medidores Rápidos de Tendência Técnica (Termómetros)</strong> para obter dados quantitativos na ponta dos seus dedos.
+                </p>
+                <div className="flex flex-wrap gap-4 pt-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-on-surface-variant">
+                    <span className="text-[#00f5a0] text-sm">✓</span> Calendário Económico Geral
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-on-surface-variant">
+                    <span className="text-[#00f5a0] text-sm">✓</span> Termómetros FX & Cripto
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-on-surface-variant">
+                    <span className="text-[#00f5a0] text-sm">✓</span> Mapas de Calor Setorizados
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#00f5a0]">
+                    <span className="text-sm">✓</span> Grátis em TODOS os Planos!
+                  </div>
+                </div>
+              </div>
+              <div className="bg-[#00f5a0]/5 border border-[#00f5a0]/15 p-6 rounded-2xl flex flex-col items-center justify-center text-center max-w-xs shrink-0 self-stretch lg:self-auto">
+                <span className="text-3xl mb-2">🌍</span>
+                <span className="font-headline text-xs font-black uppercase text-[#00f5a0] tracking-widest mb-1">Acesso Irrestrito</span>
+                <p className="text-[11px] text-on-surface-variant/80 font-medium">Disponível de forma 100% gratuita para todas as nossas licenças e assinaturas de forma direta.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
