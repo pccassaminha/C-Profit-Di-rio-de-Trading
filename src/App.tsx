@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import TradeJournal from './components/TradeJournal';
 import Withdrawals from './components/Withdrawals';
 import Community from './components/Community';
+import Panorama from './components/Panorama';
 import Settings from './components/Settings';
 import Profile from './components/Profile';
 import Plans from './components/Plans';
@@ -123,7 +124,7 @@ export default function App() {
 
   const renderContent = () => {
     // Se o plano estiver expirado, forçar exibição da página de planos
-    const allowedExpiredTabs = ['plans', 'payments', 'profile', 'support', 'settings', 'admin'];
+    const allowedExpiredTabs = ['plans', 'payments', 'profile', 'support', 'settings', 'admin', 'panorama'];
     const isAdmin = user?.email === 'exportacoes.extras@gmail.com' || userPlan?.role === 'admin';
     
     if (isExpired && !isAdmin && !allowedExpiredTabs.includes(activeTab)) {
@@ -134,6 +135,7 @@ export default function App() {
       case 'dashboard': return <Dashboard />;
       case 'journal': return <TradeJournal currentView={journalView} onViewChange={setJournalView} />;
       case 'withdrawals': return <Withdrawals />;
+      case 'panorama': return <Panorama />;
       case 'community': return <Community />;
       case 'settings': return <Settings />;
       case 'profile': return <Profile />;
