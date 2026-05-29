@@ -347,6 +347,56 @@ export default function Dashboard() {
     });
     unsubscribes.push(unsubWithdrawals);
 
+    // Objectives with smart one-time migration and real-time syncing
+    const qDbObjectives = query(collection(db, 'objectives'), where('userId', '==', auth.currentUser.uid));
+    const unsubObjectives = onSnapshot(qDbObjectives, (snapshot) => {
+      const dbObjectives = snapshot.docs.map(doc => ({
+        id: doc.id,
+        type: doc.data().type,
+        targetId: doc.data().targetId,
+        profitTarget: doc.data().profitTarget,
+        maxLoss: doc.data().maxLoss,
+        dailyLoss: doc.data().dailyLoss,
+        maxLossPeriod: doc.data().maxLossPeriod || 'Mês'
+      }));
+      
+      const alreadySynced = localStorage.getItem('app_objectives_synced') === 'true';
+      
+      if (dbObjectives.length > 0) {
+        setObjectives(dbObjectives);
+        localStorage.setItem('app_objectives', JSON.stringify(dbObjectives));
+        localStorage.setItem('app_objectives_synced', 'true');
+      } else {
+        const savedObjectives = localStorage.getItem('app_objectives');
+        if (savedObjectives && !alreadySynced) {
+          const parsed = JSON.parse(savedObjectives);
+          if (parsed.length > 0) {
+            parsed.forEach(async (obj: any) => {
+              try {
+                await addDoc(collection(db, 'objectives'), {
+                  userId: auth.currentUser?.uid,
+                  type: obj.type,
+                  targetId: obj.targetId,
+                  profitTarget: obj.profitTarget,
+                  maxLoss: obj.maxLoss,
+                  dailyLoss: obj.dailyLoss,
+                  maxLossPeriod: obj.maxLossPeriod || 'Mês'
+                });
+              } catch (e) {
+                console.error("Migration error in Dashboard: ", e);
+              }
+            });
+            localStorage.setItem('app_objectives_synced', 'true');
+          } else {
+            setObjectives([]);
+          }
+        } else {
+          setObjectives([]);
+        }
+      }
+    });
+    unsubscribes.push(unsubObjectives);
+
     const accountsByPath: Record<string, any[]> = { old: [], new: [] };
     const updateAccounts = (data: any[], path: 'old' | 'new') => {
       accountsByPath[path] = data;

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Flame, Gauge, TrendingUp, Grid, Layers2 } from 'lucide-react';
+import { Calendar, Flame, Gauge, TrendingUp, Grid, Layers2, Activity } from 'lucide-react';
 
 interface WidgetProps {
-  widgetType: 'events' | 'forex-heat-map' | 'market-quotes' | 'technical-analysis';
+  widgetType: 'events' | 'forex-heat-map' | 'market-quotes' | 'technical-analysis' | 'stock-heatmap';
   config: any;
   height?: string;
 }
@@ -105,9 +105,39 @@ function TickerTapeWidget() {
   );
 }
 
+// Custom Premium Investing.com economic calendar widget styled perfectly to match the application's dark aesthetic
+function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
+  return (
+    <div className="w-full bg-surface-container-low border border-outline-variant/10 rounded-2xl p-2 relative overflow-hidden flex flex-col justify-between" style={{ height }}>
+      <iframe
+        src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_credit,_centralBanks,_confidenceIndex,_balance,_Bonds&features=datepicker,timezone,timeselector,filters&countries=17,86,25,6,37,26,5,22,39,14,48,10,35,43,38,4,36,12,72&calType=day&timeZone=60&lang=12"
+        width="100%"
+        height="100%"
+        frameBorder="0"
+        allowTransparency={true}
+        className="rounded-xl w-full h-full bg-white transition-opacity duration-300"
+        style={{ 
+          colorScheme: 'dark',
+          filter: 'invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(1.15)',
+        }}
+        title="Economic Calendar"
+      />
+      <div className="flex justify-between items-center px-1 pt-1.5 select-none shrink-0">
+        <span className="text-[10px] text-on-surface-variant/40 font-mono">Investing.com Engine V2</span>
+        <div className="text-[10px] text-on-surface-variant font-medium">
+          <span className="opacity-65">Calendário por </span>
+          <a href="https://br.investing.com/" rel="noopener nofollow" target="_blank" className="text-primary hover:underline font-bold transition-all">
+            Investing.com Brasil
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Panorama() {
   const [layoutMode, setLayoutMode] = useState<'grid' | 'tabs'>('grid');
-  const [activeTab, setActiveTab] = useState<'calendar' | 'heatmap' | 'technical' | 'quotes'>('calendar');
+  const [activeTab, setActiveTab] = useState<'calendar' | 'heatmap' | 'technical' | 'quotes' | 'stockHeatmap'>('calendar');
 
   // Widget config definitions
   const calendarConfig = {
@@ -127,6 +157,24 @@ export default function Panorama() {
     isTransparent: true,
     colorTheme: 'dark',
     locale: 'pt'
+  };
+
+  const stockHeatmapConfig = {
+    dataSource: "NASDAQ100",
+    blockSize: "market_cap_basic",
+    blockColor: "change",
+    grouping: "sector",
+    locale: "br",
+    symbolUrl: "",
+    colorTheme: "dark",
+    exchanges: [],
+    hasTopBar: false,
+    isDataSetEnabled: false,
+    isZoomEnabled: true,
+    hasSymbolTooltip: true,
+    isMonoSize: false,
+    width: "100%",
+    height: "100%"
   };
 
   // Upgraded custom-configured quotesConfig containing precisely requested symbols groups
@@ -254,11 +302,7 @@ export default function Panorama() {
               </div>
             </div>
             <div className="flex-1 min-h-[500px]">
-              <TradingViewWidget
-                widgetType="events"
-                config={calendarConfig}
-                height="500px"
-              />
+              <InvestingCalendarWidget height="500px" />
             </div>
           </div>
 
@@ -322,6 +366,26 @@ export default function Panorama() {
             </div>
           </div>
 
+          {/* Card 5: Mapa de Calor de Ações (NASDAQ100) */}
+          <div className="bg-surface-container border border-outline-variant/10 rounded-3xl p-6 flex flex-col space-y-4 xl:col-span-2">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center animate-pulse">
+                <Activity size={18} />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm tracking-tight text-on-surface">Mapa de Calor de Ações (NASDAQ 100)</h3>
+                <p className="text-[11px] text-on-surface-variant font-medium">Distribuição e desempenho setorial do ecossistema de ações globais em tempo real.</p>
+              </div>
+            </div>
+            <div className="flex-1 min-h-[550px]">
+              <TradingViewWidget
+                widgetType="stock-heatmap"
+                config={stockHeatmapConfig}
+                height="550px"
+              />
+            </div>
+          </div>
+
         </div>
       )}
 
@@ -375,6 +439,17 @@ export default function Panorama() {
               <TrendingUp size={14} />
               Cotações de Moedas
             </button>
+            <button
+              onClick={() => setActiveTab('stockHeatmap')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                activeTab === 'stockHeatmap'
+                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+              }`}
+            >
+              <Activity size={14} />
+              Mapa de Calor Ações
+            </button>
           </div>
 
           {" "}
@@ -387,11 +462,7 @@ export default function Panorama() {
                   <h3 className="font-bold text-lg text-on-surface">Calendário Macro-Econômico em Tela Cheia</h3>
                 </div>
                 <div className="flex-1 min-h-[550px]">
-                  <TradingViewWidget
-                    widgetType="events"
-                    config={calendarConfig}
-                    height="580px"
-                  />
+                  <InvestingCalendarWidget height="580px" />
                 </div>
               </div>
             )}
@@ -438,6 +509,22 @@ export default function Panorama() {
                   <TradingViewWidget
                     widgetType="market-quotes"
                     config={quotesConfig}
+                    height="580px"
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'stockHeatmap' && (
+              <div className="flex-1 flex flex-col space-y-4">
+                <div className="flex items-center gap-3">
+                  <Activity className="text-primary animate-pulse" size={20} />
+                  <h3 className="font-bold text-lg text-on-surface">Mapa Termográfico de Ações NASDAQ 100</h3>
+                </div>
+                <div className="flex-1 min-h-[550px]">
+                  <TradingViewWidget
+                    widgetType="stock-heatmap"
+                    config={stockHeatmapConfig}
                     height="580px"
                   />
                 </div>

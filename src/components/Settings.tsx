@@ -175,6 +175,56 @@ export default function Settings() {
     });
     unsubscribes.push(unsubNew);
 
+    // Objectives with smart one-time migration and real-time syncing
+    const qDbObjectives = query(collection(db, 'objectives'), where('userId', '==', auth.currentUser.uid));
+    const unsubObjectives = onSnapshot(qDbObjectives, (snapshot) => {
+      const dbObjectives = snapshot.docs.map(doc => ({
+        id: doc.id,
+        type: doc.data().type,
+        targetId: doc.data().targetId,
+        profitTarget: doc.data().profitTarget,
+        maxLoss: doc.data().maxLoss,
+        dailyLoss: doc.data().dailyLoss,
+        maxLossPeriod: doc.data().maxLossPeriod || 'Mês'
+      }));
+      
+      const alreadySynced = localStorage.getItem('app_objectives_synced') === 'true';
+      
+      if (dbObjectives.length > 0) {
+        setObjectives(dbObjectives);
+        localStorage.setItem('app_objectives', JSON.stringify(dbObjectives));
+        localStorage.setItem('app_objectives_synced', 'true');
+      } else {
+        const savedObjectives = localStorage.getItem('app_objectives');
+        if (savedObjectives && !alreadySynced) {
+          const parsed = JSON.parse(savedObjectives);
+          if (parsed.length > 0) {
+            parsed.forEach(async (obj: any) => {
+              try {
+                await addDoc(collection(db, 'objectives'), {
+                  userId: auth.currentUser?.uid,
+                  type: obj.type,
+                  targetId: obj.targetId,
+                  profitTarget: obj.profitTarget,
+                  maxLoss: obj.maxLoss,
+                  dailyLoss: obj.dailyLoss,
+                  maxLossPeriod: obj.maxLossPeriod || 'Mês'
+                });
+              } catch (e) {
+                console.error("Migration error in Settings: ", e);
+              }
+            });
+            localStorage.setItem('app_objectives_synced', 'true');
+          } else {
+            setObjectives([]);
+          }
+        } else {
+          setObjectives([]);
+        }
+      }
+    });
+    unsubscribes.push(unsubObjectives);
+
     const accountsByPath: Record<string, any[]> = { old: [], new: [] };
     const updateAccounts = (data: any[], path: 'old' | 'new') => {
       accountsByPath[path] = data;
@@ -200,6 +250,34 @@ export default function Settings() {
     localStorage.setItem('app_visible_markets', visibleMarkets);
     localStorage.setItem('app_objectives', JSON.stringify(objectives));
     localStorage.setItem('app_sessions', JSON.stringify(sessions));
+
+    // Save objectives to Firestore to guarantee zero-drift and cloud sync across custom domains
+    if (auth.currentUser && objectives.length > 0) {
+      try {
+        const qObj = query(collection(db, 'objectives'), where('userId', '==', auth.currentUser.uid));
+        const snapObj = await getDocs(qObj);
+        
+        // Delete current ones to avoid duplication
+        const deletePromises = snapObj.docs.map(d => deleteDoc(d.ref));
+        await Promise.all(deletePromises);
+        
+        // Save fresh copies with standard attributes
+        const addPromises = objectives.map(obj => 
+          addDoc(collection(db, 'objectives'), {
+            userId: auth.currentUser?.uid,
+            type: obj.type,
+            targetId: obj.targetId,
+            profitTarget: obj.profitTarget,
+            maxLoss: obj.maxLoss,
+            dailyLoss: obj.dailyLoss,
+            maxLossPeriod: obj.maxLossPeriod || 'Mês'
+          })
+        );
+        await Promise.all(addPromises);
+      } catch (err) {
+        console.error("Error saving objectives batch to Firestore during settings save:", err);
+      }
+    }
 
     // Save Billing Profile
     if (auth.currentUser) {
@@ -436,6 +514,13 @@ export default function Settings() {
           snapPlan.forEach(d => planPromises.push(deleteDoc(doc(db, 'planning', d.id))));
           await Promise.all(planPromises);
 
+          // 4.5. Delete all objectives from Firestore
+          const objectivesPromises: Promise<any>[] = [];
+          const qObj = query(collection(db, 'objectives'), where('userId', '==', uid));
+          const snapObj = await getDocs(qObj);
+          snapObj.forEach(d => objectivesPromises.push(deleteDoc(doc(db, 'objectives', d.id))));
+          await Promise.all(objectivesPromises);
+
           // 5. Delete all accounts (both paths)
           const accountsPromises: Promise<any>[] = [];
           
@@ -457,6 +542,7 @@ export default function Settings() {
           localStorage.removeItem('app_default_trade_type');
           localStorage.removeItem('app_force_show_ob_filter');
           localStorage.removeItem('app_objectives');
+          localStorage.removeItem('app_objectives_synced');
           localStorage.removeItem('app_sessions');
           localStorage.removeItem('app_currency');
 
@@ -848,38 +934,6 @@ export default function Settings() {
                           <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
                         </div>
                       </div>
-
-                      <div className="space-y-2">
-                        <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Novo Trade (Padrão)</label>
-                        <div className="relative">
-                          <select 
-                            value={defaultTradeType}
-                            onChange={(e) => setDefaultTradeType(e.target.value as 'ask' | 'forex' | 'ob')}
-                            className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none appearance-none cursor-pointer focus:border-primary transition-colors"
-                          >
-                            <option value="ask">Perguntar Sempre</option>
-                            <option value="forex">Forex / Índices</option>
-                            <option value="ob">Opções Binárias (OB)</option>
-                          </select>
-                          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2 flex flex-col justify-center">
-                        <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider mb-2">Visibilidade de Mercados</label>
-                        <div className="relative">
-                          <select 
-                            value={visibleMarkets}
-                            onChange={(e) => setVisibleMarkets(e.target.value as 'all' | 'forex' | 'ob')}
-                            className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none appearance-none cursor-pointer focus:border-primary transition-colors"
-                          >
-                            <option value="all">Mostrar Tudo (Forex + OB)</option>
-                            <option value="forex">Apenas Forex / Índices</option>
-                            <option value="ob">Apenas Opções Binárias</option>
-                          </select>
-                          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
-                        </div>
-                      </div>
                     </div>
                 </div>
               </motion.div>
@@ -944,6 +998,38 @@ export default function Settings() {
                             {showCommunityFilter ? 'Mostrar no feed' : 'Ocultar (fixar feed padrão)'}
                           </div>
                         </label>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Novo Trade (Padrão)</label>
+                        <div className="relative">
+                          <select 
+                            value={defaultTradeType}
+                            onChange={(e) => setDefaultTradeType(e.target.value as 'ask' | 'forex' | 'ob')}
+                            className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none appearance-none cursor-pointer focus:border-primary transition-colors"
+                          >
+                            <option value="ask">Perguntar Sempre</option>
+                            <option value="forex">Forex / Índices</option>
+                            <option value="ob">Opções Binárias (OB)</option>
+                          </select>
+                          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2 flex flex-col justify-center">
+                        <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider mb-2">Visibilidade de Mercados</label>
+                        <div className="relative">
+                          <select 
+                            value={visibleMarkets}
+                            onChange={(e) => setVisibleMarkets(e.target.value as 'all' | 'forex' | 'ob')}
+                            className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none appearance-none cursor-pointer focus:border-primary transition-colors"
+                          >
+                            <option value="all">Mostrar Tudo (Forex + OB)</option>
+                            <option value="forex">Apenas Forex / Índices</option>
+                            <option value="ob">Apenas Opções Binárias</option>
+                          </select>
+                          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+                        </div>
                       </div>
                     </div>
                 </div>
@@ -1016,10 +1102,17 @@ export default function Settings() {
                                   <span className="material-symbols-outlined text-sm">edit</span>
                                 </button>
                                 <button 
-                                  onClick={() => {
+                                  onClick={async () => {
                                     const newObjectives = objectives.filter(o => o.id !== obj.id);
                                     setObjectives(newObjectives);
                                     localStorage.setItem('app_objectives', JSON.stringify(newObjectives));
+                                    if (auth.currentUser) {
+                                      try {
+                                        await deleteDoc(doc(db, 'objectives', obj.id));
+                                      } catch (err) {
+                                        console.error("Error deleting objective from db:", err);
+                                      }
+                                    }
                                   }}
                                   className="text-on-surface-variant hover:text-error transition-colors"
                                 >
@@ -1641,13 +1734,47 @@ export default function Settings() {
               </div>
 
               <button 
-                onClick={() => {
+                onClick={async () => {
                   let newObjectives;
-                  if (editingObjective.id) {
+                  const isEditing = !!editingObjective.id;
+                  
+                  if (isEditing) {
+                    if (auth.currentUser) {
+                      try {
+                        await updateDoc(doc(db, 'objectives', editingObjective.id), {
+                          type: editingObjective.type,
+                          targetId: editingObjective.targetId,
+                          profitTarget: editingObjective.profitTarget,
+                          maxLoss: editingObjective.maxLoss,
+                          dailyLoss: editingObjective.dailyLoss,
+                          maxLossPeriod: editingObjective.maxLossPeriod || 'Mês'
+                        });
+                      } catch (err) {
+                        console.error("Error updating objective:", err);
+                      }
+                    }
                     newObjectives = objectives.map(o => o.id === editingObjective.id ? editingObjective : o);
                   } else {
-                    newObjectives = [...objectives, { ...editingObjective, id: Date.now().toString() }];
+                    let docId = Date.now().toString();
+                    if (auth.currentUser) {
+                      try {
+                        const newDocRef = await addDoc(collection(db, 'objectives'), {
+                          userId: auth.currentUser?.uid,
+                          type: editingObjective.type,
+                          targetId: editingObjective.targetId,
+                          profitTarget: editingObjective.profitTarget,
+                          maxLoss: editingObjective.maxLoss,
+                          dailyLoss: editingObjective.dailyLoss,
+                          maxLossPeriod: editingObjective.maxLossPeriod || 'Mês'
+                        });
+                        docId = newDocRef.id;
+                      } catch (err) {
+                        console.error("Error creating objective:", err);
+                      }
+                    }
+                    newObjectives = [...objectives, { ...editingObjective, id: docId }];
                   }
+                  
                   setObjectives(newObjectives);
                   localStorage.setItem('app_objectives', JSON.stringify(newObjectives));
                   setIsObjectiveModalOpen(false);

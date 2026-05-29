@@ -279,7 +279,7 @@ export default function Planner() {
                                       {entry.isDailyNote && ' • NOTA DIÁRIA'}
                                     </span>
                                   </div>
-                                  <h2 className="text-xl md:text-2xl font-black text-on-surface font-headline leading-tight flex items-center gap-3">
+                                  <h2 className="text-xl md:text-2xl font-black text-on-surface font-body leading-tight flex items-center gap-3">
                                     {entry.title}
                                     {isExpanded ? (
                                       <ChevronUp size={20} className="text-primary animate-bounce-slow" />
