@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Flame, Gauge, TrendingUp, Grid, Layers2, Activity } from 'lucide-react';
 
 interface WidgetProps {
-  widgetType: 'events' | 'forex-heat-map' | 'market-quotes' | 'technical-analysis' | 'stock-heatmap';
+  widgetType: 'events' | 'forex-heat-map' | 'market-quotes' | 'technical-analysis' | 'stock-heatmap' | 'crypto-coins-heatmap';
   config: any;
   height?: string;
 }
@@ -141,13 +141,28 @@ export default function Panorama() {
   const [layoutMode, setLayoutMode] = useState<'grid' | 'tabs'>('grid');
   const [activeTab, setActiveTab] = useState<'calendar' | 'heatmap' | 'technical' | 'quotes' | 'stockHeatmap'>('calendar');
 
+  // Technical Analysis selector state
+  const [technicalSymbol, setTechnicalSymbol] = useState<'FX:EURUSD' | 'PEPPERSTONE:NAS100' | 'OANDA:XAUUSD' | 'BINANCE:BTCUSD'>('FX:EURUSD');
+  
+  // Heatmap selector states
+  const [heatmapType, setHeatmapType] = useState<'forex' | 'crypto'>('forex');
+  const [stockHeatmapType, setStockHeatmapType] = useState<'nasdaq' | 'djca'>('nasdaq');
+
+  // Technical symbols constant
+  const technicalSymbols = [
+    { id: 'FX:EURUSD', label: 'EUR/USD (Euro)' },
+    { id: 'PEPPERSTONE:NAS100', label: 'NASDAQ 100' },
+    { id: 'OANDA:XAUUSD', label: 'Ouro (XAU/USD)' },
+    { id: 'BINANCE:BTCUSD', label: 'Bitcoin (BTC/USD)' },
+  ] as const;
+
   // Widget config definitions
   const calendarConfig = {
     colorTheme: 'dark',
     isTransparent: true,
     width: '100%',
     height: '100%',
-    locale: 'pt',
+    locale: 'br',
     importanceFilter: '-1,0,1',
     countryFilter: 'us,eu,gb,jp,ch,ca,au,nz,br,ao'
   };
@@ -158,7 +173,23 @@ export default function Panorama() {
     currencies: ['EUR', 'USD', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD'],
     isTransparent: true,
     colorTheme: 'dark',
-    locale: 'pt'
+    locale: 'br'
+  };
+
+  const cryptoHeatmapConfig = {
+    dataSource: "Crypto",
+    blockSize: "market_cap_calc",
+    blockColor: "24h_close_change|5",
+    locale: "br",
+    symbolUrl: "",
+    colorTheme: "dark",
+    hasTopBar: false,
+    isDataSetEnabled: false,
+    isZoomEnabled: true,
+    hasSymbolTooltip: true,
+    isMonoSize: false,
+    width: "100%",
+    height: "100%"
   };
 
   const stockHeatmapConfig = {
@@ -179,6 +210,24 @@ export default function Panorama() {
     height: "100%"
   };
 
+  const djcaHeatmapConfig = {
+    dataSource: "DJCA",
+    blockSize: "market_cap_basic",
+    blockColor: "change",
+    grouping: "sector",
+    locale: "br",
+    symbolUrl: "",
+    colorTheme: "dark",
+    exchanges: [],
+    hasTopBar: true,
+    isDataSetEnabled: true,
+    isZoomEnabled: true,
+    hasSymbolTooltip: true,
+    isMonoSize: false,
+    width: "100%",
+    height: "100%"
+  };
+
   // Upgraded custom-configured quotesConfig containing precisely requested symbols groups
   const quotesConfig = {
     width: '100%',
@@ -186,7 +235,7 @@ export default function Panorama() {
     colorTheme: 'dark',
     isTransparent: true,
     showSymbolLogo: true,
-    locale: 'pt',
+    locale: 'br',
     largeChartUrl: '',
     symbolsGroups: [
       {
@@ -232,17 +281,17 @@ export default function Panorama() {
     ]
   };
 
-  const technicalConfig = {
-    interval: '1h',
+  const getTechnicalConfig = (symbol: string) => ({
+    interval: '1m',
     width: '100%',
     isTransparent: true,
     height: '100%',
-    symbol: 'FX:EURUSD',
+    symbol: symbol,
     showIntervalTabs: true,
     displayMode: 'single',
-    locale: 'pt',
+    locale: 'br',
     colorTheme: 'dark'
-  };
+  });
 
   return (
     <div id="panorama-container" className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8 animate-in fade-in duration-500">
@@ -307,24 +356,57 @@ export default function Panorama() {
               <InvestingCalendarWidget height="500px" />
             </div>
           </div>
-
-          {/* Card 2: Mapa de Calor */}
+               {/* Card 2: Mapa de Calor */}
           <div className="bg-surface-container border border-outline-variant/10 rounded-3xl p-6 flex flex-col space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-orange-500/15 text-orange-400 flex items-center justify-center">
-                <Flame size={18} />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/15 text-orange-400 flex items-center justify-center">
+                  <Flame size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-tight text-on-surface">Mapa de Calor</h3>
+                  <p className="text-[11px] text-on-surface-variant font-medium">Volatilidade relativa em tempo real.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-sm tracking-tight text-on-surface">Mapa de Calor FX</h3>
-                <p className="text-[11px] text-on-surface-variant font-medium">Volatilidade relativa entre as moedas maiores.</p>
+              
+              {/* Heatmap Type Toggle */}
+              <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0">
+                <button
+                  onClick={() => setHeatmapType('forex')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
+                    heatmapType === 'forex'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Forex
+                </button>
+                <button
+                  onClick={() => setHeatmapType('crypto')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
+                    heatmapType === 'crypto'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Cripto
+                </button>
               </div>
             </div>
             <div className="flex-1 min-h-[500px]">
-              <TradingViewWidget
-                widgetType="forex-heat-map"
-                config={heatmapConfig}
-                height="500px"
-              />
+              {heatmapType === 'forex' ? (
+                <TradingViewWidget
+                  widgetType="forex-heat-map"
+                  config={heatmapConfig}
+                  height="500px"
+                />
+              ) : (
+                <TradingViewWidget
+                  widgetType="crypto-coins-heatmap"
+                  config={cryptoHeatmapConfig}
+                  height="500px"
+                />
+              )}
             </div>
           </div>
 
@@ -350,39 +432,84 @@ export default function Panorama() {
 
           {/* Card 4: Analise Tecnica */}
           <div className="bg-surface-container border border-outline-variant/10 rounded-3xl p-6 flex flex-col space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center">
-                <Gauge size={18} />
+            <div className="flex flex-col space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center">
+                  <Gauge size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-tight text-on-surface">Análise Técnica</h3>
+                  <p className="text-[11px] text-on-surface-variant font-medium">Indicador de força e termômetro de tendências.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-sm tracking-tight text-on-surface">Análise Técnica</h3>
-                <p className="text-[11px] text-on-surface-variant font-medium">Indicador de força e termómetro de tendências.</p>
+
+              {/* Symbol selector */}
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 w-full">
+                {technicalSymbols.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setTechnicalSymbol(s.id)}
+                    className={`flex-1 min-w-[70px] px-2 py-1.5 rounded-lg font-bold uppercase text-[9px] tracking-wider transition-all cursor-pointer text-center ${
+                      technicalSymbol === s.id
+                        ? 'bg-primary/20 text-primary border border-primary/20'
+                        : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="flex-1 min-h-[480px]">
               <TradingViewWidget
                 widgetType="technical-analysis"
-                config={technicalConfig}
+                config={getTechnicalConfig(technicalSymbol)}
                 height="480px"
               />
             </div>
           </div>
 
-          {/* Card 5: Mapa de Calor de Ações (NASDAQ100) */}
+          {/* Card 5: Mapa de Calor de Ações e Índices */}
           <div className="bg-surface-container border border-outline-variant/10 rounded-3xl p-6 flex flex-col space-y-4 xl:col-span-2">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center animate-pulse">
-                <Activity size={18} />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center animate-pulse">
+                  <Activity size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-tight text-on-surface">Mapa de Calor Corporativo</h3>
+                  <p className="text-[11px] text-on-surface-variant font-medium">Mapeamento dinâmico do ecossistema de ações e setores do mercado.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-sm tracking-tight text-on-surface">Mapa de Calor de Ações (NASDAQ 100)</h3>
-                <p className="text-[11px] text-on-surface-variant font-medium">Distribuição e desempenho setorial do ecossistema de ações globais em tempo real.</p>
+
+              {/* Stock Heatmap Type Toggle */}
+              <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
+                <button
+                  onClick={() => setStockHeatmapType('nasdaq')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
+                    stockHeatmapType === 'nasdaq'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  NASDAQ 100
+                </button>
+                <button
+                  onClick={() => setStockHeatmapType('djca')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
+                    stockHeatmapType === 'djca'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Dow Jones (DJCA)
+                </button>
               </div>
             </div>
             <div className="flex-1 min-h-[550px]">
               <TradingViewWidget
                 widgetType="stock-heatmap"
-                config={stockHeatmapConfig}
+                config={stockHeatmapType === 'nasdaq' ? stockHeatmapConfig : djcaHeatmapConfig}
                 height="550px"
               />
             </div>
@@ -471,30 +598,83 @@ export default function Panorama() {
 
             {activeTab === 'heatmap' && (
               <div className="flex-1 flex flex-col space-y-4">
-                <div className="flex items-center gap-3">
-                  <Flame className="text-orange-400" size={20} />
-                  <h3 className="font-bold text-lg text-on-surface">Mapa Termográfico Forex (Intercalares)</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Flame className="text-orange-400" size={20} />
+                    <h3 className="font-bold text-lg text-on-surface">Mapa Termográfico</h3>
+                  </div>
+                  
+                  {/* Heatmap Type Toggle */}
+                  <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
+                    <button
+                      onClick={() => setHeatmapType('forex')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        heatmapType === 'forex'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Forex / Moedas
+                    </button>
+                    <button
+                      onClick={() => setHeatmapType('crypto')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        heatmapType === 'crypto'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Criptomoedas
+                    </button>
+                  </div>
                 </div>
                 <div className="flex-1 min-h-[550px]">
-                  <TradingViewWidget
-                    widgetType="forex-heat-map"
-                    config={heatmapConfig}
-                    height="580px"
-                  />
+                  {heatmapType === 'forex' ? (
+                    <TradingViewWidget
+                      widgetType="forex-heat-map"
+                      config={heatmapConfig}
+                      height="580px"
+                    />
+                  ) : (
+                    <TradingViewWidget
+                      widgetType="crypto-coins-heatmap"
+                      config={cryptoHeatmapConfig}
+                      height="580px"
+                    />
+                  )}
                 </div>
               </div>
             )}
 
             {activeTab === 'technical' && (
               <div className="flex-1 flex flex-col space-y-4">
-                <div className="flex items-center gap-3">
-                  <Gauge className="text-purple-400" size={20} />
-                  <h3 className="font-bold text-lg text-on-surface">Medidores Rápidos de Tendência Técnica</h3>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <Gauge className="text-purple-400" size={20} />
+                    <h3 className="font-bold text-lg text-on-surface">Medidores Rápidos de Tendência Técnica</h3>
+                  </div>
+
+                  {/* Symbol Selector */}
+                  <div className="flex flex-wrap bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start lg:self-auto">
+                    {technicalSymbols.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setTechnicalSymbol(s.id)}
+                        className={`px-3 py-1.5 rounded-lg font-bold uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                          technicalSymbol === s.id
+                            ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                            : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex-1 min-h-[550px]">
                   <TradingViewWidget
                     widgetType="technical-analysis"
-                    config={technicalConfig}
+                    config={getTechnicalConfig(technicalSymbol)}
                     height="580px"
                   />
                 </div>
@@ -519,14 +699,40 @@ export default function Panorama() {
 
             {activeTab === 'stockHeatmap' && (
               <div className="flex-1 flex flex-col space-y-4">
-                <div className="flex items-center gap-3">
-                  <Activity className="text-primary animate-pulse" size={20} />
-                  <h3 className="font-bold text-lg text-on-surface">Mapa Termográfico de Ações NASDAQ 100</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Activity className="text-primary animate-pulse" size={20} />
+                    <h3 className="font-bold text-lg text-on-surface">Mapa Termográfico Corporativo em Tela Cheia</h3>
+                  </div>
+
+                  {/* Stock Heatmap Type Toggle */}
+                  <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
+                    <button
+                      onClick={() => setStockHeatmapType('nasdaq')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        stockHeatmapType === 'nasdaq'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      NASDAQ 100
+                    </button>
+                    <button
+                      onClick={() => setStockHeatmapType('djca')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        stockHeatmapType === 'djca'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Dow Jones (DJCA)
+                    </button>
+                  </div>
                 </div>
                 <div className="flex-1 min-h-[550px]">
                   <TradingViewWidget
                     widgetType="stock-heatmap"
-                    config={stockHeatmapConfig}
+                    config={stockHeatmapType === 'nasdaq' ? stockHeatmapConfig : djcaHeatmapConfig}
                     height="580px"
                   />
                 </div>
