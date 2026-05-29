@@ -108,21 +108,23 @@ function TickerTapeWidget() {
 // Custom Premium Investing.com economic calendar widget styled perfectly to match the application's dark aesthetic
 function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
   return (
-    <div className="w-full bg-surface-container-low border border-outline-variant/10 rounded-2xl p-2 relative overflow-hidden flex flex-col justify-between" style={{ height }}>
-      <iframe
-        src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_credit,_centralBanks,_confidenceIndex,_balance,_Bonds&features=datepicker,timezone,timeselector,filters&countries=17,86,25,6,37,26,5,22,39,14,48,10,35,43,38,4,36,12,72&calType=day&timeZone=60&lang=12"
-        width="100%"
-        height="100%"
-        frameBorder="0"
-        allowTransparency={true}
-        className="rounded-xl w-full h-full bg-white transition-opacity duration-300"
-        style={{ 
-          colorScheme: 'dark',
-          filter: 'invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(1.15)',
-        }}
-        title="Economic Calendar"
-      />
-      <div className="flex justify-between items-center px-1 pt-1.5 select-none shrink-0">
+    <div className="w-full bg-[#141414] border border-outline-variant/10 rounded-2xl p-2 relative overflow-hidden flex flex-col justify-between" style={{ height }}>
+      <div className="flex-1 w-full flex items-center justify-center bg-[#141414] overflow-hidden rounded-xl">
+        <iframe
+          src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_credit,_centralBanks,_confidenceIndex,_balance,_Bonds&features=datepicker,timezone,timeselector,filters&countries=17,86,25,6,37,26,5,22,39,14,48,10,35,43,38,4,36,12,72&calType=day&timeZone=60&lang=12"
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          allowtransparency="true"
+          className="w-full h-full bg-white transition-opacity duration-300 max-w-[850px] mx-auto rounded-lg"
+          style={{ 
+            colorScheme: 'dark',
+            filter: 'invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(1.15)',
+          }}
+          title="Economic Calendar"
+        />
+      </div>
+      <div className="flex justify-between items-center px-1 pt-1.5 select-none shrink-0 bg-[#141414]">
         <span className="text-[10px] text-on-surface-variant/40 font-mono">Investing.com Engine V2</span>
         <div className="text-[10px] text-on-surface-variant font-medium">
           <span className="opacity-65">Calendário por </span>
