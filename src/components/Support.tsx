@@ -1,11 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTrades } from '../hooks/useTrades';
-import { MessageSquare, Phone, Mail, Clock, ShieldCheck } from 'lucide-react';
+import { MessageSquare, Phone, Mail, Clock, ShieldCheck, User, HelpCircle, Send } from 'lucide-react';
 
 export default function Support() {
   const { globalSettings } = useTrades();
   const phone = globalSettings?.whatsappNumber || '244921319200';
   const whatsappUrl = `https://wa.me/${phone}`;
+
+  const [name, setName] = useState('');
+  const [question, setQuestion] = useState('');
+
+  const handleSendSupportMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !question.trim()) return;
+
+    const messageText = `Olá Suporte CProfit,\n\nNome: ${name.trim()}\nPergunta: ${question.trim()}`;
+    const formattedUrl = `https://wa.me/${phone}?text=${encodeURIComponent(messageText)}`;
+    
+    // Redirect / open in new tab
+    const anchor = document.createElement('a');
+    anchor.href = formattedUrl;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.click();
+  };
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto w-full space-y-8 animate-in fade-in duration-500">
@@ -18,7 +36,7 @@ export default function Support() {
         <a 
           href={whatsappUrl}
           target="_blank"
-          rel="no-referrer"
+          rel="noopener noreferrer"
           className="bg-[#25D366] text-[#022c16] px-8 py-4 rounded-2xl font-black hover:scale-105 transition-all shadow-xl shadow-[#25D366]/20 flex items-center gap-3 uppercase tracking-widest text-sm"
         >
           <MessageSquare size={20} />
@@ -57,29 +75,52 @@ export default function Support() {
         </div>
       </div>
 
-      <div className="bg-surface-container border border-outline-variant/10 rounded-3xl p-10 text-center space-y-6">
-        <h3 className="text-2xl font-black text-on-surface uppercase tracking-tighter">Dúvidas Frequentes</h3>
-        <div className="max-w-2xl mx-auto space-y-4 text-left">
-          <details className="group bg-surface-container-low border border-outline-variant/10 rounded-2xl overflow-hidden cursor-pointer transition-all hover:bg-surface-container-high">
-            <summary className="p-6 font-bold text-on-surface flex justify-between items-center list-none">
-              Como sincronizo minha conta MT5?
-              <span className="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
-            </summary>
-            <div className="p-6 pt-0 text-on-surface-variant border-t border-outline-variant/5 text-sm leading-relaxed">
-              Vá em Configurações &gt; Conectar Plataformas. Copie seu Token de Sincronização e insira no nosso expert advisor (EA) no seu terminal MT5. O status mudará para "Sincronizado" automaticamente.
-            </div>
-          </details>
-
-          <details className="group bg-surface-container-low border border-outline-variant/10 rounded-2xl overflow-hidden cursor-pointer transition-all hover:bg-surface-container-high">
-            <summary className="p-6 font-bold text-on-surface flex justify-between items-center list-none">
-              Quanto tempo leva para ativar o plano?
-              <span className="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
-            </summary>
-            <div className="p-6 pt-0 text-on-surface-variant border-t border-outline-variant/5 text-sm leading-relaxed">
-              Após anexar o comprovativo na página de planos, nossa equipe valida em até 2 horas durante o horário comercial. Você receberá um aviso no Dashboard assim que estiver ativo.
-            </div>
-          </details>
+      {/* Faça uma Pergunta Form */}
+      <div className="bg-surface-container border border-outline-variant/10 rounded-3xl p-6 md:p-10 space-y-6">
+        <div className="text-center space-y-2">
+          <h3 className="text-2xl font-black text-on-surface uppercase tracking-tighter">Faça uma Pergunta</h3>
+          <p className="text-sm text-on-surface-variant max-w-md mx-auto">Insira seu nome e sua pergunta abaixo. Você será redirecionado para o WhatsApp oficial de suporte da CProfit.</p>
         </div>
+
+        <form onSubmit={handleSendSupportMessage} className="max-w-2xl mx-auto space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider pl-1 flex items-center gap-1.5">
+              <User size={13} className="text-primary" />
+              Seu Nome
+            </label>
+            <input 
+              type="text" 
+              required
+              value={name} 
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Ana Silva" 
+              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider pl-1 flex items-center gap-1.5">
+              <HelpCircle size={13} className="text-primary" />
+              Sua Pergunta
+            </label>
+            <textarea 
+              required
+              rows={4}
+              value={question} 
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Escreva aqui a sua dúvida ou questão..." 
+              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all resize-none"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-[#25D366] text-[#022c16] font-black py-4 rounded-2xl hover:scale-[1.01] transition-all shadow-lg shadow-[#25D366]/10 flex items-center justify-center gap-2 uppercase tracking-wider text-sm mt-6 cursor-pointer"
+          >
+            <Send size={16} />
+            Enviar Mensagem via WhatsApp
+          </button>
+        </form>
       </div>
     </div>
   );

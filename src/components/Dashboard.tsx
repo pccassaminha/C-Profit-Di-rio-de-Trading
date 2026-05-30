@@ -323,6 +323,7 @@ export default function Dashboard() {
     if (!auth.currentUser) return;
 
     const unsubscribes: (() => void)[] = [];
+    let isMigratingObjectives = false;
 
     // Path 1: root accounts (old)
     const qOld = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
@@ -368,12 +369,17 @@ export default function Dashboard() {
         localStorage.setItem('app_objectives_synced', 'true');
       } else {
         const savedObjectives = localStorage.getItem('app_objectives');
-        if (savedObjectives && !alreadySynced) {
+        if (savedObjectives) {
           const parsed = JSON.parse(savedObjectives);
           if (parsed.length > 0) {
-            parsed.forEach(async (obj: any) => {
-              try {
-                await addDoc(collection(db, 'objectives'), {
+            // Keep local objectives in state so they do not disappear
+            setObjectives(parsed);
+            
+            // If the server lacks documents but we have local objectives, self-heal by syncing up to Firestore
+            if (!isMigratingObjectives) {
+              isMigratingObjectives = true;
+              const promises = parsed.map((obj: any) => {
+                return addDoc(collection(db, 'objectives'), {
                   userId: auth.currentUser?.uid,
                   type: obj.type,
                   targetId: obj.targetId,
@@ -382,11 +388,15 @@ export default function Dashboard() {
                   dailyLoss: obj.dailyLoss,
                   maxLossPeriod: obj.maxLossPeriod || 'Mês'
                 });
-              } catch (e) {
-                console.error("Migration error in Dashboard: ", e);
-              }
-            });
-            localStorage.setItem('app_objectives_synced', 'true');
+              });
+              Promise.all(promises).then(() => {
+                localStorage.setItem('app_objectives_synced', 'true');
+                isMigratingObjectives = false;
+              }).catch(err => {
+                console.error("Migration/Self-heal error in Dashboard:", err);
+                isMigratingObjectives = false;
+              });
+            }
           } else {
             setObjectives([]);
           }
@@ -584,7 +594,8 @@ export default function Dashboard() {
       relevantMarketTypes.forEach(mType => {
         const marketObj = objectives.find(obj => obj.type === 'market' && obj.targetId === mType);
         
-        if (marketObj) {
+        // Only use the Market-level objective if it has actual defined progress metric targets (not blank/empty)
+        if (marketObj && (Number(marketObj.profitTarget) > 0 || Number(marketObj.maxLoss) > 0 || Number(marketObj.dailyLoss) > 0)) {
           // Use Market-level objective for this type
           if (marketObj.profitTarget) totalProfitTarget += Number(marketObj.profitTarget) || 0;
           if (marketObj.maxLoss) totalMaxLoss += Number(marketObj.maxLoss) || 0;
@@ -1274,117 +1285,129 @@ export default function Dashboard() {
 
       {/* Monthly Comparison */}
       <div className="space-y-8 md:space-y-12">
-        {(data.hasProfitTarget || data.hasMaxLoss || data.hasDailyLoss) && (
-          <>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 md:mb-6">
-              <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Visão geral dos objetivos</h3>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 md:mb-6">
+          <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Visão geral dos objetivos</h3>
+        </div>
+
+        {(data.hasProfitTarget || data.hasMaxLoss || data.hasDailyLoss) ? (
+          <div className="flex flex-col gap-6 md:gap-8">
+            {/* Lucro (Full Width) */}
+            <div className="bg-surface-container-low border border-secondary/30 rounded-2xl p-6 md:p-8">
+              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Lucro</h4>
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
+                <div>
+                  <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Atual</p>
+                  <p className={`${data.totalPnl >= 0 ? 'text-secondary' : 'text-error'} font-bold text-base md:text-xl`}>
+                    {data.totalPnl >= 0 ? '+' : ''}{formatCurrency(data.totalPnl)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Lucro</p>
+                  <p className="text-on-surface font-bold text-base md:text-xl">{data.hasProfitTarget ? formatCurrency(data.totalProfitTarget) : 'Não definida'}</p>
+                </div>
+                <div>
+                  <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Remanescente</p>
+                  <p className="text-on-surface font-bold text-base md:text-xl">
+                    {data.hasProfitTarget ? formatCurrency(Math.max(0, data.totalProfitTarget - data.totalPnl)) : '-'}
+                  </p>
+                </div>
+              </div>
+              {data.hasProfitTarget && (
+                <>
+                  <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
+                    <div className="absolute left-0 top-0 h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, (data.totalPnl / data.totalProfitTarget) * 100))}%` }}></div>
+                  </div>
+                  <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
+                    <span>$0.00</span>
+                    <span>{formatCurrency(data.totalProfitTarget)}</span>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="flex flex-col gap-6 md:gap-8">
-              {/* Lucro (Full Width) */}
-              <div className="bg-surface-container-low border border-secondary/30 rounded-2xl p-6 md:p-8">
-                <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Lucro</h4>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+              {/* Perda Máxima */}
+              <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
+                <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Máxima</h4>
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
                   <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Atual</p>
-                    <p className={`${data.totalPnl >= 0 ? 'text-secondary' : 'text-error'} font-bold text-base md:text-xl`}>
-                      {data.totalPnl >= 0 ? '+' : ''}{formatCurrency(data.totalPnl)}
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
+                    <p className="text-error font-bold text-base md:text-xl">
+                      {formatCurrency(data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Lucro</p>
-                    <p className="text-on-surface font-bold text-base md:text-xl">{data.hasProfitTarget ? formatCurrency(data.totalProfitTarget) : 'Não definida'}</p>
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Limite Máximo De Perda</p>
+                    <p className="text-on-surface font-bold text-base md:text-xl">{data.hasMaxLoss ? formatCurrency(data.totalMaxLoss) : 'Não definida'}</p>
                   </div>
                   <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Remanescente</p>
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Máxima Restante</p>
                     <p className="text-on-surface font-bold text-base md:text-xl">
-                      {data.hasProfitTarget ? formatCurrency(Math.max(0, data.totalProfitTarget - data.totalPnl)) : '-'}
+                      {data.hasMaxLoss ? formatCurrency(Math.max(0, data.totalMaxLoss - (data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0))) : '-'}
                     </p>
                   </div>
                 </div>
-                {data.hasProfitTarget && (
+                {data.hasMaxLoss && (
                   <>
                     <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
-                      <div className="absolute left-0 top-0 h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, (data.totalPnl / data.totalProfitTarget) * 100))}%` }}></div>
+                      <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0) / data.totalMaxLoss) * 100)}%` }}></div>
                     </div>
                     <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
                       <span>$0.00</span>
-                      <span>{formatCurrency(data.totalProfitTarget)}</span>
+                      <span>{formatCurrency(data.totalMaxLoss)}</span>
                     </div>
                   </>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-                {/* Perda Máxima */}
-                <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
-                  <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Máxima</h4>
-                  <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
-                    <div>
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
-                      <p className="text-error font-bold text-base md:text-xl">
-                        {formatCurrency(data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Limite Máximo De Perda</p>
-                      <p className="text-on-surface font-bold text-base md:text-xl">{data.hasMaxLoss ? formatCurrency(data.totalMaxLoss) : 'Não definida'}</p>
-                    </div>
-                    <div>
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Máxima Restante</p>
-                      <p className="text-on-surface font-bold text-base md:text-xl">
-                        {data.hasMaxLoss ? formatCurrency(Math.max(0, data.totalMaxLoss - (data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0))) : '-'}
-                      </p>
-                    </div>
+              {/* Perda Diária */}
+              <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
+                <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Diária</h4>
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
+                  <div>
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
+                    <p className="text-error font-bold text-base md:text-xl">
+                      {formatCurrency(data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0)}
+                    </p>
                   </div>
-                  {data.hasMaxLoss && (
-                    <>
-                      <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
-                        <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0) / data.totalMaxLoss) * 100)}%` }}></div>
-                      </div>
-                      <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
-                        <span>$0.00</span>
-                        <span>{formatCurrency(data.totalMaxLoss)}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Perda Diária */}
-                <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
-                  <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Diária</h4>
-                  <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
-                    <div>
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
-                      <p className="text-error font-bold text-base md:text-xl">
-                        {formatCurrency(data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Perda Diária</p>
-                      <p className="text-on-surface font-bold text-base md:text-xl">{data.hasDailyLoss ? formatCurrency(data.totalDailyLoss) : 'Não definida'}</p>
-                    </div>
-                    <div>
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Diária Restante</p>
-                      <p className="text-on-surface font-bold text-base md:text-xl">
-                        {data.hasDailyLoss ? formatCurrency(Math.max(0, data.totalDailyLoss - (data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0))) : '-'}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Perda Diária</p>
+                    <p className="text-on-surface font-bold text-base md:text-xl">{data.hasDailyLoss ? formatCurrency(data.totalDailyLoss) : 'Não definida'}</p>
                   </div>
-                  {data.hasDailyLoss && (
-                    <>
-                      <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
-                        <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0) / data.totalDailyLoss) * 100)}%` }}></div>
-                      </div>
-                      <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
-                        <span>$0.00</span>
-                        <span>{formatCurrency(data.totalDailyLoss)}</span>
-                      </div>
-                    </>
-                  )}
+                  <div>
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Diária Restante</p>
+                    <p className="text-on-surface font-bold text-base md:text-xl">
+                      {data.hasDailyLoss ? formatCurrency(Math.max(0, data.totalDailyLoss - (data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0))) : '-'}
+                    </p>
+                  </div>
                 </div>
+                {data.hasDailyLoss && (
+                  <>
+                    <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
+                      <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0) / data.totalDailyLoss) * 100)}%` }}></div>
+                    </div>
+                    <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
+                      <span>$0.00</span>
+                      <span>{formatCurrency(data.totalDailyLoss)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-          </>
+          </div>
+        ) : (
+          <div className="bg-surface-container-low border border-outline-variant/15 rounded-3xl p-8 text-center space-y-4 max-w-2xl mx-auto">
+            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto text-3xl">
+              🎯
+            </div>
+            <h4 className="text-lg font-black text-on-surface uppercase tracking-tight">Nenhum Objetivo Definido</h4>
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              Não existem objetivos de trading (como meta de lucro, limite de perda diária ou semanal) definidos para a conta ou mercado atualmente selecionado. 
+            </p>
+            <p className="text-xs text-on-surface-variant/80">
+              Acesse a página de <strong>Configurações</strong> &gt; aba <strong>Objetivos e Limites Mensais</strong> para definir as suas metas e passar a acompanhar o seu progresso neste painel.
+            </p>
+          </div>
         )}
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 md:mb-6 mt-8 md:mt-12">

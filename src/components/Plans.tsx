@@ -667,12 +667,12 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                     {/* Seleção do Método de Pagamento */}
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Selecione o Método</label>
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 bg-surface-container-low rounded-2xl p-1 border border-outline-variant/10">
+                      <div className="flex flex-row gap-2 bg-surface-container-low rounded-2xl p-1 border border-outline-variant/10 w-full">
                         {globalSettings?.showIban !== false && (
                           <button
                             type="button"
                             onClick={() => setPaymentMethod('iban')}
-                            className={`flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'iban' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                            className={`flex-1 flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'iban' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
                           >
                             <Landmark size={14} />
                             <span className="text-[9px] font-black uppercase tracking-tight">IBAN</span>
@@ -682,7 +682,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                           <button
                             type="button"
                             onClick={() => setPaymentMethod('express')}
-                            className={`flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'express' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                            className={`flex-1 flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'express' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
                           >
                             <img 
                               src={globalSettings?.multicaixaLogoUrl || "https://i.ibb.co/vz6W1fN/mcx-logo.png"} 
@@ -696,7 +696,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                           <button
                             type="button"
                             onClick={() => setPaymentMethod('multicaixa')}
-                            className={`flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'multicaixa' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                            className={`flex-1 flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'multicaixa' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
                           >
                             <Smartphone size={14} />
                             <span className="text-[9px] font-black uppercase tracking-tight">Referência</span>
@@ -706,7 +706,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                           <button
                             type="button"
                             onClick={() => setPaymentMethod('kwik')}
-                            className={`flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'kwik' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                            className={`flex-1 flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'kwik' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
                           >
                             <span className="text-sm">💸</span>
                             <span className="text-[9px] font-black uppercase tracking-tight">KWIK</span>
@@ -730,14 +730,14 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                             </label>
                             <span className="text-[8px] font-black text-primary uppercase bg-primary/10 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Clicar para Copiar</span>
                           </div>
-                          <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col">
+                          <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col text-center items-center justify-center">
                             {globalSettings?.kwikName && (
                               <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
-                                Titular / Favorecido: <span className="text-on-surface">{globalSettings.kwikName}</span>
+                                Titular: <span className="text-on-surface">{globalSettings.kwikName}</span>
                               </span>
                             )}
                             <span className="text-base font-black text-primary font-mono tracking-tight break-all">{globalSettings?.kwikKey || 'Chave não configurada'}</span>
-                            <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center gap-1.5 border-t border-outline-variant/10 pt-1.5">
+                            <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center justify-center gap-1.5 border-t border-outline-variant/10 pt-1.5 w-full">
                               <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>
                               Kwik: <span className="text-on-surface font-semibold">Chave de Transferência Instantânea</span>
                             </span>
@@ -757,15 +757,15 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                             </label>
                             <span className="text-[8px] font-black text-primary uppercase bg-primary/10 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Clicar para Copiar</span>
                           </div>
-                          <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col">
+                          <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col text-center items-center justify-center">
                             {globalSettings?.ibanName && (
                               <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
-                                Favorecido: <span className="text-on-surface">{globalSettings.ibanName}</span>
+                                Titular: <span className="text-on-surface">{globalSettings.ibanName}</span>
                               </span>
                             )}
                             <span className="text-xl md:text-2xl font-black text-on-surface font-mono tracking-tight break-all">{globalSettings?.iban || 'A carregar...'}</span>
                             {globalSettings?.ibanBank && (
-                              <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center gap-1.5 border-t border-outline-variant/10 pt-1.5">
+                              <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center justify-center gap-1.5 border-t border-outline-variant/10 pt-1.5 w-full">
                                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>
                                 Banco: <span className="text-on-surface font-semibold">{globalSettings.ibanBank}</span>
                               </span>
@@ -814,14 +814,9 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                           </div>
                           
                           {(globalSettings?.expressNumber || globalSettings?.whatsappNumber) && (
-                            <div className="px-5 py-3 bg-amber-500/15 border border-amber-500/30 rounded-xl">
+                            <div className="px-5 py-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-center flex flex-col items-center justify-center">
                                <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">Telemóvel Destino</span>
                                <span className="font-bold text-on-surface font-mono tracking-wider">{(globalSettings.expressNumber || globalSettings.whatsappNumber).replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}</span>
-                               {globalSettings?.ibanName && (
-                                 <p className="text-[9.5px] text-on-surface-variant italic mt-1 leading-normal">
-                                   Favorecido: <span className="font-semibold text-on-surface">{globalSettings.ibanName}</span>
-                                 </p>
-                               )}
                             </div>
                           )}
 
@@ -832,7 +827,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                               value={expressCode}
                               onChange={(e) => setExpressCode(e.target.value)}
                               placeholder="Ex: 08343843"
-                              className="w-full bg-surface-container border border-amber-500/30 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-amber-500 transition-all font-mono"
+                              className="w-full bg-surface-container border border-amber-500/30 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-amber-500 transition-all font-mono text-center"
                             />
                           </div>
                         </div>

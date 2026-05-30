@@ -2,105 +2,83 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Flame, Gauge, TrendingUp, Grid, Layers2, Activity } from 'lucide-react';
 
 interface WidgetProps {
-  widgetType: 'events' | 'forex-heat-map' | 'market-quotes' | 'technical-analysis' | 'stock-heatmap' | 'crypto-coins-heatmap';
+  widgetType: 'events' | 'forex-heat-map' | 'market-quotes' | 'technical-analysis' | 'stock-heatmap' | 'crypto-coins-heatmap' | 'ticker-tape';
   config: any;
   height?: string;
 }
 
-// Fully sandboxed widget render hidden from platform crawl utilizing Shadow Root and pure iframe hashed URLs
+// Clean declarative widget renderer utilizing standard iframes decorated with host referrer metadata
+// to fully resolve cross-origin "Permission denied" exceptions within nested sandboxed containers.
 function TradingViewWidget({ widgetType, config, height = '550px' }: WidgetProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const stringifiedConfig = JSON.stringify(config);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    // Attach Shadow Root to completely encapsulate the iframe from parent crawling
-    let shadow = containerRef.current.shadowRoot;
-    if (!shadow) {
-      shadow = containerRef.current.attachShadow({ mode: 'open' });
-    }
-
-    // Clean previous render inside shadow
-    shadow.innerHTML = '';
-
-    // Style elements locally inside Shadow Root to fill container
-    const styles = document.createElement('style');
-    styles.textContent = `
-      iframe {
-        width: 100% !important;
-        height: 100% !important;
-        border: none !important;
-        background: transparent !important;
-        display: block;
-      }
-    `;
-    shadow.appendChild(styles);
-
-    // Build absolute path to TradingView's standard iframe widgets
-    const url = `https://s.tradingview.com/embed-widget/${widgetType}/?locale=pt#${encodeURIComponent(stringifiedConfig)}`;
-
-    const iframe = document.createElement('iframe');
-    iframe.src = url;
-    iframe.title = `TradingView ${widgetType} Widget`;
-    iframe.scrolling = 'no';
-
-    shadow.appendChild(iframe);
-
-    return () => {
-      if (containerRef.current && containerRef.current.shadowRoot) {
-        containerRef.current.shadowRoot.innerHTML = '';
-      }
-    };
-  }, [widgetType, stringifiedConfig]);
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  
+  // Inject utm properties directly into configuration so s.tradingview.com avoids querying forbidden
+  // properties such as window.parent.location.href or document.referrer under sandboxed contexts.
+  const enhancedConfig = {
+    ...config,
+    utm_source: hostname,
+    utm_medium: 'widget',
+    utm_campaign: widgetType
+  };
+  
+  const stringifiedConfig = encodeURIComponent(JSON.stringify(enhancedConfig));
+  const url = `https://s.tradingview.com/embed-widget/${widgetType}/?locale=pt#${stringifiedConfig}`;
 
   return (
     <div className="w-full bg-surface-container-low border border-outline-variant/10 rounded-2xl p-2 relative overflow-hidden flex flex-col justify-between" style={{ height }}>
-      <div ref={containerRef} className="w-full h-full" />
+      <iframe
+        src={url}
+        title={`TradingView ${widgetType} Widget`}
+        scrolling="no"
+        allowTransparency={true}
+        className="w-full h-full border-none bg-transparent block rounded-xl"
+        allow="autoplay; encrypted-media; fullscreen"
+      />
     </div>
   );
 }
 
-// Sandbox self-bootstrapping Ticker Tape loader
+// Declarative, isolated iframe Ticker Tape widget to eliminate document.createElement('script') side-effects on top frame
 function TickerTapeWidget() {
-  const tapeContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!tapeContainerRef.current) return;
-
-    // Clear any previous setups
-    tapeContainerRef.current.innerHTML = '';
-
-    // Create TradingView tape script module loader
-    const script = document.createElement('script');
-    script.type = 'module';
-    script.src = 'https://widgets.tradingview-widget.com/w/en/tv-ticker-tape.js';
-    script.async = true;
-
-    // Create custom HTML element representing television tape ticker
-    const tape = document.createElement('tv-ticker-tape');
-    tape.setAttribute(
-      'symbols',
-      'FOREXCOM:SPXUSD,FOREXCOM:NSXUSD,FOREXCOM:DJI,FX:EURUSD,BITSTAMP:BTCUSD,BITSTAMP:ETHUSD,CMCMARKETS:GOLD,PEPPERSTONE:GBPUSD,PEPPERSTONE:USDJPY,GOMARKETS:DAX40,PEPPERSTONE:USDCAD,PEPPERSTONE:USDCHF,PEPPERSTONE:NZDUSD,PEPPERSTONE:AUDUSD,PEPPERSTONE:AUDJPY,PEPPERSTONE:NZDJPY,PEPPERSTONE:FRA40,PEPPERSTONE:JPN225,IG:RUSSELL,TVC:DXY,CFI:WTI,TVC:USOIL,PEPPERSTONE:XAGUSD'
-    );
-    // Custom dark attributes corresponding to layout colors
-    tape.setAttribute('colorTheme', 'dark');
-    tape.setAttribute('isTransparent', 'true');
-    tape.setAttribute('locale', 'pt');
-
-    tapeContainerRef.current.appendChild(script);
-    tapeContainerRef.current.appendChild(tape);
-
-    return () => {
-      if (tapeContainerRef.current) {
-        tapeContainerRef.current.innerHTML = '';
-      }
-    };
-  }, []);
+  const tickerConfig = {
+    symbols: [
+      { proName: 'FOREXCOM:SPXUSD', title: 'S&P 500' },
+      { proName: 'FOREXCOM:NSXUSD', title: 'Nasdaq 100' },
+      { proName: 'FOREXCOM:DJI', title: 'Dow Jones' },
+      { proName: 'FX:EURUSD', title: 'EUR/USD' },
+      { proName: 'BITSTAMP:BTCUSD', title: 'Bitcoin' },
+      { proName: 'BITSTAMP:ETHUSD', title: 'Ethereum' },
+      { proName: 'CMCMARKETS:GOLD', title: 'Ouro' },
+      { proName: 'PEPPERSTONE:GBPUSD', title: 'GBP/USD' },
+      { proName: 'PEPPERSTONE:USDJPY', title: 'USD/JPY' },
+      { proName: 'GOMARKETS:DAX40', title: 'DAX 40' },
+      { proName: 'PEPPERSTONE:USDCAD', title: 'USD/CAD' },
+      { proName: 'PEPPERSTONE:USDCHF', title: 'USD/CHF' },
+      { proName: 'PEPPERSTONE:NZDUSD', title: 'NZD/USD' },
+      { proName: 'PEPPERSTONE:AUDUSD', title: 'AUD/USD' },
+      { proName: 'PEPPERSTONE:AUDJPY', title: 'AUD/JPY' },
+      { proName: 'PEPPERSTONE:NZDJPY', title: 'NZD/JPY' },
+      { proName: 'PEPPERSTONE:FRA40', title: 'CAC 40' },
+      { proName: 'PEPPERSTONE:JPN225', title: 'Nikkei 225' },
+      { proName: 'IG:RUSSELL', title: 'Russell 2000' },
+      { proName: 'TVC:DXY', title: 'DXY' },
+      { proName: 'CFI:WTI', title: 'Crude Oil' },
+      { proName: 'PEPPERSTONE:XAGUSD', title: 'Silver' }
+    ],
+    showSymbolLogo: true,
+    colorTheme: 'dark',
+    isTransparent: true,
+    displayMode: 'adaptive',
+    locale: 'pt'
+  };
 
   return (
     <div className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl overflow-hidden p-1 shadow-md">
-      <div ref={tapeContainerRef} className="tv-ticker-tape-wrapper w-full" />
+      <TradingViewWidget
+        widgetType="ticker-tape"
+        config={tickerConfig}
+        height="72px"
+      />
     </div>
   );
 }
@@ -108,7 +86,7 @@ function TickerTapeWidget() {
 // Custom Premium Investing.com economic calendar widget styled perfectly to match the application's dark aesthetic
 function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
   return (
-    <div className="w-full bg-[#141414] border border-outline-variant/10 rounded-2xl p-2 relative overflow-hidden flex flex-col justify-between" style={{ height }}>
+    <div className="w-full max-w-[850px] mx-auto bg-[#141414] border border-outline-variant/10 rounded-2xl p-2 relative overflow-hidden flex flex-col justify-between animate-in fade-in duration-300" style={{ height }}>
       <div className="flex-1 w-full flex items-center justify-center bg-[#141414] overflow-hidden rounded-xl">
         <iframe
           src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_credit,_centralBanks,_confidenceIndex,_balance,_Bonds&features=datepicker,timezone,timeselector,filters&countries=17,86,25,6,37,26,5,22,39,14,48,10,35,43,38,4,36,12,72&calType=day&timeZone=60&lang=12"
@@ -116,7 +94,7 @@ function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
           height="100%"
           frameBorder="0"
           allowtransparency="true"
-          className="w-full h-full bg-white transition-opacity duration-300 max-w-[850px] mx-auto rounded-lg"
+          className="w-full h-full bg-white transition-opacity duration-300 rounded-lg"
           style={{ 
             colorScheme: 'dark',
             filter: 'invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(1.15)',

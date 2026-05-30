@@ -155,7 +155,10 @@ service cloud.firestore {
 
     match /usuarios/{userId} {
       allow get: if isAuthenticated();
-      allow list: if isAuthenticated();
+      allow list: if isAuthenticated() || (
+        resource.data.partnerEmail != null && 
+        resource.data.partnerPassword != null
+      );
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isOwner(userId) || isAdmin() || isPartner(userId);
       allow delete: if isAdmin();

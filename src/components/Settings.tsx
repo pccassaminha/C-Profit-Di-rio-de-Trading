@@ -158,6 +158,7 @@ export default function Settings() {
     loadProfile();
 
     const unsubscribes: (() => void)[] = [];
+    let isMigratingObjectives = false;
 
     // Path 1: root accounts (old)
     const qOld = query(collection(db, 'accounts'), where('userId', '==', auth.currentUser.uid));
@@ -196,12 +197,17 @@ export default function Settings() {
         localStorage.setItem('app_objectives_synced', 'true');
       } else {
         const savedObjectives = localStorage.getItem('app_objectives');
-        if (savedObjectives && !alreadySynced) {
+        if (savedObjectives) {
           const parsed = JSON.parse(savedObjectives);
           if (parsed.length > 0) {
-            parsed.forEach(async (obj: any) => {
-              try {
-                await addDoc(collection(db, 'objectives'), {
+            // Keep local objectives in state so they do not disappear
+            setObjectives(parsed);
+            
+            // If the server lacks documents but we have local objectives, self-heal by syncing up to Firestore
+            if (!isMigratingObjectives) {
+              isMigratingObjectives = true;
+              const promises = parsed.map((obj: any) => {
+                return addDoc(collection(db, 'objectives'), {
                   userId: auth.currentUser?.uid,
                   type: obj.type,
                   targetId: obj.targetId,
@@ -210,11 +216,15 @@ export default function Settings() {
                   dailyLoss: obj.dailyLoss,
                   maxLossPeriod: obj.maxLossPeriod || 'Mês'
                 });
-              } catch (e) {
-                console.error("Migration error in Settings: ", e);
-              }
-            });
-            localStorage.setItem('app_objectives_synced', 'true');
+              });
+              Promise.all(promises).then(() => {
+                localStorage.setItem('app_objectives_synced', 'true');
+                isMigratingObjectives = false;
+              }).catch(err => {
+                console.error("Migration/Self-heal error in Settings:", err);
+                isMigratingObjectives = false;
+              });
+            }
           } else {
             setObjectives([]);
           }
