@@ -5,6 +5,19 @@ import { collection, addDoc, query, where, onSnapshot, orderBy, getDocs, getDoc,
 import { CreditCard, Check, ShieldCheck, Zap, Star, LayoutGrid, Smartphone, MessageSquare, History, Upload, Landmark, X, FileText } from 'lucide-react';
 import Modal from './Modal';
 
+// Helper to parse price string containing dots, commas, spaces, etc. into a Number
+const parsePriceToNumber = (val: string | number): number => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  const clean = val.toString().replace(/[^0-9]/g, '');
+  return Number(clean) || 0;
+};
+
+// Helper to format number to string with thousands dots
+const formatPrice = (num: number): string => {
+  return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
 export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { forcedExpired?: boolean, hideHeader?: boolean, onAuthRequired?: () => void }) {
   const { userPlan, globalSettings } = useTrades();
   const [payments, setPayments] = useState<any[]>([]);
@@ -218,7 +231,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
   // Aplicar Desconto do Cupão
   const getDiscountedPrice = (plan: any) => {
-     const priceNum = Number(plan.price.replace(/\./g, ''));
+     const priceNum = parsePriceToNumber(plan.price);
      if (priceNum < 5000) {
         return plan.price; // O cupão afetará apenas os planos a partir de 5.000 Kz para cima
      }
@@ -238,7 +251,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         discountPercentage = 50;
      }
 
-     const originalPriceNum = Number(plan.price.replace(/\./g, ''));
+     const originalPriceNum = parsePriceToNumber(plan.price);
      let finalPriceNum = originalPriceNum;
 
      if (discountPercentage > 0) {
@@ -250,14 +263,14 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
      if (finalPriceNum < 0) finalPriceNum = 0;
      
      // Formatar novamente com pontos
-     return finalPriceNum.toLocaleString('pt-PT').replace(/,/g, '.');
+     return formatPrice(finalPriceNum);
   };
 
   const getFinalDiscountLabel = (plan: any, finalPriceStr: string) => {
-      const finalPriceNum = Number(finalPriceStr.replace(/\./g, ''));
+      const finalPriceNum = parsePriceToNumber(finalPriceStr);
       if (plan.id === 'trial_30') return plan.discount;
       if (plan.oldPrice) {
-          const oldPriceNum = Number(plan.oldPrice.replace(/\./g, ''));
+          const oldPriceNum = parsePriceToNumber(plan.oldPrice);
           if (oldPriceNum > finalPriceNum) {
               const hasCoupon = appliedCoupon && (appliedCoupon.targetPlan === 'all' || appliedCoupon.targetPlan === plan.id);
               const hasTrialConversion = !appliedCoupon && (userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30');
@@ -316,7 +329,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         userEmail: auth.currentUser?.email || '',
         userPhone: payerPhone,
         planId: showPaymentModal.id,
-        amount: Number(showPaymentModal.price.replace(/\./g, '')),
+        amount: parsePriceToNumber(showPaymentModal.price),
         status: 'pending',
         transactionCode: numericId,
         proofUrl: 'WhatsApp Support',
@@ -674,15 +687,11 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                           <span className="line-through font-mono text-white/50">{showPaymentModal.oldPrice} Kz</span>
                         </div>
                         <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
-                          <span>Desconto Padrão (Profit):</span>
-                          <span className="text-[#00f5a0]">-33% OFF</span>
+                          <span>Desconto Activo:</span>
+                          <span className="text-[#00f5a0] font-black">
+                            {(appliedCoupon || userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30') ? '83% OFF' : '33% OFF'}
+                          </span>
                         </div>
-                        {(appliedCoupon || userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30') && (
-                          <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
-                            <span>Soma Cupom Especial:</span>
-                            <span className="text-[#00f5a0]">-50% OFF (Total: -83% OFF)</span>
-                          </div>
-                        )}
                         <div className="border-t border-dashed border-[#00f5a0]/20 my-1"></div>
                         <div className="flex justify-between items-center text-sm font-black text-white">
                           <span className="uppercase tracking-wider flex items-center gap-1.5 text-[11px] text-[#00f5a0]">
@@ -690,7 +699,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                             Poupança Total:
                           </span>
                           <span className="text-[#00f5a0] font-mono tracking-tight font-black text-base bg-[#00f5a0]/15 px-3 py-1 rounded-xl">
-                            Economiza {(Number(showPaymentModal.oldPrice.replace(/\./g, '')) - Number(showPaymentModal.price.replace(/\./g, ''))).toLocaleString('pt-PT').replace(/,/g, '.')} Kz
+                            Economiza {formatPrice(parsePriceToNumber(showPaymentModal.oldPrice) - parsePriceToNumber(showPaymentModal.price))} Kz
                           </span>
                         </div>
                       </div>
