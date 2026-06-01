@@ -1218,30 +1218,7 @@ export default function Dashboard() {
             <span className="material-symbols-outlined">add</span>
           </button>
 
-          <div className="relative" ref={exportDropdownRef}>
-            <button 
-              onClick={() => setExportMenuOpen(!exportMenuOpen)}
-              className="w-10 h-10 md:w-12 md:h-12 bg-surface-container-low border border-outline-variant/20 hover:bg-surface-container-high transition-colors rounded-full flex items-center justify-center text-on-surface shrink-0"
-              title="Mais Opções"
-            >
-              <MoreVertical size={20} />
-            </button>
-            {exportMenuOpen && (
-              <div className="absolute top-full right-0 mt-2 w-56 bg-surface-container-high border border-outline-variant/20 shadow-xl rounded-2xl overflow-hidden z-[50] animate-in fade-in slide-in-from-top-2">
-                <button 
-                  onClick={() => {
-                    handleExportPDF();
-                    setExportMenuOpen(false);
-                  }}
-                  disabled={isExporting}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Download size={18} />
-                  {isExporting ? 'Exportando...' : 'Exportar Relatório PDF'}
-                </button>
-              </div>
-            )}
-          </div>
+
         </div>
       </div>
 
