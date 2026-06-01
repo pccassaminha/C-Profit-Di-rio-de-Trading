@@ -17,6 +17,7 @@ import Support from './components/Support';
 import Planner from './components/Planner';
 import UserAffiliate from './components/UserAffiliate';
 import GlobalChatWidget from './components/GlobalChatWidget';
+import MobileBottomNav from './components/MobileBottomNav';
 import { useTrades } from './hooks/useTrades';
 
 import Auth from './components/Auth';
@@ -190,10 +191,12 @@ export default function App() {
             </button>
           </div>
         )}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto pb-24 md:pb-6">
           {renderContent()}
         </main>
       </div>
+
+      <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {activeTab === 'community' && <GlobalChatWidget isSidebarOpen={isSidebarOpen} />}
 

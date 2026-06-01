@@ -230,19 +230,17 @@ export default function Topbar({
   const unreadCount = broadcasts.filter(b => !seenIds.includes(b.id)).length + totalUnreadChats + friendRequests.length + roomInvites.length;
 
   return (
-    <header className="flex justify-between items-center px-6 w-full h-20 sticky top-0 z-40 bg-background border-b border-outline-variant/20">
-      <div className="flex items-center gap-4">
+    <header className="flex justify-between items-center px-4 md:px-6 w-full h-16 md:h-20 sticky top-0 z-40 bg-background border-b border-outline-variant/20">
+      <div className="flex items-center gap-3">
         <button 
           onClick={toggleSidebar}
-          className="w-10 h-10 rounded-full border border-outline-variant/20 flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors"
+          className="w-10 h-10 rounded-full border border-outline-variant/20 hidden md:flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors"
         >
           <span className="material-symbols-outlined text-sm">menu</span>
         </button>
-        <div className="flex md:hidden items-center gap-2">
-          <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
-            <span className="material-symbols-outlined text-on-primary text-sm">show_chart</span>
-          </div>
-          <span className="text-xl font-black tracking-tight text-primary font-headline">C Profit</span>
+        <div className="flex md:hidden items-center gap-2 select-none">
+          <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[24px] w-auto drop-shadow-md rounded" />
+          <span className="text-sm font-extrabold tracking-tight text-primary font-headline uppercase">Profit</span>
         </div>
       </div>
 

@@ -362,7 +362,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   };
 
   return (
-    <div className={`p-8 max-w-[1440px] mx-auto min-h-screen animate-in fade-in duration-500 space-y-12 ${hideHeader ? 'min-h-fit py-0' : ''}`}>
+    <div className={`p-4 md:p-8 max-w-[1440px] mx-auto min-h-screen animate-in fade-in duration-500 space-y-8 md:space-y-12 ${hideHeader ? 'min-h-fit py-0' : ''}`}>
       {forcedExpired && (
         <div className="bg-error/10 border border-error/50 p-6 rounded-3xl flex items-center gap-6 animate-in slide-in-from-top duration-500">
           <div className="w-14 h-14 bg-error/20 rounded-2xl flex items-center justify-center text-error shadow-lg shadow-error/10">

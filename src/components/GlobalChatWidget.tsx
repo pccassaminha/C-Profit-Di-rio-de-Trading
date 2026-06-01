@@ -516,9 +516,9 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
       {/* Floating Button */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-[60] w-14 h-14 bg-primary text-on-primary rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-transform"
+        className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-[60] w-12 h-12 md:w-14 md:h-14 bg-primary text-on-primary rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-transform"
       >
-        {isOpen ? <X size={24} /> : <MessageSquare size={24} />}
+        {isOpen ? <X className="w-5 h-5 md:w-6 md:h-6" /> : <MessageSquare className="w-5 h-5 md:w-6 md:h-6" />}
         {!isOpen && totalUnread > 0 && (
           <span className="absolute -top-1 -right-1 bg-error text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full animate-pulse border-2 border-surface">
             {totalUnread}
@@ -532,7 +532,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
           className={`fixed z-[60] bg-surface border border-outline-variant/20 shadow-2xl overflow-hidden flex flex-col md:flex-row transition-all ${
             isFullScreen 
               ? 'inset-0 w-full h-full rounded-none' 
-              : 'bottom-24 right-6 w-[calc(100vw-3rem)] max-w-3xl h-[600px] max-h-[80vh] rounded-3xl'
+              : 'bottom-[104px] right-4 md:right-6 w-[calc(100vw-2rem)] md:w-[calc(100vw-3rem)] max-w-3xl h-[400px] md:h-[600px] max-h-[55vh] md:max-h-[80vh] rounded-2xl md:rounded-3xl'
           }`}
         >
           {/* Sidebar - Chat List */}
