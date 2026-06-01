@@ -27,6 +27,7 @@ function TradingViewWidget({ widgetType, config, height = '550px' }: WidgetProps
   return (
     <div className="w-full bg-surface-container-low border border-outline-variant/10 rounded-2xl p-2 relative overflow-hidden flex flex-col justify-between" style={{ height }}>
       <iframe
+        key={url}
         src={url}
         title={`TradingView ${widgetType} Widget`}
         scrolling="no"
@@ -120,7 +121,7 @@ export default function Panorama() {
   const [activeTab, setActiveTab] = useState<'calendar' | 'heatmap' | 'technical' | 'quotes'>('calendar');
 
   // Technical Analysis selector state
-  const [technicalSymbol, setTechnicalSymbol] = useState<'FX:EURUSD' | 'PEPPERSTONE:NAS100' | 'OANDA:XAUUSD' | 'BINANCE:BTCUSD'>('FX:EURUSD');
+  const [technicalSymbol, setTechnicalSymbol] = useState<'FX:EURUSD' | 'OANDA:XAUUSD' | 'BINANCE:BTCUSD'>('FX:EURUSD');
   
   // Unified heatmap selector state
   const [activeHeatmap, setActiveHeatmap] = useState<'nasdaq' | 'djca' | 'forex' | 'crypto'>('nasdaq');
@@ -128,7 +129,6 @@ export default function Panorama() {
   // Technical symbols constant
   const technicalSymbols = [
     { id: 'FX:EURUSD', label: 'EUR/USD (Euro)' },
-    { id: 'PEPPERSTONE:NAS100', label: 'NASDAQ 100' },
     { id: 'OANDA:XAUUSD', label: 'Ouro (XAU/USD)' },
     { id: 'BINANCE:BTCUSD', label: 'Bitcoin (BTC/USD)' },
   ] as const;
