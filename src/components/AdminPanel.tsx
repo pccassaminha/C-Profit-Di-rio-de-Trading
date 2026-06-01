@@ -287,17 +287,17 @@ export default function AdminPanel() {
       const fetchedCoupons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCoupons(fetchedCoupons);
       
-      const hasDesconto50 = fetchedCoupons.some((c: any) => c.code === 'CPROFIT50%OFF');
+      const hasDesconto50 = fetchedCoupons.some((c: any) => c.code === 'CPROFIT83%OFF');
       if (!hasDesconto50) {
         addDoc(collection(db, 'coupons'), {
-          code: 'CPROFIT50%OFF',
+          code: 'CPROFIT83%OFF',
           discountType: 'percentage',
           discountValue: 50,
           targetPlan: 'all',
           partnerRef: 'Plataforma',
           active: true,
           createdAt: new Date().toISOString()
-        }).catch(err => console.error('Erro ao auto-criar cupão CPROFIT50%OFF:', err));
+        }).catch(err => console.error('Erro ao auto-criar cupão CPROFIT83%OFF:', err));
       }
     });
 

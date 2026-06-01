@@ -31,7 +31,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
   };
 
   const copyPopupCoupon = () => {
-    navigator.clipboard.writeText('CPROFIT50%OFF');
+    navigator.clipboard.writeText('CPROFIT83%OFF');
     setPopupCopied(true);
     setTimeout(() => {
       setPopupCopied(false);
@@ -39,7 +39,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
   };
 
   const copyCouponCode = () => {
-    navigator.clipboard.writeText('CPROFIT50%OFF');
+    navigator.clipboard.writeText('CPROFIT83%OFF');
     setCouponCopied(true);
     setTimeout(() => {
       setCouponCopied(false);
@@ -793,7 +793,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
             🔥 CAMPANHA DE LANÇAMENTO EXCLUSIVA
           </span>
           <h2 className="font-headline text-[clamp(28px,3vw,38px)] font-extrabold tracking-[-0.02em] text-white">
-            Garanta <span className="text-[#00f5a0]">50% de Desconto</span> no Seu Acesso
+            Garanta <span className="text-[#00f5a0]">83% de Desconto</span> no Seu Acesso
           </h2>
           <p className="text-xs text-on-surface-variant max-w-lg mx-auto">
             Facilitamos o seu início! Clique no botão abaixo para copiar o cupão oficial e cole-o diretamente na barra de checkout durante o pagamento.
@@ -801,7 +801,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
 
           <div className="mt-6 inline-flex flex-col sm:flex-row items-center gap-3 bg-white/5 border border-outline-variant/15 p-3 rounded-2xl max-w-md mx-auto">
             <div className="flex items-center gap-2 px-4 py-2 bg-black/40 rounded-xl border border-outline-variant/10 font-mono text-xs font-black text-white select-all">
-              🏷️ <span className="text-[#00f5a0]">CPROFIT50%OFF</span>
+              🏷️ <span className="text-[#00f5a0]">CPROFIT83%OFF</span>
             </div>
             
             <button
@@ -928,7 +928,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                 </div>
                 
                 <h3 className="font-headline text-[28px] md:text-[34px] font-black leading-tight tracking-tight text-white">
-                  Obtenha <span className="text-[#00f5a0]">50% OFF</span> na Primeira Subscrição!
+                  Obtenha <span className="text-[#00f5a0]">83% OFF</span> na Primeira Subscrição!
                 </h3>
                 
                 <p className="text-sm text-on-surface-variant leading-relaxed mt-4 max-w-md">
@@ -939,7 +939,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
               {/* Coupon Copier Container */}
               <div className="mt-8 p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col sm:flex-row items-center gap-3">
                 <div className="flex-1 flex items-center justify-between w-full px-4 py-3 bg-black/60 border border-outline-variant/10 rounded-xl font-mono text-sm font-black text-white selection:bg-[#00f5a0]/30 select-all">
-                  <span className="text-[#00f5a0]">CPROFIT50%OFF</span>
+                  <span className="text-[#00f5a0]">CPROFIT83%OFF</span>
                   <span className="text-[10px] text-white/30 uppercase tracking-widest ml-2 font-normal">CUPÃO</span>
                 </div>
                 
@@ -964,7 +964,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                   }}
                   className="w-full py-4 rounded-xl bg-[#00f5a0] text-background text-xs font-black uppercase tracking-wider hover:opacity-95 transition-all text-center cursor-pointer shadow-[0_10px_30px_rgba(0,245,160,0.25)] flex items-center justify-center gap-2"
                 >
-                  <Wallet size={14} /> ASSINATURA (50% OFF)
+                  <Wallet size={14} /> ASSINATURA (83% OFF)
                 </button>
                 <button
                   onClick={() => {
@@ -973,7 +973,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                   }}
                   className="w-full py-4 rounded-xl bg-transparent hover:bg-cyan-500/10 border border-cyan-500/60 text-cyan-400 hover:text-white hover:border-cyan-500 text-xs font-black uppercase tracking-wider transition-all text-center cursor-pointer flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(6,182,212,0.15)]"
                 >
-                  <Zap size={14} className="text-cyan-400 animate-pulse" /> INSTALAR TRIAL (30 DIAS)
+                  <Zap size={14} className="text-cyan-400 animate-pulse" /> INICIAL TESTE DE 30 DIAS
                 </button>
               </div>
 

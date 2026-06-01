@@ -60,17 +60,17 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         return;
       }
       
-      // Fallback for CPROFIT50%OFF if not yet in database (e.g., initial seed)
-      if (cleanCode === 'CPROFIT50%OFF') {
+      // Fallback for CPROFIT83%OFF if not yet in database (e.g., initial seed)
+      if (cleanCode === 'CPROFIT83%OFF') {
         setAppliedCoupon({
-          id: 'descontode50_static',
-          code: 'CPROFIT50%OFF',
+          id: 'descontode83_static',
+          code: 'CPROFIT83%OFF',
           active: true,
           discountType: 'percentage',
           discountValue: 50,
           targetPlan: 'all'
         });
-        setValidationMsg({ text: 'Cupom "CPROFIT50%OFF" de 50% de DESCONTO aplicado com sucesso!', type: 'success' });
+        setValidationMsg({ text: 'Cupom "CPROFIT83%OFF" de 83% de DESCONTO aplicado com sucesso!', type: 'success' });
         return;
       }
 
@@ -189,12 +189,11 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       id: 'semestral_8',
       name: 'Plano Semestral',
       oldPrice: '45.000',
-      discount: '-44% OFF',
-      savingsText: 'Poupa Kz 20.000 no semestre',
-      price: '25.000',
+      discount: '-33% OFF',
+      savingsText: 'Poupa Kz 15.000 no semestre',
+      price: '30.000',
       period: 'a cada 6 meses',
       days: 180,
-      savings: '17% OFF',
       limits: '8 Contas Forex + 8 Contas OB',
       totalLimit: 16,
       features: ['Acesso ao Panorama Económico', 'Análise Psicológica Avançada', 'Exportação de Dados (PDF)', 'Acesso à Comunidade'],
@@ -205,12 +204,11 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       id: 'anual_16',
       name: 'Plano Anual',
       oldPrice: '90.000',
-      discount: '-50% OFF',
-      savingsText: 'Poupa Kz 45.000 no ano',
-      price: '45.000',
+      discount: '-33% OFF',
+      savingsText: 'Poupa Kz 30.000 no ano',
+      price: '60.000',
       period: 'por ano',
       days: 365,
-      savings: '25% OFF',
       limits: '16 Contas Forex + 16 Contas OB',
       totalLimit: 32,
       features: ['Acesso ao Panorama Económico', 'Mentorias Coletivas', 'Acesso Antecipado a Beta', 'Personalização de Interface', 'Suporte Prioritário via WhatsApp', 'Acesso à Comunidade VIP'],
@@ -257,12 +255,16 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
   const getFinalDiscountLabel = (plan: any, finalPriceStr: string) => {
       const finalPriceNum = Number(finalPriceStr.replace(/\./g, ''));
+      if (plan.id === 'trial_30') return plan.discount;
       if (plan.oldPrice) {
           const oldPriceNum = Number(plan.oldPrice.replace(/\./g, ''));
           if (oldPriceNum > finalPriceNum) {
-              const perc = Math.round(((oldPriceNum - finalPriceNum) / oldPriceNum) * 100);
-              let suffix = appliedCoupon ? ' SUPERCUPOM' : ' OFF';
-              return `-${perc}%${suffix}`;
+              const hasCoupon = appliedCoupon && (appliedCoupon.targetPlan === 'all' || appliedCoupon.targetPlan === plan.id);
+              const hasTrialConversion = !appliedCoupon && (userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30');
+              if (hasCoupon || hasTrialConversion) {
+                  return `-83% SUPERCUPOM`;
+              }
+              return `-33% OFF`;
           }
       }
       return plan.discount;
@@ -398,10 +400,10 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
             </div>
             <div>
               <h3 className="text-[#00f5a0] font-black text-lg uppercase tracking-wider">
-                🎁 Desconto de Conversão Especial – 50% OFF Ativado!
+                🎁 Desconto de Conversão Especial – 83% OFF Ativado!
               </h3>
               <p className="text-on-surface-variant text-xs font-semibold leading-relaxed">
-                Como agradecimento especial por testar a plataforma Profit, você recebeu um <strong className="text-white">Desconto Exclusivo de 50%</strong> em qualquer assinatura ativa! O desconto já foi aplicado e está visível nos planos abaixo de forma automática.
+                Como agradecimento especial por testar a plataforma Profit, você recebeu um <strong className="text-white">Desconto Exclusivo de 83%</strong> em qualquer assinatura ativa! O desconto já foi aplicado e está visível nos planos abaixo de forma automática.
               </p>
             </div>
           </div>
@@ -663,6 +665,36 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                       <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.3em]">Total a Liquidar:</span>
                       <span className="text-3xl font-black text-primary font-mono tracking-tighter">{showPaymentModal.price} Kz</span>
                     </div>
+
+                    {/* Economia e Desconto Expressivo */}
+                    {showPaymentModal.id !== 'trial_30' && (
+                      <div className="bg-[#00f5a0]/10 border border-[#00f5a0]/30 rounded-2xl p-4 flex flex-col gap-2 text-left">
+                        <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
+                          <span>Preço Normal Original:</span>
+                          <span className="line-through font-mono text-white/50">{showPaymentModal.oldPrice} Kz</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
+                          <span>Desconto Padrão (Profit):</span>
+                          <span className="text-[#00f5a0]">-33% OFF</span>
+                        </div>
+                        {(appliedCoupon || userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30') && (
+                          <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
+                            <span>Soma Cupom Especial:</span>
+                            <span className="text-[#00f5a0]">-50% OFF (Total: -83% OFF)</span>
+                          </div>
+                        )}
+                        <div className="border-t border-dashed border-[#00f5a0]/20 my-1"></div>
+                        <div className="flex justify-between items-center text-sm font-black text-white">
+                          <span className="uppercase tracking-wider flex items-center gap-1.5 text-[11px] text-[#00f5a0]">
+                            <span className="material-symbols-outlined text-sm">savings</span>
+                            Poupança Total:
+                          </span>
+                          <span className="text-[#00f5a0] font-mono tracking-tight font-black text-base bg-[#00f5a0]/15 px-3 py-1 rounded-xl">
+                            Economiza {(Number(showPaymentModal.oldPrice.replace(/\./g, '')) - Number(showPaymentModal.price.replace(/\./g, ''))).toLocaleString('pt-PT').replace(/,/g, '.')} Kz
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Seleção do Método de Pagamento */}
                     <div className="space-y-3">

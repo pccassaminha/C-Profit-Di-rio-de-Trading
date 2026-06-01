@@ -153,7 +153,7 @@ export default function App() {
   };
 
   const handleCopyCoupon = () => {
-    navigator.clipboard.writeText('CPROFIT50%OFF');
+    navigator.clipboard.writeText('CPROFIT83%OFF');
     setCopiedCoupon(true);
     setTimeout(() => setCopiedCoupon(false), 3000);
   };
@@ -207,7 +207,7 @@ export default function App() {
               <div className="w-8 h-8 bg-[#00f5a0]/15 rounded-xl flex items-center justify-center text-[#00f5a0] shrink-0">
                  <span className="material-symbols-outlined text-xl">local_activity</span>
               </div>
-              <p className="font-extrabold text-xs uppercase tracking-wider text-[#00f5a0]">🎁 Cupom de 50% Ativado!</p>
+              <p className="font-extrabold text-xs uppercase tracking-wider text-[#00f5a0]">🎁 Cupom de 83% Ativado!</p>
             </div>
             <button 
               onClick={() => setIsBannerDismissed(true)} 
@@ -220,11 +220,11 @@ export default function App() {
           
           <div className="mt-3 space-y-3">
             <p className="text-[11px] text-white/80 leading-relaxed font-semibold">
-              Obtenha um <strong className="text-white font-black">Desconto de 50% Vitalício</strong> ao migrar para qualquer um dos planos profissionais. Copie e cole o código abaixo!
+              Obtenha um <strong className="text-white font-black">Desconto de 83% Vitalício</strong> ao migrar para qualquer um dos planos profissionais. Copie e cole o código abaixo!
             </p>
             
             <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 justify-between">
-              <code className="text-[#00f5a0] font-black tracking-widest text-xs font-mono">CPROFIT50%OFF</code>
+              <code className="text-[#00f5a0] font-black tracking-widest text-xs font-mono">CPROFIT83%OFF</code>
               <button 
                 onClick={handleCopyCoupon}
                 className="bg-[#00f5a0] hover:bg-[#00f5a0]/80 text-black px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shrink-0"

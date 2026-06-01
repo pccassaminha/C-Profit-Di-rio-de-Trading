@@ -31,7 +31,7 @@ function TradingViewWidget({ widgetType, config, height = '550px' }: WidgetProps
         src={url}
         title={`TradingView ${widgetType} Widget`}
         scrolling="no"
-        allowTransparency={true}
+        allowtransparency="true"
         className="w-full h-full border-none bg-transparent block rounded-xl"
         allow="autoplay; encrypted-media; fullscreen"
       />

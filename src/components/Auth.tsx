@@ -285,11 +285,11 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
             } else {
               console.warn('Cupom de desconto inativo.');
             }
-          } else if (uppercaseCode === 'CPROFIT50%OFF') {
+          } else if (uppercaseCode === 'CPROFIT83%OFF') {
             // Fallback if coupon collection is not synced or loaded yet
             validCoupon = {
-              id: 'descontode50_static',
-              code: 'CPROFIT50%OFF',
+              id: 'descontode83_static',
+              code: 'CPROFIT83%OFF',
               discountType: 'percentage',
               discountValue: 50,
               targetPlan: 'all',
