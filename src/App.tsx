@@ -125,7 +125,7 @@ export default function App() {
 
   const renderContent = () => {
     // Se o plano estiver expirado, forçar exibição da página de planos
-    const allowedExpiredTabs = ['plans', 'payments', 'profile', 'support', 'settings', 'admin', 'panorama'];
+    const allowedExpiredTabs = ['plans', 'payments', 'profile', 'support', 'settings', 'admin'];
     const isAdmin = user?.email === 'exportacoes.extras@gmail.com' || userPlan?.role === 'admin';
     
     if (isExpired && !isAdmin && !allowedExpiredTabs.includes(activeTab)) {

@@ -86,7 +86,16 @@ function TickerTapeWidget() {
 
 // Custom Economic Calendar Widget supporting both original light flags and inverted dark mode styles
 function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    const saved = localStorage.getItem('panorama_investing_is_dark');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const toggleTheme = () => {
+    const nextVal = !isDark;
+    setIsDark(nextVal);
+    localStorage.setItem('panorama_investing_is_dark', String(nextVal));
+  };
 
   return (
     <div className="w-full max-w-[680px] mx-auto bg-[#141414] border border-outline-variant/10 rounded-2xl p-2 relative overflow-hidden flex flex-col justify-between" style={{ height }}>
@@ -97,7 +106,7 @@ function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsDark(!isDark)}
+            onClick={toggleTheme}
             className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
               isDark 
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' 
@@ -130,7 +139,15 @@ function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
 export default function Panorama() {
   const [layoutMode, setLayoutMode] = useState<'grid' | 'tabs'>('grid');
   const [activeTab, setActiveTab] = useState<'calendar' | 'heatmap' | 'technical' | 'quotes'>('calendar');
-  const [calendarSource, setCalendarSource] = useState<'tradingview' | 'investing'>('tradingview');
+  const [calendarSource, setCalendarSource] = useState<'tradingview' | 'investing'>(() => {
+    const saved = localStorage.getItem('panorama_calendar_source');
+    return (saved === 'tradingview' || saved === 'investing') ? saved : 'tradingview';
+  });
+
+  const handleCalendarSourceChange = (source: 'tradingview' | 'investing') => {
+    setCalendarSource(source);
+    localStorage.setItem('panorama_calendar_source', source);
+  };
 
   // Technical Analysis selector state
   const [technicalSymbol, setTechnicalSymbol] = useState<'FX:EURUSD' | 'OANDA:XAUUSD' | 'BINANCE:BTCUSD'>('FX:EURUSD');
@@ -371,7 +388,7 @@ export default function Panorama() {
               {/* Source Switcher Toggle */}
               <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
                 <button
-                  onClick={() => setCalendarSource('tradingview')}
+                  onClick={() => handleCalendarSourceChange('tradingview')}
                   className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
                     calendarSource === 'tradingview'
                       ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
@@ -381,7 +398,7 @@ export default function Panorama() {
                   TradingView
                 </button>
                 <button
-                  onClick={() => setCalendarSource('investing')}
+                  onClick={() => handleCalendarSourceChange('investing')}
                   className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
                     calendarSource === 'investing'
                       ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
@@ -599,7 +616,7 @@ export default function Panorama() {
                   {/* Source Switcher Toggle */}
                   <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
                     <button
-                      onClick={() => setCalendarSource('tradingview')}
+                      onClick={() => handleCalendarSourceChange('tradingview')}
                       className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
                         calendarSource === 'tradingview'
                           ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
@@ -609,7 +626,7 @@ export default function Panorama() {
                       TradingView
                     </button>
                     <button
-                      onClick={() => setCalendarSource('investing')}
+                      onClick={() => handleCalendarSourceChange('investing')}
                       className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
                         calendarSource === 'investing'
                           ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'

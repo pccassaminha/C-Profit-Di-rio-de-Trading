@@ -204,3 +204,11 @@ body {
   animation: pulse 2s infinite;
 }
 
+.material-icons {
+  /* Impede que o texto cause comportamentos estranhos antes de carregar */
+  font-display: block; 
+  /* Ou use propriedades para garantir que o texto não "vaze" */
+  white-space: nowrap;
+  word-wrap: normal;
+}
+
