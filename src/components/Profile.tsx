@@ -105,6 +105,38 @@ const syncHistoricalProfileData = async (uid: string, newPhotoURL: string, newNa
   }
 };
 
+const COUNTRIES = [
+  { code: 'AO', label: 'AO +244', dialCode: '+244', flag: '🇦🇴' },
+  { code: 'PT', label: 'PT +351', dialCode: '+351', flag: '🇵🇹' },
+  { code: 'BR', label: 'BR +55', dialCode: '+55', flag: '🇧🇷' },
+  { code: 'MZ', label: 'MZ +258', dialCode: '+258', flag: '🇲🇿' },
+  { code: 'CV', label: 'CV +238', dialCode: '+238', flag: '🇨🇻' },
+  { code: 'GW', label: 'GW +245', dialCode: '+245', flag: '🇬🇼' },
+  { code: 'ST', label: 'ST +239', dialCode: '+239', flag: '🇸🇹' },
+  { code: 'GQ', label: 'GQ +240', dialCode: '+240', flag: '🇬🇶' }
+];
+
+const parsePhoneNumberInput = (phoneVal: string) => {
+  const dialCodes = ['+244', '+351', '+55', '+258', '+238', '+245', '+239', '+240'];
+  let cleaned = (phoneVal || '').trim();
+  
+  for (const dial of dialCodes) {
+    if (cleaned.startsWith(dial)) {
+      return { dialCode: dial, localNumber: cleaned.substring(dial.length).trim() };
+    }
+    const noPlus = dial.replace('+', '');
+    if (cleaned.startsWith(noPlus)) {
+      return { dialCode: dial, localNumber: cleaned.substring(noPlus.length).trim() };
+    }
+  }
+  
+  if (cleaned.length === 9 && cleaned.startsWith('9')) {
+    return { dialCode: '+244', localNumber: cleaned };
+  }
+  
+  return { dialCode: '+244', localNumber: cleaned };
+};
+
 export default function Profile() {
   const user = auth.currentUser;
   const [firstName, setFirstName] = useState(user?.displayName?.split(' ')[0] || '');
@@ -112,6 +144,27 @@ export default function Profile() {
   const [email, setEmail] = useState(user?.email || '');
   const [contactEmail, setContactEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [profileDialCode, setProfileDialCode] = useState('+244');
+  const [profilePhoneLocal, setProfilePhoneLocal] = useState('');
+
+  useEffect(() => {
+    if (phoneNumber) {
+      const parsed = parsePhoneNumberInput(phoneNumber);
+      setProfileDialCode(parsed.dialCode);
+      setProfilePhoneLocal(parsed.localNumber);
+    }
+  }, [phoneNumber]);
+
+  const handleProfilePhoneLocalChange = (val: string) => {
+    const clean = val.replace(/\D/g, '');
+    setProfilePhoneLocal(clean);
+    setPhoneNumber(profileDialCode + clean);
+  };
+
+  const handleProfileDialChange = (val: string) => {
+    setProfileDialCode(val);
+    setPhoneNumber(val + profilePhoneLocal);
+  };
   const [photoURL, setPhotoURL] = useState(user?.photoURL || '');
   const [isPrivate, setIsPrivate] = useState(false);
   const [myPosts, setMyPosts] = useState<any[]>([]);
@@ -1071,13 +1124,28 @@ export default function Profile() {
                       <span>Tornar Privado</span>
                     </label>
                   </div>
-                  <input 
-                    type="tel" 
-                    value={phoneNumber}
-                    placeholder="Ex: +244 921 319 200"
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
-                  />
+                  <div className="flex gap-2">
+                    <div className="relative shrink-0">
+                      <select 
+                        value={profileDialCode}
+                        onChange={(e) => handleProfileDialChange(e.target.value)}
+                        className="bg-surface-container border border-outline-variant/20 rounded-xl px-3 py-2 text-xs font-black text-on-surface outline-none focus:border-primary transition-all appearance-none cursor-pointer pr-7 max-h-10"
+                      >
+                        {COUNTRIES.map(c => (
+                          <option key={c.code} value={c.dialCode}>{c.flag} {c.label}</option>
+                        ))}
+                      </select>
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[8px]">▼</div>
+                    </div>
+
+                    <input 
+                      type="tel" 
+                      value={profilePhoneLocal}
+                      placeholder="Ex: 923 000 000"
+                      onChange={(e) => handleProfilePhoneLocalChange(e.target.value)}
+                      className="flex-1 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface font-mono"
+                    />
+                  </div>
                 </div>
 
                 {/* REDES SOCIAIS CONFIG BLOCK */}

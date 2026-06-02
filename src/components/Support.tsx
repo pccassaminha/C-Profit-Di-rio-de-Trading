@@ -2,9 +2,18 @@ import React, { useState } from 'react';
 import { useTrades } from '../hooks/useTrades';
 import { MessageSquare, Phone, Mail, Clock, ShieldCheck, User, HelpCircle, Send } from 'lucide-react';
 
+const getFormattedPhone = (phone: string | undefined): string => {
+  if (!phone) return '244956394712';
+  let clean = phone.replace(/\D/g, '');
+  if (clean.length === 9 && clean.startsWith('9')) {
+    return '244' + clean;
+  }
+  return clean || '244956394712';
+};
+
 export default function Support() {
   const { globalSettings } = useTrades();
-  const phone = globalSettings?.whatsappNumber || '244921319200';
+  const phone = getFormattedPhone(globalSettings?.whatsappNumber);
   const whatsappUrl = `https://wa.me/${phone}`;
 
   const [name, setName] = useState('');

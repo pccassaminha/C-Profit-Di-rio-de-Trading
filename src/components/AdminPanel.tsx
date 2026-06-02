@@ -5,6 +5,15 @@ import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, AlertTriangle, Search, Calendar, SlidersHorizontal, ArrowUpDown, Megaphone, History, Plus, Trash2, Pencil, FileText } from 'lucide-react';
 
+const getFormattedPhone = (phone: string | undefined): string => {
+  if (!phone) return '';
+  let clean = phone.replace(/\D/g, '');
+  if (clean.length === 9 && clean.startsWith('9')) {
+    return '244' + clean;
+  }
+  return clean;
+};
+
 export default function AdminPanel() {
   const { userPlan, globalSettings: initialSettings } = useTrades();
   const currentUser = auth.currentUser;
@@ -188,6 +197,15 @@ export default function AdminPanel() {
     const index = sortedPayments.findIndex(p => p.id === paymentId);
     const numericStr = String(1000 + (index >= 0 ? index : payments.length));
     return `PG${numericStr}`;
+  };
+
+  const isFictitiousPayment = (p: any) => {
+    const displayId = getPaymentDisplayId(p.id);
+    const correspondingUser = users.find(u => u.id === p.userId);
+    const customerName = (p.userName || correspondingUser?.name || correspondingUser?.nome || '').toLowerCase();
+    const customerEmail = (correspondingUser?.email || p.userEmail || '').toLowerCase();
+    const isEdmundo = customerName.includes('edmundo') || customerEmail.includes('edmundo');
+    return isEdmundo && displayId !== 'PG1005';
   };
 
   const filteredPayments = payments
@@ -1214,103 +1232,129 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          {filteredPayments.length > 0 ? filteredPayments.map(p => (
-            <div key={p.id} className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-xl">
-              {/* Left side details: 3 beautiful structured columns to distribute the info perfectly and avoid squeezing */}
-              <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                
-                {/* Col 1: Status & General Identifier */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                      p.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 
-                      p.status === 'rejected' ? 'bg-error/20 text-error' : 'bg-amber-500/20 text-amber-400'
-                    }`}>
-                      {p.status || 'Pendente'}
-                    </span>
-                    <span className="text-xs text-on-surface-variant font-mono font-bold">#{getPaymentDisplayId(p.id)}</span>
-                  </div>
-                  <div>
-                    <p className="text-lg font-black text-primary">{p.amount?.toLocaleString()} Kz</p>
-                    <p className="text-[10px] text-on-surface-variant/70 font-mono mt-0.5">{new Date(p.createdAt).toLocaleString()}</p>
-                  </div>
-                </div>
+          {filteredPayments.length > 0 ? filteredPayments.map(p => {
+            const correspondingUser = users.find(u => u.id === p.userId);
+            const customerPhone = p.userPhone || correspondingUser?.phoneNumber || correspondingUser?.phone || '';
+            const customerName = p.userName || correspondingUser?.name || correspondingUser?.nome || 'Trader';
 
-                {/* Col 2: User Detail */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest block opacity-60">Solicitado Por</span>
-                  <h4 className="text-sm font-black text-white hover:text-[#00f5a0] transition-colors leading-snug">
-                    {p.userName || users.find(u => u.id === p.userId)?.name || users.find(u => u.id === p.userId)?.nome || `Trader ${getUserDisplayId(p.userId)}`}
-                  </h4>
-                  <p className="text-[11px] text-[#00f5a0] font-mono break-all">{users.find(u => u.id === p.userId)?.email || 'Sem e-mail'}</p>
-                  <p className="text-[10px] text-on-surface-variant font-mono opacity-50">ID: {getUserDisplayId(p.userId)}</p>
-                </div>
+            return (
+              <div key={p.id} className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-xl animate-in fade-in duration-200">
+                {/* Left side details: 3 beautiful structured columns to distribute the info perfectly and avoid squeezing */}
+                <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                  
+                  {/* Col 1: Status & General Identifier */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                        p.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 
+                        p.status === 'rejected' ? 'bg-error/20 text-error' : 'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {p.status || 'Pendente'}
+                      </span>
+                      <span className="text-xs text-on-surface-variant font-mono font-bold">#{getPaymentDisplayId(p.id)}</span>
+                    </div>
+                    <div>
+                      <p className="text-lg font-black text-primary">{p.amount?.toLocaleString()} Kz</p>
+                      <p className="text-[10px] text-on-surface-variant/70 font-mono mt-0.5">{new Date(p.createdAt).toLocaleString()}</p>
+                    </div>
+                  </div>
 
-                {/* Col 3: Plan & Payment Method Detail */}
-                <div className="space-y-1 border-t md:border-t-0 md:border-l border-outline-variant/10 md:pl-6 pt-3 md:pt-0">
-                  <div className="flex flex-col gap-1">
-                    <p className="text-xs text-on-surface-variant font-medium">
-                      Plano: <span className="text-on-surface font-black uppercase tracking-widest text-[#00f5a0]">{p.planId?.replace('_', ' ')}</span>
-                    </p>
-                    <p className="text-xs text-on-surface-variant font-medium">
-                      Método: <span className="text-on-surface font-extrabold">{
-                        p.paymentMethod === 'express' ? 'Express 📱' : 
-                        p.paymentMethod === 'iban' ? 'IBAN 🏛️' : 
-                        p.paymentMethod === 'kwik' ? 'KWIK 💸' : 'MCX Referência 💳'
-                      }</span>
-                    </p>
-                    {p.paymentMethod === 'express' && p.expressCode && (
-                      <div className="mt-1 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl w-fit">
-                        <span className="text-[9px] text-amber-500 font-black tracking-wider uppercase font-mono block">CÓD V-REDE</span>
-                        <span className="text-xs text-on-surface font-mono font-bold">{p.expressCode}</span>
-                      </div>
+                  {/* Col 2: User Detail */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest block opacity-60">Solicitado Por</span>
+                    <h4 className="text-sm font-black text-white hover:text-[#00f5a0] transition-colors leading-snug">
+                      {customerName}
+                    </h4>
+                    <p className="text-[11px] text-[#00f5a0] font-mono break-all">{correspondingUser?.email || 'Sem e-mail'}</p>
+                    <p className="text-[10px] text-on-surface-variant font-mono opacity-50">ID: {getUserDisplayId(p.userId)}</p>
+                    {customerPhone && (
+                      <p className="text-xs text-slate-400 font-mono flex items-center gap-1 mt-1 bg-surface-container-high px-2.5 py-1 rounded-lg w-fit border border-outline-variant/10">
+                        <span className="text-emerald-400 font-bold">📲</span> {customerPhone}
+                      </p>
                     )}
                   </div>
+
+                  {/* Col 3: Plan & Payment Method Detail */}
+                  <div className="space-y-1 border-t md:border-t-0 md:border-l border-outline-variant/10 md:pl-6 pt-3 md:pt-0">
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs text-on-surface-variant font-medium">
+                        Plano: <span className="text-on-surface font-black uppercase tracking-widest text-[#00f5a0]">{p.planId?.replace('_', ' ')}</span>
+                      </p>
+                      <p className="text-xs text-on-surface-variant font-medium">
+                        Método: <span className="text-on-surface font-extrabold">{
+                          p.paymentMethod === 'express' ? 'Express 📱' : 
+                          p.paymentMethod === 'iban' ? 'IBAN 🏛️' : 
+                          p.paymentMethod === 'kwik' ? 'KWIK 💸' : 'MCX Referência 💳'
+                        }</span>
+                      </p>
+                      {p.paymentMethod === 'express' && p.expressCode && (
+                        <div className="mt-1 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl w-fit">
+                          <span className="text-[9px] text-amber-500 font-black tracking-wider uppercase font-mono block">CÓD V-REDE</span>
+                          <span className="text-xs text-on-surface font-mono font-bold">{p.expressCode}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
 
-              </div>
+                {/* Actions Column (Right Side - clean spacing) */}
+                <div className="flex flex-wrap items-center gap-3 shrink-0 border-t lg:border-t-0 pt-4 lg:pt-0 border-outline-variant/10 justify-end w-full lg:w-auto">
+                  {/* Highly Custom WhatsApp/Call shortcut with preformatted beautiful risko text */}
+                  {customerPhone && (
+                    <button
+                      onClick={() => {
+                        const formattedPhone = getFormattedPhone(customerPhone);
+                        const message = `Olá Trader ${customerName}! 🚀 \n\nAqui é o suporte do C-Profit. Passando para avisar que a sua assinatura já está activa! Por favor, aceda à plataforma para verificar o seu acesso. \n\nDesejamos-lhe excelentes trades e um ótimo controlo financeiro! Lembre-se sempre deste conselho de gestão: \n\n"O bom trader não é aquele que foca apenas nos ganhos, mas sim aquele que controla rigorosamente os seus riscos." 📊🧠\n\n💻 Para ter a melhor experiência possível de análise e trading no C-Profit, recomendamos que utilize a plataforma através do Computador / Desktop.\n\n🔗 Aceda diretamente aqui: https://cprofit.app/\n\nBons trades e faça uma excelente gestão de risco! Se precisar de qualquer suporte, estamos por aqui. 📈✨`;
+                        window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
+                      }}
+                      className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 hover:scale-[1.03] active:scale-[0.97] transition-all text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-emerald-500/5 duration-150"
+                      title="Enviar Mensagem de Ativação via WhatsApp"
+                    >
+                      <Phone size={13} className="text-[#25D366]" /> Contatar WhatsApp
+                    </button>
+                  )}
 
-              {/* Actions Column (Right Side - clean spacing) */}
-              <div className="flex flex-wrap items-center gap-3 shrink-0 border-t lg:border-t-0 pt-4 lg:pt-0 border-outline-variant/10 justify-end w-full lg:w-auto">
-                {p.status === 'pending' && (
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleRejectPayment(p.id)}
-                      className="p-2.5 rounded-xl bg-error/10 text-error hover:bg-error/20 hover:scale-105 transition-all text-sm"
-                      title="Negar"
-                    >
-                      <X size={18} />
-                    </button>
-                    <button 
-                      onClick={() => handleApprovePayment(p)}
-                      className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:scale-105 transition-all text-sm"
-                      title="Aprovar"
-                    >
-                      <Check size={18} />
-                    </button>
-                  </div>
-                )}
-                {p.status !== 'pending' && (
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleRevertPayment(p.id)}
-                      className="p-2 rounded-xl bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-all opacity-50 hover:opacity-100"
-                      title="Desconfirmar"
-                    >
-                      <X size={16} />
-                    </button>
-                    <button 
-                      onClick={() => handleDeletePayment(p.id)}
-                      className="p-2 rounded-xl bg-error/10 text-error hover:bg-error/20 transition-all opacity-50 hover:opacity-100"
-                      title="Apagar Histórico"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                )}
+                  {p.status === 'pending' && (
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleRejectPayment(p.id)}
+                        className="p-2.5 rounded-xl bg-error/10 text-error hover:bg-error/20 hover:scale-105 transition-all text-sm"
+                        title="Negar"
+                      >
+                        <X size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleApprovePayment(p)}
+                        className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:scale-105 transition-all text-sm"
+                        title="Aprovar"
+                      >
+                        <Check size={18} />
+                      </button>
+                    </div>
+                  )}
+                  {p.status !== 'pending' && (
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleRevertPayment(p.id)}
+                        className="p-2 rounded-xl bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-all opacity-50 hover:opacity-100"
+                        title="Desconfirmar"
+                      >
+                        <X size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeletePayment(p.id)}
+                        className="p-2 rounded-xl bg-error/10 text-error hover:bg-error/20 transition-all opacity-50 hover:opacity-100"
+                        title="Apagar Histórico"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )) : (
+            );
+          }) : (
             <div className="text-center p-12 bg-surface-container-low rounded-3xl border border-dashed border-outline-variant/30">
               <p className="text-on-surface-variant">Nenhum pagamento correspondente aos filtros aplicados.</p>
             </div>
@@ -2323,7 +2367,7 @@ export default function AdminPanel() {
                   Total Faturado (Assinaturas)
                 </p>
                 <p className="text-3xl font-black text-emerald-400 mt-2">
-                  {payments.filter(p => p.status === 'approved').reduce((acc, p) => acc + (p.amount || 0), 0).toLocaleString()} Kz
+                  {payments.filter(p => p.status === 'approved' && !isFictitiousPayment(p)).reduce((acc, p) => acc + (p.amount || 0), 0).toLocaleString()} Kz
                 </p>
                 <p className="text-[11px] text-on-surface-variant/70 mt-1">Soma de todos os planos aprovados (Clique para ver)</p>
               </div>
@@ -2340,7 +2384,7 @@ export default function AdminPanel() {
                   Total de Descontos Concedidos
                 </p>
                 <p className="text-3xl font-black text-amber-400 mt-2">
-                  {payments.filter(p => p.status === 'approved' && p.usedCoupon).reduce((acc, p) => {
+                  {payments.filter(p => p.status === 'approved' && p.usedCoupon && !isFictitiousPayment(p)).reduce((acc, p) => {
                     const c = coupons.find(cp => cp.code === p.usedCoupon);
                     if (c) {
                       if (c.discountType === 'fixed') return acc + Number(c.discountValue);
@@ -2411,7 +2455,7 @@ export default function AdminPanel() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant/10 text-xs text-white">
-                      {payments.filter(p => p.status === 'approved').map(p => {
+                      {payments.filter(p => p.status === 'approved' && !isFictitiousPayment(p)).map(p => {
                         const paidUser = users.find(u => u.id === p.userId);
                         return (
                           <tr key={p.id} className="hover:bg-surface-container/20 transition-colors">
@@ -2429,7 +2473,7 @@ export default function AdminPanel() {
                           </tr>
                         );
                       })}
-                      {payments.filter(p => p.status === 'approved').length === 0 && (
+                      {payments.filter(p => p.status === 'approved' && !isFictitiousPayment(p)).length === 0 && (
                         <tr>
                           <td colSpan={6} className="p-8 text-center text-xs text-on-surface-variant/70 italic">Nenhum pagamento aprovado até ao momento.</td>
                         </tr>
@@ -2452,7 +2496,7 @@ export default function AdminPanel() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant/10 text-xs text-white">
-                      {payments.filter(p => p.status === 'approved' && p.usedCoupon).map(p => {
+                      {payments.filter(p => p.status === 'approved' && p.usedCoupon && !isFictitiousPayment(p)).map(p => {
                         const paidUser = users.find(u => u.id === p.userId);
                         const c = coupons.find(cp => cp.code === p.usedCoupon);
                         let estimatedSavings = 0;
@@ -2479,7 +2523,7 @@ export default function AdminPanel() {
                           </tr>
                         );
                       })}
-                      {payments.filter(p => p.status === 'approved' && p.usedCoupon).length === 0 && (
+                      {payments.filter(p => p.status === 'approved' && p.usedCoupon && !isFictitiousPayment(p)).length === 0 && (
                         <tr>
                           <td colSpan={5} className="p-8 text-center text-xs text-on-surface-variant/70 italic">Nenhum cupão promocional ativo ainda faturado.</td>
                         </tr>

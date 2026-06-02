@@ -6,6 +6,38 @@ import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDoc
 import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+const COUNTRIES = [
+  { code: 'AO', label: 'AO +244', dialCode: '+244', flag: '🇦🇴' },
+  { code: 'PT', label: 'PT +351', dialCode: '+351', flag: '🇵🇹' },
+  { code: 'BR', label: 'BR +55', dialCode: '+55', flag: '🇧🇷' },
+  { code: 'MZ', label: 'MZ +258', dialCode: '+258', flag: '🇲🇿' },
+  { code: 'CV', label: 'CV +238', dialCode: '+238', flag: '🇨🇻' },
+  { code: 'GW', label: 'GW +245', dialCode: '+245', flag: '🇬🇼' },
+  { code: 'ST', label: 'ST +239', dialCode: '+239', flag: '🇸🇹' },
+  { code: 'GQ', label: 'GQ +240', dialCode: '+240', flag: '🇬🇶' }
+];
+
+const parsePhoneNumberInput = (phoneVal: string) => {
+  const dialCodes = ['+244', '+351', '+55', '+258', '+238', '+245', '+239', '+240'];
+  let cleaned = (phoneVal || '').trim();
+  
+  for (const dial of dialCodes) {
+    if (cleaned.startsWith(dial)) {
+      return { dialCode: dial, localNumber: cleaned.substring(dial.length).trim() };
+    }
+    const noPlus = dial.replace('+', '');
+    if (cleaned.startsWith(noPlus)) {
+      return { dialCode: dial, localNumber: cleaned.substring(noPlus.length).trim() };
+    }
+  }
+  
+  if (cleaned.length === 9 && cleaned.startsWith('9')) {
+    return { dialCode: '+244', localNumber: cleaned };
+  }
+  
+  return { dialCode: '+244', localNumber: cleaned };
+};
+
 export interface Objective {
   id: string;
   type: 'account' | 'market';
@@ -70,6 +102,27 @@ export default function Settings() {
   const [billingName, setBillingName] = useState('');
   const [billingEmail, setBillingEmail] = useState('');
   const [billingPhone, setBillingPhone] = useState('');
+  const [billingDialCode, setBillingDialCode] = useState('+244');
+  const [billingPhoneLocal, setBillingPhoneLocal] = useState('');
+
+  useEffect(() => {
+    if (billingPhone) {
+      const parsed = parsePhoneNumberInput(billingPhone);
+      setBillingDialCode(parsed.dialCode);
+      setBillingPhoneLocal(parsed.localNumber);
+    }
+  }, [billingPhone]);
+
+  const handleBillingPhoneLocalChange = (val: string) => {
+    const clean = val.replace(/\D/g, '');
+    setBillingPhoneLocal(clean);
+    setBillingPhone(billingDialCode + clean);
+  };
+
+  const handleBillingDialChange = (val: string) => {
+    setBillingDialCode(val);
+    setBillingPhone(val + billingPhoneLocal);
+  };
   const [registrationId, setRegistrationId] = useState('');
   const [partnerEmail, setPartnerEmail] = useState('');
   const [partnerPassword, setPartnerPassword] = useState('');
@@ -866,15 +919,30 @@ export default function Settings() {
                         className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none focus:border-primary transition-colors"
                       />
                     </div>
-                    <div className="space-y-2">
+                     <div className="space-y-2">
                       <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Telemóvel (WhatsApp)</label>
-                      <input 
-                        type="text"
-                        value={billingPhone}
-                        onChange={(e) => setBillingPhone(e.target.value)}
-                        placeholder="+244 9..."
-                        className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none focus:border-primary transition-colors font-mono"
-                      />
+                      <div className="flex gap-2">
+                        <div className="relative shrink-0 text-white">
+                          <select 
+                            value={billingDialCode}
+                            onChange={(e) => handleBillingDialChange(e.target.value)}
+                            className="bg-surface-container border border-outline-variant/20 rounded-lg px-3 py-3 text-sm font-black text-on-surface outline-none focus:border-primary transition-colors appearance-none pr-8 cursor-pointer h-full"
+                          >
+                            {COUNTRIES.map(c => (
+                              <option key={c.code} value={c.dialCode}>{c.flag} {c.label}</option>
+                            ))}
+                          </select>
+                          <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[8px]">▼</div>
+                        </div>
+
+                        <input 
+                          type="text"
+                          value={billingPhoneLocal}
+                          onChange={(e) => handleBillingPhoneLocalChange(e.target.value)}
+                          placeholder="Ex: 923 000 000"
+                          className="flex-1 bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none focus:border-primary transition-colors font-mono"
+                        />
+                      </div>
                     </div>
                   </div>
                   <p className="text-[10px] text-on-surface-variant mt-4 italic lowercase">

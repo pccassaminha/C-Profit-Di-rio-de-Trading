@@ -6,6 +6,15 @@ import { CreditCard, History, Download, FileText, CheckCircle2, XCircle, Clock, 
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+const getFormattedPhone = (phone: string | undefined): string => {
+  if (!phone) return '244956394712';
+  let clean = phone.replace(/\D/g, '');
+  if (clean.length === 9 && clean.startsWith('9')) {
+    return '244' + clean;
+  }
+  return clean || '244956394712';
+};
+
 export default function Payments() {
   const { userPlan, globalSettings } = useTrades();
   const [payments, setPayments] = useState<any[]>([]);
@@ -332,7 +341,7 @@ export default function Payments() {
               {selectedInvoice.status === 'pending' && (
                 <button 
                   onClick={() => {
-                    const phone = globalSettings?.whatsappNumber || '244921319200';
+                    const phone = getFormattedPhone(globalSettings?.whatsappNumber);
                     window.open(`https://wa.me/${phone}?text=Olá, envio em anexo o comprovativo do pagamento #${selectedInvoice.id.slice(0, 8)}`, '_blank');
                   }}
                   className="flex items-center justify-center gap-3 bg-[#25D366] text-[#022c16] px-8 py-4 rounded-2xl font-black shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all uppercase tracking-widest text-sm"

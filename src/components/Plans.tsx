@@ -18,6 +18,47 @@ const formatPrice = (num: number): string => {
   return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 };
 
+const getFormattedPhone = (phone: string | undefined): string => {
+  if (!phone) return '244956394712';
+  let clean = phone.replace(/\D/g, '');
+  if (clean.length === 9 && clean.startsWith('9')) {
+    return '244' + clean;
+  }
+  return clean || '244956394712';
+};
+
+const COUNTRIES = [
+  { code: 'AO', label: 'AO +244', dialCode: '+244', flag: '🇦🇴' },
+  { code: 'PT', label: 'PT +351', dialCode: '+351', flag: '🇵🇹' },
+  { code: 'BR', label: 'BR +55', dialCode: '+55', flag: '🇧🇷' },
+  { code: 'MZ', label: 'MZ +258', dialCode: '+258', flag: '🇲🇿' },
+  { code: 'CV', label: 'CV +238', dialCode: '+238', flag: '🇨🇻' },
+  { code: 'GW', label: 'GW +245', dialCode: '+245', flag: '🇬🇼' },
+  { code: 'ST', label: 'ST +239', dialCode: '+239', flag: '🇸🇹' },
+  { code: 'GQ', label: 'GQ +240', dialCode: '+240', flag: '🇬🇶' }
+];
+
+const parsePhoneNumberInput = (phoneVal: string) => {
+  const dialCodes = ['+244', '+351', '+55', '+258', '+238', '+245', '+239', '+240'];
+  let cleaned = (phoneVal || '').trim();
+  
+  for (const dial of dialCodes) {
+    if (cleaned.startsWith(dial)) {
+      return { dialCode: dial, localNumber: cleaned.substring(dial.length).trim() };
+    }
+    const noPlus = dial.replace('+', '');
+    if (cleaned.startsWith(noPlus)) {
+      return { dialCode: dial, localNumber: cleaned.substring(noPlus.length).trim() };
+    }
+  }
+  
+  if (cleaned.length === 9 && cleaned.startsWith('9')) {
+    return { dialCode: '+244', localNumber: cleaned };
+  }
+  
+  return { dialCode: '+244', localNumber: cleaned };
+};
+
 export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { forcedExpired?: boolean, hideHeader?: boolean, onAuthRequired?: () => void }) {
   const { userPlan, globalSettings } = useTrades();
   const [payments, setPayments] = useState<any[]>([]);
@@ -26,6 +67,27 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [payerName, setPayerName] = useState(auth.currentUser?.displayName || '');
   const [payerPhone, setPayerPhone] = useState('');
+  const [payerDialCode, setPayerDialCode] = useState('+244');
+  const [payerPhoneLocal, setPayerPhoneLocal] = useState('');
+
+  useEffect(() => {
+    if (payerPhone) {
+      const parsed = parsePhoneNumberInput(payerPhone);
+      setPayerDialCode(parsed.dialCode);
+      setPayerPhoneLocal(parsed.localNumber);
+    }
+  }, [payerPhone]);
+
+  const handlePayerPhoneLocalChange = (val: string) => {
+    const clean = val.replace(/\D/g, '');
+    setPayerPhoneLocal(clean);
+    setPayerPhone(payerDialCode + clean);
+  };
+
+  const handlePayerDialChange = (val: string) => {
+    setPayerDialCode(val);
+    setPayerPhone(val + payerPhoneLocal);
+  };
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<'iban' | 'multicaixa' | 'express' | 'kwik'>('iban');
   const [expressCode, setExpressCode] = useState('');
@@ -33,6 +95,19 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const [typedCoupon, setTypedCoupon] = useState('');
   const [validationMsg, setValidationMsg] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
   const [hadTrial30, setHadTrial30] = useState(false);
+  const [showModalCouponInput, setShowModalCouponInput] = useState(false);
+  const [modalCouponCode, setModalCouponCode] = useState('');
+  const [modalCouponError, setModalCouponError] = useState<string | null>(null);
+  const [modalCouponSuccessMsg, setModalCouponSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (showPaymentModal) {
+      setShowModalCouponInput(false);
+      setModalCouponCode('');
+      setModalCouponError(null);
+      setModalCouponSuccessMsg(null);
+    }
+  }, [showPaymentModal]);
 
   const hasUsedTrial = !!(
     userPlan?.hadTrial30 || 
@@ -50,8 +125,13 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     return () => unsubCoupons();
   }, []);
 
-  const handleApplyCouponCode = async (codeStr: string) => {
-    setValidationMsg(null);
+  const handleApplyCouponCode = async (codeStr: string, isFromModal = false) => {
+    if (isFromModal) {
+      setModalCouponError(null);
+      setModalCouponSuccessMsg(null);
+    } else {
+      setValidationMsg(null);
+    }
     const cleanCode = codeStr.trim().toUpperCase();
     if (!cleanCode) return;
 
@@ -63,13 +143,18 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       if (!snap.empty) {
         const couponDoc = snap.docs[0].data();
         if (!couponDoc.active) {
-          setValidationMsg({ text: 'Cupom inválido ou inativo.', type: 'error' });
+          const errorMsg = 'Cupom inválido ou inativo.';
+          if (isFromModal) setModalCouponError(errorMsg);
+          else setValidationMsg({ text: errorMsg, type: 'error' });
           return;
         }
         
         const cp = { id: snap.docs[0].id, ...couponDoc };
         setAppliedCoupon(cp);
-        setValidationMsg({ text: `Cupom "${cleanCode}" de ${couponDoc.discountValue}${couponDoc.discountType === 'percentage' ? '%' : ' Kz'} aplicado com sucesso!`, type: 'success' });
+        
+        const successMsg = `Cupom "${cleanCode}" de ${couponDoc.discountValue}${couponDoc.discountType === 'percentage' ? '%' : ' Kz'} aplicado com sucesso!`;
+        if (isFromModal) setModalCouponSuccessMsg(successMsg);
+        else setValidationMsg({ text: successMsg, type: 'success' });
         return;
       }
       
@@ -83,14 +168,20 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
           discountValue: 50,
           targetPlan: 'all'
         });
-        setValidationMsg({ text: 'Cupom "CPROFIT83%OFF" de 83% de DESCONTO aplicado com sucesso!', type: 'success' });
+        const successMsg = 'Cupom "CPROFIT83%OFF" de 83% de DESCONTO aplicado com sucesso!';
+        if (isFromModal) setModalCouponSuccessMsg(successMsg);
+        else setValidationMsg({ text: successMsg, type: 'success' });
         return;
       }
 
-      setValidationMsg({ text: 'Cupom inválido ou inativo.', type: 'error' });
+      const errorMsg = 'Cupom inválido ou inativo.';
+      if (isFromModal) setModalCouponError(errorMsg);
+      else setValidationMsg({ text: errorMsg, type: 'error' });
     } catch (err) {
       console.error(err);
-      setValidationMsg({ text: 'Erro ao validar cupom.', type: 'error' });
+      const errorMsg = 'Erro ao validar cupom.';
+      if (isFromModal) setModalCouponError(errorMsg);
+      else setValidationMsg({ text: errorMsg, type: 'error' });
     }
   };
 
@@ -294,7 +385,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   });
 
   const handleSupport = () => {
-    const phone = globalSettings?.whatsappNumber || '244921319200';
+    const phone = getFormattedPhone(globalSettings?.whatsappNumber);
     window.open(`https://wa.me/${phone}`, '_blank');
   };
 
@@ -323,13 +414,16 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     setIsSubmitting(true);
     try {
       const numericId = generateNumericId();
+      const targetPlan = plans.find(p => p.id === showPaymentModal.id) || showPaymentModal;
+      const dynamicPrice = getDiscountedPrice(targetPlan);
+
       await addDoc(collection(db, 'payments'), {
         userId: auth.currentUser?.uid,
         userName: payerName,
         userEmail: auth.currentUser?.email || '',
         userPhone: payerPhone,
         planId: showPaymentModal.id,
-        amount: parsePriceToNumber(showPaymentModal.price),
+        amount: parsePriceToNumber(dynamicPrice),
         status: 'pending',
         transactionCode: numericId,
         proofUrl: 'WhatsApp Support',
@@ -664,46 +758,140 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Telemóvel (WhatsApp)</label>
-                        <input 
-                          type="text" 
-                          value={payerPhone}
-                          onChange={(e) => setPayerPhone(e.target.value)}
-                          placeholder="+244 9..."
-                          className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all font-mono"
-                        />
+                        <div className="flex gap-2">
+                          <div className="relative shrink-0">
+                            <select 
+                              value={payerDialCode}
+                              onChange={(e) => handlePayerDialChange(e.target.value)}
+                              className="bg-surface-container border border-outline-variant/10 rounded-2xl pl-4 pr-9 py-4 text-xs font-black text-on-surface outline-none focus:border-primary transition-all appearance-none cursor-pointer h-full"
+                            >
+                              {COUNTRIES.map(c => (
+                                <option key={c.code} value={c.dialCode}>{c.flag} {c.label}</option>
+                              ))}
+                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[8px]">▼</div>
+                          </div>
+
+                          <input 
+                            type="text" 
+                            required
+                            value={payerPhoneLocal}
+                            onChange={(e) => handlePayerPhoneLocalChange(e.target.value)}
+                            placeholder="Ex: 923 000 000"
+                            className="flex-1 bg-surface-container border border-outline-variant/10 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all font-mono"
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center pb-6 border-b border-outline-variant/20">
-                      <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.3em]">Total a Liquidar:</span>
-                      <span className="text-3xl font-black text-primary font-mono tracking-tighter">{showPaymentModal.price} Kz</span>
-                    </div>
+                    {(() => {
+                      const targetPlan = plans.find(p => p.id === showPaymentModal.id) || showPaymentModal;
+                      const dynamicPrice = getDiscountedPrice(targetPlan);
+                      const is83Off = (appliedCoupon || userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30');
+                      const originalOldPrice = targetPlan.oldPrice || targetPlan.price;
+                      const savingsAmount = parsePriceToNumber(originalOldPrice) - parsePriceToNumber(dynamicPrice);
 
-                    {/* Economia e Desconto Expressivo */}
-                    {showPaymentModal.id !== 'trial_30' && (
-                      <div className="bg-[#00f5a0]/10 border border-[#00f5a0]/30 rounded-2xl p-4 flex flex-col gap-2 text-left">
-                        <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
-                          <span>Preço Normal Original:</span>
-                          <span className="line-through font-mono text-white/50">{showPaymentModal.oldPrice} Kz</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
-                          <span>Desconto Activo:</span>
-                          <span className="text-[#00f5a0] font-black">
-                            {(appliedCoupon || userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30') ? '83% OFF' : '33% OFF'}
-                          </span>
-                        </div>
-                        <div className="border-t border-dashed border-[#00f5a0]/20 my-1"></div>
-                        <div className="flex justify-between items-center text-sm font-black text-white">
-                          <span className="uppercase tracking-wider flex items-center gap-1.5 text-[11px] text-[#00f5a0]">
-                            <span className="material-symbols-outlined text-sm">savings</span>
-                            Poupança Total:
-                          </span>
-                          <span className="text-[#00f5a0] font-mono tracking-tight font-black text-base bg-[#00f5a0]/15 px-3 py-1 rounded-xl">
-                            Economiza {formatPrice(parsePriceToNumber(showPaymentModal.oldPrice) - parsePriceToNumber(showPaymentModal.price))} Kz
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                      return (
+                        <>
+                          <div className="flex justify-between items-center pb-6 border-b border-outline-variant/20">
+                            <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.3em]">Total a Liquidar:</span>
+                            <span className="text-3xl font-black text-primary font-mono tracking-tighter">{dynamicPrice} Kz</span>
+                          </div>
+
+                          {/* Economia e Desconto Expressivo */}
+                          {showPaymentModal.id !== 'trial_30' && (
+                            <div className="bg-[#00f5a0]/10 border border-[#00f5a0]/30 rounded-2xl p-4 flex flex-col gap-2 text-left">
+                              <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
+                                <span>Preço Normal Original:</span>
+                                <span className="line-through font-mono text-white/50">{originalOldPrice} Kz</span>
+                              </div>
+                              <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
+                                <span>Desconto Activo:</span>
+                                <span className="text-[#00f5a0] font-black">
+                                  {is83Off ? '83% OFF' : '33% OFF'}
+                                </span>
+                              </div>
+                              <div className="border-t border-dashed border-[#00f5a0]/20 my-1"></div>
+                              <div className="flex justify-between items-center text-sm font-black text-white">
+                                <span className="uppercase tracking-wider flex items-center gap-1.5 text-[11px] text-[#00f5a0]">
+                                  <span className="material-symbols-outlined text-sm">savings</span>
+                                  Poupança Total:
+                                </span>
+                                <span className="text-[#00f5a0] font-mono tracking-tight font-black text-base bg-[#00f5a0]/15 px-3 py-1 rounded-xl">
+                                  Economiza {formatPrice(savingsAmount)} Kz
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Cupão de Desconto Interativo no Modal */}
+                          {showPaymentModal.id !== 'trial_30' && (
+                            <div className="border border-outline-variant/10 rounded-2xl p-3 bg-surface-container-low/50">
+                              {!showModalCouponInput ? (
+                                <button 
+                                  type="button"
+                                  onClick={() => setShowModalCouponInput(true)}
+                                  className="text-[11px] font-black text-primary hover:underline flex items-center gap-1.5 transition-all text-left uppercase tracking-widest"
+                                >
+                                  <span className="material-symbols-outlined text-sm">local_activity</span>
+                                  Tens um cupão ?
+                                </button>
+                              ) : (
+                                <div className="space-y-2.5 animate-in slide-in-from-top-1 duration-200">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-1">
+                                      <span className="material-symbols-outlined text-xs">local_activity</span>
+                                      Código do Cupão
+                                    </span>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => {
+                                        setShowModalCouponInput(false);
+                                        setModalCouponError(null);
+                                        setModalCouponSuccessMsg(null);
+                                      }}
+                                      className="text-[9px] font-black text-rose-400 uppercase tracking-widest hover:underline"
+                                    >
+                                      Ocultar
+                                    </button>
+                                  </div>
+                                  
+                                  <div className="flex gap-2">
+                                    <input 
+                                      type="text" 
+                                      value={modalCouponCode}
+                                      onChange={(e) => setModalCouponCode(e.target.value.toUpperCase())}
+                                      placeholder="Ex: CPROFIT83%OFF"
+                                      className="flex-1 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs font-bold text-on-surface uppercase outline-none focus:border-primary placeholder:text-on-surface-variant/30 font-mono text-white"
+                                    />
+                                    <button 
+                                      type="button"
+                                      onClick={async () => {
+                                        await handleApplyCouponCode(modalCouponCode, true);
+                                      }}
+                                      className="bg-primary text-on-primary text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-opacity-90 transition-all shrink-0"
+                                    >
+                                      Aplicar
+                                    </button>
+                                  </div>
+                                  
+                                  {modalCouponSuccessMsg && (
+                                    <p className="text-[10px] font-bold text-emerald-400 leading-normal">
+                                      {modalCouponSuccessMsg}
+                                    </p>
+                                  )}
+                                  {modalCouponError && (
+                                    <p className="text-[10px] font-bold text-rose-400 leading-normal">
+                                      {modalCouponError}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     {/* Seleção do Método de Pagamento */}
                     <div className="space-y-3">

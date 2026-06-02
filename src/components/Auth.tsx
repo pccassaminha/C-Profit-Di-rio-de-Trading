@@ -27,6 +27,17 @@ import {
   Phone
 } from 'lucide-react';
 
+const COUNTRIES = [
+  { code: 'AO', label: 'AO +244', dialCode: '+244', flag: '🇦🇴' },
+  { code: 'PT', label: 'PT +351', dialCode: '+351', flag: '🇵🇹' },
+  { code: 'BR', label: 'BR +55', dialCode: '+55', flag: '🇧🇷' },
+  { code: 'MZ', label: 'MZ +258', dialCode: '+258', flag: '🇲🇿' },
+  { code: 'CV', label: 'CV +238', dialCode: '+238', flag: '🇨🇻' },
+  { code: 'GW', label: 'GW +245', dialCode: '+245', flag: '🇬🇼' },
+  { code: 'ST', label: 'ST +239', dialCode: '+239', flag: '🇸🇹' },
+  { code: 'GQ', label: 'GQ +240', dialCode: '+240', flag: '🇬🇶' }
+];
+
 interface AuthProps {
   onSuccess: () => void;
   initialMode?: 'login' | 'register';
@@ -40,6 +51,12 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneDialCode, setPhoneDialCode] = useState('+244');
+  const [phoneLocal, setPhoneLocal] = useState('');
+
+  useEffect(() => {
+    setPhoneNumber(phoneDialCode + phoneLocal.replace(/\D/g, ''));
+  }, [phoneDialCode, phoneLocal]);
   const [couponCode, setCouponCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -536,17 +553,32 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-2 overflow-hidden"
                   >
-                    <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50">Número de Telefone</label>
-                    <div className="relative">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40" size={20} />
-                      <input 
-                        type="tel" 
-                        required={!isLogin}
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        placeholder="Ex: +244 900 000 000"
-                        className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-4 text-on-surface outline-none focus:border-primary transition-all font-bold placeholder:text-on-surface-variant/30"
-                      />
+                    <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50 block">Número de Telefone</label>
+                    <div className="flex gap-2">
+                      <div className="relative shrink-0">
+                        <select 
+                          value={phoneDialCode}
+                          onChange={(e) => setPhoneDialCode(e.target.value)}
+                          className="bg-surface-container border border-outline-variant/10 rounded-2xl pl-4 pr-9 py-4 text-xs font-black text-on-surface outline-none focus:border-primary transition-all appearance-none cursor-pointer h-full"
+                        >
+                          {COUNTRIES.map(c => (
+                            <option key={c.code} value={c.dialCode}>{c.flag} {c.label}</option>
+                          ))}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[8px]">▼</div>
+                      </div>
+
+                      <div className="relative flex-1">
+                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40" size={18} />
+                        <input 
+                          type="tel" 
+                          required={!isLogin}
+                          value={phoneLocal}
+                          onChange={(e) => setPhoneLocal(e.target.value)}
+                          placeholder="Ex: 923 000 000"
+                          className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-4 text-on-surface outline-none focus:border-primary transition-all font-bold placeholder:text-on-surface-variant/30 font-mono"
+                        />
+                      </div>
                     </div>
                   </motion.div>
                 )}

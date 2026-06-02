@@ -28,7 +28,7 @@ export const useTrades = (manualTrades: any[] = []) => {
     };
     
     const defaultSettings = {
-      whatsappNumber: '244921319200',
+      whatsappNumber: '244956394712',
       iban: 'AO06 0000 0000 0000 0000 0',
       multicaixaEntity: '12345',
       multicaixaReference: '000 000 000',
