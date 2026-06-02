@@ -84,33 +84,44 @@ function TickerTapeWidget() {
   );
 }
 
-// Custom Premium Investing.com economic calendar widget styled perfectly to match the application's dark aesthetic
+// Custom Economic Calendar Widget supporting both original light flags and inverted dark mode styles
 function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
+  const [isDark, setIsDark] = useState(true);
+
   return (
-    <div className="w-full max-w-[850px] mx-auto bg-[#141414] border border-outline-variant/10 rounded-2xl p-2 relative overflow-hidden flex flex-col justify-between animate-in fade-in duration-300" style={{ height }}>
-      <div className="flex-1 w-full flex items-center justify-center bg-[#141414] overflow-hidden rounded-xl">
+    <div className="w-full max-w-[680px] mx-auto bg-[#141414] border border-outline-variant/10 rounded-2xl p-2 relative overflow-hidden flex flex-col justify-between" style={{ height }}>
+      <div className="flex justify-between items-center px-1 pb-1.5 select-none shrink-0 bg-[#141414]">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-on-surface-variant font-mono uppercase tracking-wider">Investing.com Engine</span>
+          <span className="text-[9px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-md font-bold">V2</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsDark(!isDark)}
+            className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+              isDark 
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' 
+                : 'bg-white/10 text-white border border-white/20'
+            }`}
+          >
+            {isDark ? '🎨 Tema Escuro' : '☀️ Tema Claro (Bandeiras Originais)'}
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 w-full flex items-center justify-center bg-white overflow-hidden rounded-xl">
         <iframe
           src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_credit,_centralBanks,_confidenceIndex,_balance,_Bonds&features=datepicker,timezone,timeselector,filters&countries=17,86,25,6,37,26,5,22,39,14,48,10,35,43,38,4,36,12,72&calType=day&timeZone=60&lang=12"
           width="100%"
           height="100%"
           frameBorder="0"
           allowtransparency="true"
-          className="w-full h-full bg-white transition-opacity duration-300 rounded-lg"
+          className="w-full h-full bg-white transition-all duration-300 rounded-lg animate-in fade-in"
           style={{ 
-            colorScheme: 'dark',
-            filter: 'invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(1.15)',
+            colorScheme: isDark ? 'dark' : 'light',
+            filter: isDark ? 'invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(1.15)' : 'none',
           }}
           title="Economic Calendar"
         />
-      </div>
-      <div className="flex justify-between items-center px-1 pt-1.5 select-none shrink-0 bg-[#141414]">
-        <span className="text-[10px] text-on-surface-variant/40 font-mono">Investing.com Engine V2</span>
-        <div className="text-[10px] text-on-surface-variant font-medium">
-          <span className="opacity-65">Calendário por </span>
-          <a href="https://br.investing.com/" rel="noopener nofollow" target="_blank" className="text-primary hover:underline font-bold transition-all">
-            Investing.com Brasil
-          </a>
-        </div>
       </div>
     </div>
   );
@@ -119,12 +130,13 @@ function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
 export default function Panorama() {
   const [layoutMode, setLayoutMode] = useState<'grid' | 'tabs'>('grid');
   const [activeTab, setActiveTab] = useState<'calendar' | 'heatmap' | 'technical' | 'quotes'>('calendar');
+  const [calendarSource, setCalendarSource] = useState<'tradingview' | 'investing'>('tradingview');
 
   // Technical Analysis selector state
   const [technicalSymbol, setTechnicalSymbol] = useState<'FX:EURUSD' | 'OANDA:XAUUSD' | 'BINANCE:BTCUSD'>('FX:EURUSD');
   
   // Unified heatmap selector state
-  const [activeHeatmap, setActiveHeatmap] = useState<'nasdaq' | 'djca' | 'forex' | 'crypto'>('nasdaq');
+  const [activeHeatmap, setActiveHeatmap] = useState<'nasdaq' | 'djca' | 'forex' | 'crypto'>('forex');
 
   // Technical symbols constant
   const technicalSymbols = [
@@ -345,17 +357,52 @@ export default function Panorama() {
           
           {/* Card 1: Calendario */}
           <div className="bg-surface-container border border-outline-variant/10 rounded-3xl p-6 flex flex-col space-y-4 xl:col-span-2">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#00f5a0]/15 text-primary flex items-center justify-center">
-                <Calendar size={18} />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#00f5a0]/15 text-primary flex items-center justify-center">
+                  <Calendar size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-tight text-on-surface">Calendário Econômico</h3>
+                  <p className="text-[11px] text-on-surface-variant">Notícias macroeconômicas e eventos de alta liquidez.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-sm tracking-tight text-on-surface">Calendário Econômico</h3>
-                <p className="text-[11px] text-on-surface-variant">Notícias macroeconômicas e eventos de alta liquidez.</p>
+
+              {/* Source Switcher Toggle */}
+              <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
+                <button
+                  onClick={() => setCalendarSource('tradingview')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                    calendarSource === 'tradingview'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  TradingView
+                </button>
+                <button
+                  onClick={() => setCalendarSource('investing')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                    calendarSource === 'investing'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Investing.com
+                </button>
               </div>
             </div>
+
             <div className="flex-1 min-h-[500px]">
-              <InvestingCalendarWidget height="500px" />
+              {calendarSource === 'tradingview' ? (
+                <TradingViewWidget
+                  widgetType="events"
+                  config={calendarConfig}
+                  height="500px"
+                />
+              ) : (
+                <InvestingCalendarWidget height="500px" />
+              )}
             </div>
           </div>
 
@@ -434,6 +481,16 @@ export default function Panorama() {
               {/* Switcher Toggles */}
               <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
                 <button
+                  onClick={() => setActiveHeatmap('forex')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
+                    activeHeatmap === 'forex'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Forex
+                </button>
+                <button
                   onClick={() => setActiveHeatmap('nasdaq')}
                   className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
                     activeHeatmap === 'nasdaq'
@@ -452,16 +509,6 @@ export default function Panorama() {
                   }`}
                 >
                   Dow Jones (DJCA)
-                </button>
-                <button
-                  onClick={() => setActiveHeatmap('forex')}
-                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
-                    activeHeatmap === 'forex'
-                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  Forex
                 </button>
                 <button
                   onClick={() => setActiveHeatmap('crypto')}
@@ -543,12 +590,47 @@ export default function Panorama() {
           <div className="bg-surface-container border border-outline-variant/10 rounded-3xl p-6 min-h-[600px] flex flex-col">
             {activeTab === 'calendar' && (
               <div className="flex-1 flex flex-col space-y-4">
-                <div className="flex items-center gap-3">
-                  <Calendar className="text-primary" size={20} />
-                  <h3 className="font-bold text-lg text-on-surface">Calendário Macro-Econômico em Tela Cheia</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="text-primary" size={20} />
+                    <h3 className="font-bold text-lg text-on-surface">Calendário Macro-Econômico em Tela Cheia</h3>
+                  </div>
+
+                  {/* Source Switcher Toggle */}
+                  <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
+                    <button
+                      onClick={() => setCalendarSource('tradingview')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        calendarSource === 'tradingview'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      TradingView
+                    </button>
+                    <button
+                      onClick={() => setCalendarSource('investing')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        calendarSource === 'investing'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Investing.com
+                    </button>
+                  </div>
                 </div>
+
                 <div className="flex-1 min-h-[550px]">
-                  <InvestingCalendarWidget height="580px" />
+                  {calendarSource === 'tradingview' ? (
+                    <TradingViewWidget
+                      widgetType="events"
+                      config={calendarConfig}
+                      height="580px"
+                    />
+                  ) : (
+                    <InvestingCalendarWidget height="580px" />
+                  )}
                 </div>
               </div>
             )}
@@ -563,6 +645,16 @@ export default function Panorama() {
                   
                   {/* Heatmap Type Toggle */}
                   <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
+                    <button
+                      onClick={() => setActiveHeatmap('forex')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        activeHeatmap === 'forex'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Forex / Moedas
+                    </button>
                     <button
                       onClick={() => setActiveHeatmap('nasdaq')}
                       className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
@@ -582,16 +674,6 @@ export default function Panorama() {
                       }`}
                     >
                       Dow Jones
-                    </button>
-                    <button
-                      onClick={() => setActiveHeatmap('forex')}
-                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
-                        activeHeatmap === 'forex'
-                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
-                          : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
-                    >
-                      Forex / Moedas
                     </button>
                     <button
                       onClick={() => setActiveHeatmap('crypto')}
