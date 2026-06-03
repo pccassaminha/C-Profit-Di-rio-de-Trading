@@ -53,7 +53,7 @@ export default function MobileBottomNav({ activeTab, setActiveTab }: MobileBotto
 
   // Secondary items shown inside the "More" drawer
   const secondaryItems = [
-    { id: 'panorama', icon: 'explore', label: 'Panorama Geral', desc: 'Análise, calendários e feeds técnicos' },
+    { id: 'panorama', icon: 'explore', label: 'Panorama Global', desc: 'Análise, calendários e feeds técnicos' },
     { id: 'withdrawals', icon: 'account_balance_wallet', label: 'Levantamentos', desc: 'Gerencie saques e aportes' },
     { id: 'affiliates_user', icon: 'handshake', label: 'Painel do Afiliado', desc: 'Gere receita indicando traders' },
     { id: 'payments', icon: 'payments', label: 'Faturas e Registros', desc: 'Histórico de transações' },

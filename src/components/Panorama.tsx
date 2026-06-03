@@ -331,7 +331,7 @@ export default function Panorama() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div>
           <h2 className="text-3xl font-black text-on-surface font-headline uppercase italic tracking-tighter">
-            Panorama do <span className="text-primary italic">Mercado</span>
+            Panorama <span className="text-primary italic">Global</span>
           </h2>
           <p className="text-on-surface-variant mt-2 max-w-2xl text-sm font-medium">
             Acompanhe em tempo real o calendário de notícias de alto impacto acadêmicas, mapa de calor com a volatilidade das moedas e o sumário de análise técnica institucional.

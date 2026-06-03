@@ -659,6 +659,7 @@ export default function Dashboard() {
     const psychologyMap: Record<string, number> = {};
     const pairsMap: Record<string, { pnl: number, wins: number, total: number }> = {};
     const timeframeMap: Record<string, { pnl: number, wins: number, total: number }> = {};
+    const sessionsMap: Record<string, { pnl: number, wins: number, total: number }> = {};
 
     // Analysis maps
     const analysisSetupsMap: Record<string, { pnl: number, wins: number, total: number }> = {};
@@ -846,6 +847,13 @@ export default function Dashboard() {
         timeframeMap[trade.timeframe].pnl += trade.pnl;
         if (trade.pnl > 0) timeframeMap[trade.timeframe].wins += 1;
       }
+
+      if (trade.session) {
+        if (!sessionsMap[trade.session]) sessionsMap[trade.session] = { pnl: 0, wins: 0, total: 0 };
+        sessionsMap[trade.session].total += 1;
+        sessionsMap[trade.session].pnl += trade.pnl;
+        if (trade.pnl > 0) sessionsMap[trade.session].wins += 1;
+      }
     });
 
     // 3. Process Bottom Trades (tradesToProcess)
@@ -933,6 +941,11 @@ export default function Dashboard() {
       .sort((a, b) => b.pnl - a.pnl)
       .slice(0, 3);
 
+    const bestSessions = Object.entries(sessionsMap)
+      .map(([name, stats]) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
+      .sort((a, b) => b.pnl - a.pnl)
+      .slice(0, 3);
+
     const analysisBestSetups = Object.entries(analysisSetupsMap)
       .map(([name, stats]) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
       .sort((a, b) => b.pnl - a.pnl);
@@ -996,6 +1009,7 @@ export default function Dashboard() {
       bestPairs,
       predominantPsychology,
       bestTimeframes,
+      bestSessions,
       bestDaysOfWeek,
       analysisBestSetups,
       analysisBestPairs,
@@ -1390,6 +1404,81 @@ export default function Dashboard() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 md:mb-6 mt-8 md:mt-12">
             <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Análise de Performance</h3>
           </div>
+
+          {/* 3 New Performance Quadrants */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-8">
+            {/* Quadrant 1: Resultado do Mês Anterior */}
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 flex flex-col justify-between">
+              <div>
+                <h4 className="text-on-surface font-bold text-base md:text-lg mb-4 font-headline flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-xl">analytics</span>
+                  Resultado de {capitalize(prevMonthName)}
+                </h4>
+                <p className="text-on-surface-variant text-xs md:text-sm mb-2">Lucro/Prejuízo Realizado</p>
+                <p className={`font-black text-2xl md:text-3xl ${data.prevMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center gap-1.5`}>
+                  <span className="material-symbols-outlined text-xl md:text-2xl">
+                    {data.prevMonthPnl >= 0 ? 'trending_up' : 'trending_down'}
+                  </span>
+                  {data.prevMonthPnl >= 0 ? '+' : ''}{formatCurrency(data.prevMonthPnl)}
+                </p>
+              </div>
+              <p className="text-on-surface-variant text-xs mt-4 font-medium">
+                Total de <strong className="text-on-surface">{data.prevMonthTrades}</strong> {data.prevMonthTrades === 1 ? 'trade executado' : 'trades executados'}.
+              </p>
+            </div>
+
+            {/* Quadrant 2: Resultado do Mês Corrente */}
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 flex flex-col justify-between">
+              <div>
+                <h4 className="text-on-surface font-bold text-base md:text-lg mb-4 font-headline flex items-center gap-2">
+                  <span className="material-symbols-outlined text-secondary text-xl">insights</span>
+                  Resultado de {capitalize(currentMonthName)}
+                </h4>
+                <p className="text-on-surface-variant text-xs md:text-sm mb-2">Resultado Acumulado do Mês</p>
+                <p className={`font-black text-2xl md:text-3xl ${data.currentMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center gap-1.5`}>
+                  <span className="material-symbols-outlined text-xl md:text-2xl">
+                    {data.currentMonthPnl >= 0 ? 'trending_up' : 'trending_down'}
+                  </span>
+                  {data.currentMonthPnl >= 0 ? '+' : ''}{formatCurrency(data.currentMonthPnl)}
+                </p>
+              </div>
+              <p className="text-on-surface-variant text-xs mt-4 font-medium">
+                <strong className="text-on-surface">{data.currentMonthTrades}</strong> {data.currentMonthTrades === 1 ? 'trade' : 'trades'} | <strong className="text-on-surface">{data.currentMonthTradingDays}</strong> {data.currentMonthTradingDays === 1 ? 'dia ativo' : 'dias ativos'}.
+              </p>
+            </div>
+
+            {/* Quadrant 3: Performance das Sessões */}
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 flex flex-col justify-between">
+              <div>
+                <h4 className="text-on-surface font-bold text-base md:text-lg mb-4 font-headline flex items-center gap-2">
+                  <span className="material-symbols-outlined text-warning text-xl">schedule</span>
+                  Sessões (Top 3)
+                </h4>
+                <p className="text-on-surface-variant text-xs md:text-sm mb-3">Sessões com Maior Retorno</p>
+                
+                <div className="space-y-2.5">
+                  {data.bestSessions && data.bestSessions.length > 0 ? (
+                    data.bestSessions.map((session, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-xs bg-surface-container/60 p-2.5 rounded-xl border border-outline-variant/10">
+                        <div className="min-w-0 flex-1 mr-2">
+                          <p className="font-bold text-on-surface text-[11px] uppercase tracking-wider truncate">{session.name}</p>
+                          <p className="text-[9px] text-on-surface-variant">Win Rate: {session.winRate.toFixed(0)}% ({session.wins}/{session.total})</p>
+                        </div>
+                        <span className={`font-mono text-xs font-black shrink-0 ${session.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                          {session.pnl >= 0 ? '+' : ''}{formatCurrency(session.pnl)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-on-surface-variant text-xs italic">
+                      Sem dados de sessões registrados.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 md:gap-8">
           {/* Best Setups */}
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">

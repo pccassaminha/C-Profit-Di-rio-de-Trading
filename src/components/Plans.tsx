@@ -258,7 +258,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 30,
       limits: '2 Contas Forex + 2 Contas OB',
       totalLimit: 4,
-      features: ['Acesso ao Panorama Económico', 'Importação MT5, HTML e CSV', 'Diário de Trades Ilimitado', 'Relatórios de Performance', 'Acesso à Comunidade', 'Válido para novos registros'],
+      features: ['Acesso ao Panorama Global', 'Importação MT5, HTML e CSV', 'Diário de Trades Ilimitado', 'Relatórios de Performance', 'Acesso à Comunidade', 'Válido para novos registros'],
       current: userPlan?.plan_type === 'trial_30' || userPlan?.plan_type === 'trial_15'
     },
     {
@@ -272,7 +272,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 30,
       limits: '6 Contas Forex + 6 Contas OB',
       totalLimit: 12,
-      features: ['Acesso ao Panorama Económico', 'Importação MT5, HTML e CSV', 'Diário de Trades Ilimitado', 'Relatórios de Performance', 'Acesso à Comunidade'],
+      features: ['Acesso ao Panorama Global', 'Importação MT5, HTML e CSV', 'Diário de Trades Ilimitado', 'Relatórios de Performance', 'Acesso à Comunidade'],
       current: userPlan?.plan_type === 'mensal_6' || userPlan?.plan_type === 'mensal_2'
     },
     {
@@ -286,7 +286,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 90,
       limits: '6 Contas Forex + 6 Contas OB',
       totalLimit: 12,
-      features: ['Acesso ao Panorama Económico', 'Análise Psicológica Essencial', 'Suporte Prioritário via WhatsApp', 'Acesso à Comunidade VIP'],
+      features: ['Acesso ao Panorama Global', 'Análise Psicológica Essencial', 'Suporte Prioritário via WhatsApp', 'Acesso à Comunidade VIP'],
       current: userPlan?.plan_type === 'trimestral_6'
     },
     {
@@ -300,7 +300,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 180,
       limits: '8 Contas Forex + 8 Contas OB',
       totalLimit: 16,
-      features: ['Acesso ao Panorama Económico', 'Análise Psicológica Avançada', 'Exportação de Dados (PDF)', 'Acesso à Comunidade'],
+      features: ['Acesso ao Panorama Global', 'Análise Psicológica Avançada', 'Exportação de Dados (PDF)', 'Acesso à Comunidade'],
       featured: true,
       current: userPlan?.plan_type === 'semestral_8' || userPlan?.plan_type === 'semestral_6'
     },
@@ -315,7 +315,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 365,
       limits: '16 Contas Forex + 16 Contas OB',
       totalLimit: 32,
-      features: ['Acesso ao Panorama Económico', 'Mentorias Coletivas', 'Acesso Antecipado a Beta', 'Personalização de Interface', 'Suporte Prioritário via WhatsApp', 'Acesso à Comunidade VIP'],
+      features: ['Acesso ao Panorama Global', 'Mentorias Coletivas', 'Acesso Antecipado a Beta', 'Personalização de Interface', 'Suporte Prioritário via WhatsApp', 'Acesso à Comunidade VIP'],
       current: userPlan?.plan_type === 'anual_16'
     }
   ];
@@ -648,7 +648,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                 <ul className="flex flex-col gap-[10px] mb-[30px] flex-1 list-none">
                   {plan.features.map((feature, idx) => {
                      const isPrioritySupport = feature === 'Suporte Prioritário via WhatsApp';
-                     const isPanorama = feature === 'Acesso ao Panorama Económico';
+                     const isPanorama = feature === 'Acesso ao Panorama Global';
                      return (
                     <li key={idx} className="flex items-center gap-[8px] text-[13px] text-on-surface-variant leading-snug">
                       <div className={`w-[16px] h-[16px] rounded-full flex items-center justify-center shrink-0 border ${
