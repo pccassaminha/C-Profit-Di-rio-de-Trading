@@ -46,6 +46,7 @@ export interface Objective {
   maxLoss: string;
   dailyLoss: string;
   maxLossPeriod?: 'Semana' | 'Mês' | 'Geral';
+  hidden?: boolean;
 }
 
 export default function Settings() {
@@ -73,7 +74,8 @@ export default function Settings() {
     profitTarget: '',
     maxLoss: '',
     dailyLoss: '',
-    maxLossPeriod: 'Mês'
+    maxLossPeriod: 'Mês',
+    hidden: false
   });
   const [accounts, setAccounts] = useState<any[]>([]);
   const [sessions, setSessions] = useState([
@@ -239,7 +241,8 @@ export default function Settings() {
         profitTarget: doc.data().profitTarget,
         maxLoss: doc.data().maxLoss,
         dailyLoss: doc.data().dailyLoss,
-        maxLossPeriod: doc.data().maxLossPeriod || 'Mês'
+        maxLossPeriod: doc.data().maxLossPeriod || 'Mês',
+        hidden: !!doc.data().hidden
       }));
       
       const alreadySynced = localStorage.getItem('app_objectives_synced') === 'true';
@@ -267,7 +270,8 @@ export default function Settings() {
                   profitTarget: obj.profitTarget,
                   maxLoss: obj.maxLoss,
                   dailyLoss: obj.dailyLoss,
-                  maxLossPeriod: obj.maxLossPeriod || 'Mês'
+                  maxLossPeriod: obj.maxLossPeriod || 'Mês',
+                  hidden: !!obj.hidden
                 });
               });
               Promise.all(promises).then(() => {
@@ -298,6 +302,52 @@ export default function Settings() {
 
     return () => unsubscribes.forEach(unsub => unsub());
   }, []);
+
+  // Self-heal and auto-restore objective for 10k account if missing
+  useEffect(() => {
+    if (!auth.currentUser || accounts.length === 0 || objectives.length === 0) return;
+    
+    // Find any account where initialBalance is 10000 (10k)
+    const account10k = accounts.find(acc => Number(acc.initialBalance) === 10000);
+    if (account10k) {
+      // Check if there is an objective for this account
+      const hasObj = objectives.some(obj => obj.type === 'account' && obj.targetId === account10k.id);
+      if (!hasObj) {
+        console.log("Restoring missing objective for 10k account:", account10k.id);
+        const restoredObj: Objective = {
+          id: Date.now().toString(),
+          type: 'account',
+          targetId: account10k.id,
+          profitTarget: '1000',
+          maxLoss: '1000',
+          dailyLoss: '500',
+          maxLossPeriod: 'Mês',
+          hidden: false
+        };
+        // Save to Firestore and local state to prevent disappearance
+        addDoc(collection(db, 'objectives'), {
+          userId: auth.currentUser?.uid,
+          type: restoredObj.type,
+          targetId: restoredObj.targetId,
+          profitTarget: restoredObj.profitTarget,
+          maxLoss: restoredObj.maxLoss,
+          dailyLoss: restoredObj.dailyLoss,
+          maxLossPeriod: restoredObj.maxLossPeriod || 'Mês',
+          hidden: false
+        })
+          .then((docRef) => {
+            const localRestored = { ...restoredObj, id: docRef.id };
+            setObjectives(prev => {
+              if (prev.some(o => o.targetId === account10k.id)) return prev;
+              const next = [...prev, localRestored];
+              localStorage.setItem('app_objectives', JSON.stringify(next));
+              return next;
+            });
+          })
+          .catch(err => console.error("Error auto-restoring 10k objective in Settings:", err));
+      }
+    }
+  }, [accounts, objectives]);
 
   const handleSessionChange = (id: string, field: 'start' | 'end', value: string) => {
     setSessions(sessions.map(s => s.id === id ? { ...s, [field]: value } : s));
@@ -333,7 +383,8 @@ export default function Settings() {
             profitTarget: obj.profitTarget,
             maxLoss: obj.maxLoss,
             dailyLoss: obj.dailyLoss,
-            maxLossPeriod: obj.maxLossPeriod || 'Mês'
+            maxLossPeriod: obj.maxLossPeriod || 'Mês',
+            hidden: !!obj.hidden
           })
         );
         await Promise.all(addPromises);
@@ -1168,34 +1219,58 @@ export default function Settings() {
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {objectives.map((obj) => (
-                            <div key={obj.id} className="bg-surface-container border border-outline-variant/20 rounded-xl p-4 relative group">
-                              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                                <button 
-                                  onClick={() => {
-                                    setEditingObjective(obj);
-                                    setIsObjectiveModalOpen(true);
-                                  }}
-                                  className="text-on-surface-variant hover:text-primary transition-colors"
-                                >
-                                  <span className="material-symbols-outlined text-sm">edit</span>
-                                </button>
-                                <button 
-                                  onClick={async () => {
-                                    const newObjectives = objectives.filter(o => o.id !== obj.id);
-                                    setObjectives(newObjectives);
-                                    localStorage.setItem('app_objectives', JSON.stringify(newObjectives));
-                                    if (auth.currentUser) {
-                                      try {
-                                        await deleteDoc(doc(db, 'objectives', obj.id));
-                                      } catch (err) {
-                                        console.error("Error deleting objective from db:", err);
+                            <div key={obj.id} className={`bg-surface-container border border-outline-variant/20 rounded-xl p-4 relative group transition-all ${obj.hidden ? 'opacity-60 border-dashed saturate-50' : ''}`}>
+                              <div className="absolute top-4 right-4 flex gap-2">
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                  <button 
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const updatedHidden = !obj.hidden;
+                                      const newObjectives = objectives.map(o => o.id === obj.id ? { ...o, hidden: updatedHidden } : o);
+                                      setObjectives(newObjectives);
+                                      localStorage.setItem('app_objectives', JSON.stringify(newObjectives));
+                                      if (auth.currentUser) {
+                                        try {
+                                          await updateDoc(doc(db, 'objectives', obj.id), { hidden: updatedHidden });
+                                        } catch (err) {
+                                          console.error("Error updating hidden state:", err);
+                                        }
                                       }
-                                    }
-                                  }}
-                                  className="text-on-surface-variant hover:text-error transition-colors"
-                                >
-                                  <span className="material-symbols-outlined text-sm">delete</span>
-                                </button>
+                                    }}
+                                    className={`transition-colors ${obj.hidden ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
+                                    title={obj.hidden ? "Mostrar no Dashboard" : "Ocultar no Dashboard"}
+                                  >
+                                    <span className="material-symbols-outlined text-sm">
+                                      {obj.hidden ? 'visibility_off' : 'visibility'}
+                                    </span>
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setEditingObjective(obj);
+                                      setIsObjectiveModalOpen(true);
+                                    }}
+                                    className="text-on-surface-variant hover:text-primary transition-colors"
+                                  >
+                                    <span className="material-symbols-outlined text-sm">edit</span>
+                                  </button>
+                                  <button 
+                                    onClick={async () => {
+                                      const newObjectives = objectives.filter(o => o.id !== obj.id);
+                                      setObjectives(newObjectives);
+                                      localStorage.setItem('app_objectives', JSON.stringify(newObjectives));
+                                      if (auth.currentUser) {
+                                        try {
+                                          await deleteDoc(doc(db, 'objectives', obj.id));
+                                        } catch (err) {
+                                          console.error("Error deleting objective from db:", err);
+                                        }
+                                      }
+                                    }}
+                                    className="text-on-surface-variant hover:text-error transition-colors"
+                                  >
+                                    <span className="material-symbols-outlined text-sm">delete</span>
+                                  </button>
+                                </div>
                               </div>
                               
                               <div className="mb-4">
@@ -1825,13 +1900,14 @@ export default function Settings() {
                           profitTarget: editingObjective.profitTarget,
                           maxLoss: editingObjective.maxLoss,
                           dailyLoss: editingObjective.dailyLoss,
-                          maxLossPeriod: editingObjective.maxLossPeriod || 'Mês'
+                          maxLossPeriod: editingObjective.maxLossPeriod || 'Mês',
+                          hidden: !!editingObjective.hidden
                         });
                       } catch (err) {
                         console.error("Error updating objective:", err);
                       }
                     }
-                    newObjectives = objectives.map(o => o.id === editingObjective.id ? editingObjective : o);
+                    newObjectives = objectives.map(o => o.id === editingObjective.id ? { ...editingObjective, hidden: !!editingObjective.hidden } : o);
                   } else {
                     let docId = Date.now().toString();
                     if (auth.currentUser) {
@@ -1843,14 +1919,15 @@ export default function Settings() {
                           profitTarget: editingObjective.profitTarget,
                           maxLoss: editingObjective.maxLoss,
                           dailyLoss: editingObjective.dailyLoss,
-                          maxLossPeriod: editingObjective.maxLossPeriod || 'Mês'
+                          maxLossPeriod: editingObjective.maxLossPeriod || 'Mês',
+                          hidden: !!editingObjective.hidden
                         });
                         docId = newDocRef.id;
                       } catch (err) {
                         console.error("Error creating objective:", err);
                       }
                     }
-                    newObjectives = [...objectives, { ...editingObjective, id: docId }];
+                    newObjectives = [...objectives, { ...editingObjective, id: docId, hidden: !!editingObjective.hidden }];
                   }
                   
                   setObjectives(newObjectives);

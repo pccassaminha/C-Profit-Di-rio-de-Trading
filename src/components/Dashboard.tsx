@@ -11,6 +11,26 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Download, MoreVertical, AlertTriangle, Users, MessageSquare, Check, ChevronRight } from 'lucide-react';
 
+// Help function to normalize symbols and avoid duplicate entries
+function normalizeSymbol(symbol: string): string {
+  if (!symbol) return '';
+  let clean = symbol.trim().toUpperCase();
+  clean = clean.replace('/', '');
+  clean = clean.replace('\\', '');
+  
+  const match = clean.match(/^([A-Z0-9]+?)(?:\.|\_|\-|\#)[A-Za-z0-9]+$/);
+  if (match) {
+    clean = match[1];
+  }
+  
+  if (clean === 'GOLD') clean = 'XAUUSD';
+  if (clean === 'NAS100') clean = 'US100';
+  if (clean === 'SPX500') clean = 'US500';
+  if (clean === 'GER30' || clean === 'DE30' || clean === 'DE40') clean = 'GER40';
+  
+  return clean;
+}
+
 // --- COMPONENTES AUXILIARES ---
 function CalendarCell({ date, muted, trades, pnl, isWin, isLoss, active }: any) {
   const { formatCurrency } = useCurrency();
@@ -358,7 +378,8 @@ export default function Dashboard() {
         profitTarget: doc.data().profitTarget,
         maxLoss: doc.data().maxLoss,
         dailyLoss: doc.data().dailyLoss,
-        maxLossPeriod: doc.data().maxLossPeriod || 'Mês'
+        maxLossPeriod: doc.data().maxLossPeriod || 'Mês',
+        hidden: !!doc.data().hidden
       }));
       
       const alreadySynced = localStorage.getItem('app_objectives_synced') === 'true';
@@ -386,7 +407,8 @@ export default function Dashboard() {
                   profitTarget: obj.profitTarget,
                   maxLoss: obj.maxLoss,
                   dailyLoss: obj.dailyLoss,
-                  maxLossPeriod: obj.maxLossPeriod || 'Mês'
+                  maxLossPeriod: obj.maxLossPeriod || 'Mês',
+                  hidden: !!obj.hidden
                 });
               });
               Promise.all(promises).then(() => {
@@ -419,6 +441,52 @@ export default function Dashboard() {
 
     return () => unsubscribes.forEach(unsub => unsub());
   }, []);
+
+  // Self-heal and auto-restore objective for 10k account if missing
+  useEffect(() => {
+    if (!auth.currentUser || accounts.length === 0 || objectives.length === 0) return;
+    
+    // Find any account where initialBalance is 10000 (10k)
+    const account10k = accounts.find(acc => Number(acc.initialBalance) === 10000);
+    if (account10k) {
+      // Check if there is an objective for this account
+      const hasObj = objectives.some(obj => obj.type === 'account' && obj.targetId === account10k.id);
+      if (!hasObj) {
+        console.log("Restoring missing objective for 10k account:", account10k.id);
+        const restoredObj = {
+          userId: auth.currentUser.uid,
+          type: 'account' as const,
+          targetId: account10k.id,
+          profitTarget: '1000',
+          maxLoss: '1000',
+          dailyLoss: '500',
+          maxLossPeriod: 'Mês' as const,
+          hidden: false
+        };
+        // Save to Firestore and local state to prevent disappearance
+        addDoc(collection(db, 'objectives'), {
+          userId: auth.currentUser?.uid,
+          type: restoredObj.type,
+          targetId: restoredObj.targetId,
+          profitTarget: restoredObj.profitTarget,
+          maxLoss: restoredObj.maxLoss,
+          dailyLoss: restoredObj.dailyLoss,
+          maxLossPeriod: restoredObj.maxLossPeriod || 'Mês',
+          hidden: false
+        })
+          .then((docRef) => {
+            const localRestored = { ...restoredObj, id: docRef.id };
+            setObjectives(prev => {
+              if (prev.some(o => o.targetId === account10k.id)) return prev;
+              const next = [...prev, localRestored];
+              localStorage.setItem('app_objectives', JSON.stringify(next));
+              return next;
+            });
+          })
+          .catch(err => console.error("Error auto-restoring 10k objective in Dashboard:", err));
+      }
+    }
+  }, [accounts, objectives]);
 
   const hasObAccount = accounts.some(a => a.tradeType === 'ob');
   const hasForexAccount = accounts.some(a => a.tradeType !== 'ob');
@@ -592,7 +660,7 @@ export default function Dashboard() {
       const relevantMarketTypes = tradeTypeFilter === 'all' ? ['forex', 'ob'] : [tradeTypeFilter];
       
       relevantMarketTypes.forEach(mType => {
-        const marketObj = objectives.find(obj => obj.type === 'market' && obj.targetId === mType);
+        const marketObj = objectives.find(obj => obj.type === 'market' && obj.targetId === mType && !obj.hidden);
         
         // Only use the Market-level objective if it has actual defined progress metric targets (not blank/empty)
         if (marketObj && (Number(marketObj.profitTarget) > 0 || Number(marketObj.maxLoss) > 0 || Number(marketObj.dailyLoss) > 0)) {
@@ -606,7 +674,7 @@ export default function Dashboard() {
           accountsToProcess.forEach(acc => {
             const accTradeType = acc.tradeType || 'forex';
             if (accTradeType === mType) {
-              const accObj = objectives.find(obj => obj.type === 'account' && obj.targetId === acc.id);
+              const accObj = objectives.find(obj => obj.type === 'account' && obj.targetId === acc.id && !obj.hidden);
               if (accObj) {
                 if (accObj.profitTarget) totalProfitTarget += Number(accObj.profitTarget) || 0;
                 if (accObj.maxLoss) totalMaxLoss += Number(accObj.maxLoss) || 0;
@@ -619,7 +687,7 @@ export default function Dashboard() {
       });
     } else {
       // Specific account selected
-      const accountObjective = objectives.find(obj => obj.type === 'account' && obj.targetId === selectedAccount);
+      const accountObjective = objectives.find(obj => obj.type === 'account' && obj.targetId === selectedAccount && !obj.hidden);
       if (accountObjective) {
         totalProfitTarget = Number(accountObjective.profitTarget) || 0;
         totalMaxLoss = Number(accountObjective.maxLoss) || 0;
@@ -784,10 +852,11 @@ export default function Dashboard() {
         if (trade.pnl > 0) analysisDaysOfWeekMap[dayName].wins += 1;
         
         if (trade.symbol) {
-          if (!analysisPairsMap[trade.symbol]) analysisPairsMap[trade.symbol] = { pnl: 0, wins: 0, total: 0 };
-          analysisPairsMap[trade.symbol].total += 1;
-          analysisPairsMap[trade.symbol].pnl += trade.pnl;
-          if (trade.pnl > 0) analysisPairsMap[trade.symbol].wins += 1;
+          const normSymbol = normalizeSymbol(trade.symbol);
+          if (!analysisPairsMap[normSymbol]) analysisPairsMap[normSymbol] = { pnl: 0, wins: 0, total: 0 };
+          analysisPairsMap[normSymbol].total += 1;
+          analysisPairsMap[normSymbol].pnl += trade.pnl;
+          if (trade.pnl > 0) analysisPairsMap[normSymbol].wins += 1;
         }
 
         if (trade.timeframe) {
@@ -822,10 +891,11 @@ export default function Dashboard() {
     // 2. Process Performance Trades (tradesToProcess)
     tradesToProcess.forEach(trade => {
       if (trade.symbol) {
-        if (!pairsMap[trade.symbol]) pairsMap[trade.symbol] = { pnl: 0, wins: 0, total: 0 };
-        pairsMap[trade.symbol].total += 1;
-        pairsMap[trade.symbol].pnl += trade.pnl;
-        if (trade.pnl > 0) pairsMap[trade.symbol].wins += 1;
+        const normSymbol = normalizeSymbol(trade.symbol);
+        if (!pairsMap[normSymbol]) pairsMap[normSymbol] = { pnl: 0, wins: 0, total: 0 };
+        pairsMap[normSymbol].total += 1;
+        pairsMap[normSymbol].pnl += trade.pnl;
+        if (trade.pnl > 0) pairsMap[normSymbol].wins += 1;
       }
 
       if (trade.setups && Array.isArray(trade.setups)) {
@@ -1084,6 +1154,60 @@ export default function Dashboard() {
   const [sortSetupBy, setSortSetupBy] = useState<'pnl' | 'trades' | 'winRate'>('pnl');
   const [analysisMetric, setAnalysisMetric] = useState<'losses' | 'gains' | 'net'>('net');
 
+  // Detailed performance analysis filters (positive vs negative performance)
+  const [setupFilter, setSetupFilter] = useState<'positive' | 'negative'>('positive');
+  const [pairFilter, setPairFilter] = useState<'positive' | 'negative'>('positive');
+  const [sessionFilter, setSessionFilter] = useState<'positive' | 'negative'>('positive');
+  const [dayFilter, setDayFilter] = useState<'positive' | 'negative'>('positive');
+  const [timeframeFilterState, setTimeframeFilterState] = useState<'positive' | 'negative'>('positive');
+  const [hideObjectives, setHideObjectives] = useState(false);
+
+  // Memoized lists for detailed analysis section based on the selected positive/negative filter
+  const setupList = useMemo(() => {
+    const list = [...(data.analysisBestSetups || [])];
+    if (setupFilter === 'positive') {
+      return list.filter(item => item.pnl >= 0).sort((a, b) => b.pnl - a.pnl);
+    } else {
+      return list.filter(item => item.pnl < 0).sort((a, b) => a.pnl - b.pnl);
+    }
+  }, [data.analysisBestSetups, setupFilter]);
+
+  const pairList = useMemo(() => {
+    const list = [...(data.analysisBestPairs || [])];
+    if (pairFilter === 'positive') {
+      return list.filter(item => item.pnl >= 0).sort((a, b) => b.pnl - a.pnl);
+    } else {
+      return list.filter(item => item.pnl < 0).sort((a, b) => a.pnl - b.pnl);
+    }
+  }, [data.analysisBestPairs, pairFilter]);
+
+  const sessionList = useMemo(() => {
+    const list = [...(data.analysisBestSessions || [])];
+    if (sessionFilter === 'positive') {
+      return list.filter(item => item.pnl >= 0).sort((a, b) => b.pnl - a.pnl);
+    } else {
+      return list.filter(item => item.pnl < 0).sort((a, b) => a.pnl - b.pnl);
+    }
+  }, [data.analysisBestSessions, sessionFilter]);
+
+  const dayList = useMemo(() => {
+    const list = [...(data.analysisBestDaysOfWeek || [])];
+    if (dayFilter === 'positive') {
+      return list.filter(item => item.pnl >= 0).sort((a, b) => b.pnl - a.pnl);
+    } else {
+      return list.filter(item => item.pnl < 0).sort((a, b) => a.pnl - b.pnl);
+    }
+  }, [data.analysisBestDaysOfWeek, dayFilter]);
+
+  const timeframeList = useMemo(() => {
+    const list = [...(data.analysisBestTimeframes || [])];
+    if (timeframeFilterState === 'positive') {
+      return list.filter(item => item.pnl >= 0).sort((a, b) => b.pnl - a.pnl);
+    } else {
+      return list.filter(item => item.pnl < 0).sort((a, b) => a.pnl - b.pnl);
+    }
+  }, [data.analysisBestTimeframes, timeframeFilterState]);
+
   const sortedPairs = useMemo(() => {
     return Object.entries(data.pairsMap || {})
       .map(([name, stats]: any) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
@@ -1276,130 +1400,131 @@ export default function Dashboard() {
 
       {/* Monthly Comparison */}
       <div className="space-y-8 md:space-y-12">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 md:mb-6">
+        <div className="flex flex-row justify-between items-center gap-4 mb-4 md:mb-6">
           <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Visão geral dos objetivos</h3>
         </div>
 
-        {(data.hasProfitTarget || data.hasMaxLoss || data.hasDailyLoss) ? (
+        {((data.hasProfitTarget || data.hasMaxLoss || data.hasDailyLoss) && objectives.some(o => !o.hidden)) ? (
           <div className="flex flex-col gap-6 md:gap-8">
-            {/* Lucro (Full Width) */}
-            <div className="bg-surface-container-low border border-secondary/30 rounded-2xl p-6 md:p-8">
-              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Lucro</h4>
-              <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
-                <div>
-                  <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Atual</p>
-                  <p className={`${data.totalPnl >= 0 ? 'text-secondary' : 'text-error'} font-bold text-base md:text-xl`}>
-                    {data.totalPnl >= 0 ? '+' : ''}{formatCurrency(data.totalPnl)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Lucro</p>
-                  <p className="text-on-surface font-bold text-base md:text-xl">{data.hasProfitTarget ? formatCurrency(data.totalProfitTarget) : 'Não definida'}</p>
-                </div>
-                <div>
-                  <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Remanescente</p>
-                  <p className="text-on-surface font-bold text-base md:text-xl">
-                    {data.hasProfitTarget ? formatCurrency(Math.max(0, data.totalProfitTarget - data.totalPnl)) : '-'}
-                  </p>
-                </div>
-              </div>
-              {data.hasProfitTarget && (
-                <>
-                  <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
-                    <div className="absolute left-0 top-0 h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, (data.totalPnl / data.totalProfitTarget) * 100))}%` }}></div>
-                  </div>
-                  <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
-                    <span>$0.00</span>
-                    <span>{formatCurrency(data.totalProfitTarget)}</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-              {/* Perda Máxima */}
-              <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
-                <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Máxima</h4>
+              {/* Lucro (Full Width) */}
+              <div className="bg-surface-container-low border border-secondary/30 rounded-2xl p-6 md:p-8">
+                <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Lucro</h4>
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
                   <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
-                    <p className="text-error font-bold text-base md:text-xl">
-                      {formatCurrency(data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0)}
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Atual</p>
+                    <p className={`${data.totalPnl >= 0 ? 'text-secondary' : 'text-error'} font-bold text-base md:text-xl`}>
+                      {data.totalPnl >= 0 ? '+' : ''}{formatCurrency(data.totalPnl)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Limite Máximo De Perda</p>
-                    <p className="text-on-surface font-bold text-base md:text-xl">{data.hasMaxLoss ? formatCurrency(data.totalMaxLoss) : 'Não definida'}</p>
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Lucro</p>
+                    <p className="text-on-surface font-bold text-base md:text-xl">{data.hasProfitTarget ? formatCurrency(data.totalProfitTarget) : 'Não definida'}</p>
                   </div>
                   <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Máxima Restante</p>
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Remanescente</p>
                     <p className="text-on-surface font-bold text-base md:text-xl">
-                      {data.hasMaxLoss ? formatCurrency(Math.max(0, data.totalMaxLoss - (data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0))) : '-'}
+                      {data.hasProfitTarget ? formatCurrency(Math.max(0, data.totalProfitTarget - data.totalPnl)) : '-'}
                     </p>
                   </div>
                 </div>
-                {data.hasMaxLoss && (
+                {data.hasProfitTarget && (
                   <>
                     <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
-                      <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0) / data.totalMaxLoss) * 100)}%` }}></div>
+                      <div className="absolute left-0 top-0 h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, (data.totalPnl / data.totalProfitTarget) * 100))}%` }}></div>
                     </div>
                     <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
                       <span>$0.00</span>
-                      <span>{formatCurrency(data.totalMaxLoss)}</span>
+                      <span>{formatCurrency(data.totalProfitTarget)}</span>
                     </div>
                   </>
                 )}
               </div>
 
-              {/* Perda Diária */}
-              <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
-                <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Diária</h4>
-                <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
-                  <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
-                    <p className="text-error font-bold text-base md:text-xl">
-                      {formatCurrency(data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0)}
-                    </p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+                {/* Perda Máxima */}
+                <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
+                  <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Máxima</h4>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
+                    <div>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
+                      <p className="text-error font-bold text-base md:text-xl">
+                        {formatCurrency(data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Limite Máximo De Perda</p>
+                      <p className="text-on-surface font-bold text-base md:text-xl">{data.hasMaxLoss ? formatCurrency(data.totalMaxLoss) : 'Não definida'}</p>
+                    </div>
+                    <div>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Máxima Restante</p>
+                      <p className="text-on-surface font-bold text-base md:text-xl">
+                        {data.hasMaxLoss ? formatCurrency(Math.max(0, data.totalMaxLoss - (data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0))) : '-'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Perda Diária</p>
-                    <p className="text-on-surface font-bold text-base md:text-xl">{data.hasDailyLoss ? formatCurrency(data.totalDailyLoss) : 'Não definida'}</p>
-                  </div>
-                  <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Diária Restante</p>
-                    <p className="text-on-surface font-bold text-base md:text-xl">
-                      {data.hasDailyLoss ? formatCurrency(Math.max(0, data.totalDailyLoss - (data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0))) : '-'}
-                    </p>
-                  </div>
+                  {data.hasMaxLoss && (
+                    <>
+                      <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
+                        <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0) / data.totalMaxLoss) * 100)}%` }}></div>
+                      </div>
+                      <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
+                        <span>$0.00</span>
+                        <span>{formatCurrency(data.totalMaxLoss)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                {data.hasDailyLoss && (
-                  <>
-                    <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
-                      <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0) / data.totalDailyLoss) * 100)}%` }}></div>
+
+                {/* Perda Diária */}
+                <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
+                  <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Diária</h4>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
+                    <div>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
+                      <p className="text-error font-bold text-base md:text-xl">
+                        {formatCurrency(data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0)}
+                      </p>
                     </div>
-                    <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
-                      <span>$0.00</span>
-                      <span>{formatCurrency(data.totalDailyLoss)}</span>
+                    <div>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Perda Diária</p>
+                      <p className="text-on-surface font-bold text-base md:text-xl">{data.hasDailyLoss ? formatCurrency(data.totalDailyLoss) : 'Não definida'}</p>
                     </div>
-                  </>
-                )}
+                    <div>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Diária Restante</p>
+                      <p className="text-on-surface font-bold text-base md:text-xl">
+                        {data.hasDailyLoss ? formatCurrency(Math.max(0, data.totalDailyLoss - (data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0))) : '-'}
+                      </p>
+                    </div>
+                  </div>
+                  {data.hasDailyLoss && (
+                    <>
+                      <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
+                        <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0) / data.totalDailyLoss) * 100)}%` }}></div>
+                      </div>
+                      <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
+                        <span>$0.00</span>
+                        <span>{formatCurrency(data.totalDailyLoss)}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="bg-surface-container-low border border-outline-variant/15 rounded-3xl p-8 text-center space-y-4 max-w-2xl mx-auto">
-            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto text-3xl">
-              🎯
+          ) : (
+            <div className="bg-surface-container-low border border-outline-variant/15 rounded-3xl p-8 text-center space-y-4 max-w-2xl mx-auto">
+              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto text-3xl">
+                🎯
+              </div>
+              <h4 className="text-lg font-black text-on-surface uppercase tracking-tight">Nenhum Objetivo Definido</h4>
+              <p className="text-sm text-on-surface-variant leading-relaxed">
+                Não existem objetivos de trading (como meta de lucro, limite de perda diária ou semanal) definidos para a conta ou mercado atualmente selecionado. 
+              </p>
+              <p className="text-xs text-on-surface-variant/80">
+                Acesse a página de <strong>Configurações</strong> &gt; aba <strong>Objetivos e Limites Mensais</strong> para definir as suas metas e passar a acompanhar o seu progresso neste painel.
+              </p>
             </div>
-            <h4 className="text-lg font-black text-on-surface uppercase tracking-tight">Nenhum Objetivo Definido</h4>
-            <p className="text-sm text-on-surface-variant leading-relaxed">
-              Não existem objetivos de trading (como meta de lucro, limite de perda diária ou semanal) definidos para a conta ou mercado atualmente selecionado. 
-            </p>
-            <p className="text-xs text-on-surface-variant/80">
-              Acesse a página de <strong>Configurações</strong> &gt; aba <strong>Objetivos e Limites Mensais</strong> para definir as suas metas e passar a acompanhar o seu progresso neste painel.
-            </p>
-          </div>
-        )}
+          )
+        }
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 md:mb-6 mt-8 md:mt-12">
             <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Análise de Performance</h3>
@@ -1409,40 +1534,40 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-8">
             {/* Quadrant 1: Resultado do Mês Anterior */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 flex flex-col justify-between">
-              <div>
-                <h4 className="text-on-surface font-bold text-base md:text-lg mb-4 font-headline flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-xl">analytics</span>
-                  Resultado de {capitalize(prevMonthName)}
-                </h4>
+              <h4 className="text-on-surface font-bold text-base md:text-lg mb-2 font-headline flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-xl">analytics</span>
+                Resultado de {capitalize(prevMonthName)}
+              </h4>
+              <div className="flex-1 flex flex-col items-center justify-center py-4">
                 <p className="text-on-surface-variant text-xs md:text-sm mb-2">Lucro/Prejuízo Realizado</p>
-                <p className={`font-black text-2xl md:text-3xl ${data.prevMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center gap-1.5`}>
+                <p className={`font-black text-2xl md:text-3xl ${data.prevMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center justify-center gap-1.5`}>
                   <span className="material-symbols-outlined text-xl md:text-2xl">
                     {data.prevMonthPnl >= 0 ? 'trending_up' : 'trending_down'}
                   </span>
                   {data.prevMonthPnl >= 0 ? '+' : ''}{formatCurrency(data.prevMonthPnl)}
                 </p>
               </div>
-              <p className="text-on-surface-variant text-xs mt-4 font-medium">
+              <p className="text-on-surface-variant text-xs mt-2 font-medium text-center">
                 Total de <strong className="text-on-surface">{data.prevMonthTrades}</strong> {data.prevMonthTrades === 1 ? 'trade executado' : 'trades executados'}.
               </p>
             </div>
 
             {/* Quadrant 2: Resultado do Mês Corrente */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 flex flex-col justify-between">
-              <div>
-                <h4 className="text-on-surface font-bold text-base md:text-lg mb-4 font-headline flex items-center gap-2">
-                  <span className="material-symbols-outlined text-secondary text-xl">insights</span>
-                  Resultado de {capitalize(currentMonthName)}
-                </h4>
+              <h4 className="text-on-surface font-bold text-base md:text-lg mb-2 font-headline flex items-center gap-2">
+                <span className="material-symbols-outlined text-secondary text-xl">insights</span>
+                Resultado de {capitalize(currentMonthName)}
+              </h4>
+              <div className="flex-1 flex flex-col items-center justify-center py-4">
                 <p className="text-on-surface-variant text-xs md:text-sm mb-2">Resultado Acumulado do Mês</p>
-                <p className={`font-black text-2xl md:text-3xl ${data.currentMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center gap-1.5`}>
+                <p className={`font-black text-2xl md:text-3xl ${data.currentMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center justify-center gap-1.5`}>
                   <span className="material-symbols-outlined text-xl md:text-2xl">
                     {data.currentMonthPnl >= 0 ? 'trending_up' : 'trending_down'}
                   </span>
                   {data.currentMonthPnl >= 0 ? '+' : ''}{formatCurrency(data.currentMonthPnl)}
                 </p>
               </div>
-              <p className="text-on-surface-variant text-xs mt-4 font-medium">
+              <p className="text-on-surface-variant text-xs mt-2 font-medium text-center">
                 <strong className="text-on-surface">{data.currentMonthTrades}</strong> {data.currentMonthTrades === 1 ? 'trade' : 'trades'} | <strong className="text-on-surface">{data.currentMonthTradingDays}</strong> {data.currentMonthTradingDays === 1 ? 'dia ativo' : 'dias ativos'}.
               </p>
             </div>
@@ -1714,27 +1839,43 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             {/* Best Setups */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">monitoring</span>
-                Melhores Setups
-              </h4>
+              <div className="flex justify-between items-center mb-6 md:mb-8">
+                <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">monitoring</span>
+                  {setupFilter === 'positive' ? 'Melhores Setups' : 'Setups com Perda'}
+                </h4>
+                <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
+                  <button 
+                    onClick={() => setSetupFilter('positive')}
+                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${setupFilter === 'positive' ? 'bg-secondary text-on-secondary shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                  >
+                    Ganhos
+                  </button>
+                  <button 
+                    onClick={() => setSetupFilter('negative')}
+                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${setupFilter === 'negative' ? 'bg-error text-white shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                  >
+                    Perdas
+                  </button>
+                </div>
+              </div>
               <div className="space-y-4">
-                {data.analysisBestSetups.length > 0 ? (
+                {setupList.length > 0 ? (
                   <div className="flex flex-col xl:flex-row items-center gap-6">
                     <div className="w-full xl:w-1/2 h-[200px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={data.analysisBestSetups}
+                            data={setupList}
                             cx="50%"
                             cy="50%"
                             innerRadius={60}
                             outerRadius={80}
                             paddingAngle={5}
-                            dataKey="wins"
+                            dataKey="total"
                             nameKey="name"
                           >
-                            {data.analysisBestSetups.map((entry, index) => (
+                            {setupList.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={['#c3f5ff', '#ffb4ab', '#b4f2c0', '#f2b4e5'][index % 4]} />
                             ))}
                           </Pie>
@@ -1743,7 +1884,7 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     </div>
                     <div className="w-full xl:w-1/2 space-y-4">
-                      {data.analysisBestSetups.slice(0, 3).map((setup, idx) => (
+                      {setupList.slice(0, 3).map((setup, idx) => (
                         <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
                           <div>
                             <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
@@ -1757,7 +1898,7 @@ export default function Dashboard() {
                           </p>
                         </div>
                       ))}
-                      {data.analysisBestSetups.length > 3 && (
+                      {setupList.length > 3 && (
                         <button 
                           onClick={() => openAnalysisModal('setups')} 
                           className="w-full py-2 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
@@ -1771,34 +1912,52 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-on-surface-variant text-sm">Nenhum setup registrado no período.</p>
+                  <p className="text-on-surface-variant text-sm py-8 text-center italic">
+                    {setupFilter === 'positive' ? 'Nenhum setup com lucro no período.' : 'Nenhum setup com prejuízo no período.'}
+                  </p>
                 )}
               </div>
             </div>
 
             {/* Best Pairs */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary">currency_exchange</span>
-                Pares Performados
-              </h4>
+              <div className="flex justify-between items-center mb-6 md:mb-8">
+                <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
+                  <span className="material-symbols-outlined text-secondary">currency_exchange</span>
+                  {pairFilter === 'positive' ? 'Melhores Pares' : 'Pares com Perda'}
+                </h4>
+                <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
+                  <button 
+                    onClick={() => setPairFilter('positive')}
+                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${pairFilter === 'positive' ? 'bg-secondary text-on-secondary shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                  >
+                    Ganhos
+                  </button>
+                  <button 
+                    onClick={() => setPairFilter('negative')}
+                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${pairFilter === 'negative' ? 'bg-error text-white shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                  >
+                    Perdas
+                  </button>
+                </div>
+              </div>
               <div className="space-y-4">
-                {data.analysisBestPairs.length > 0 ? (
+                {pairList.length > 0 ? (
                   <div className="flex flex-col xl:flex-row items-center gap-6">
                     <div className="w-full xl:w-1/2 h-[200px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={data.analysisBestPairs}
+                            data={pairList}
                             cx="50%"
                             cy="50%"
                             innerRadius={60}
                             outerRadius={80}
                             paddingAngle={5}
-                            dataKey="wins"
+                            dataKey="total"
                             nameKey="name"
                           >
-                            {data.analysisBestPairs.map((entry, index) => (
+                            {pairList.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={['#b4f2c0', '#c3f5ff', '#ffb4ab', '#f2b4e5'][index % 4]} />
                             ))}
                           </Pie>
@@ -1807,7 +1966,7 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     </div>
                     <div className="w-full xl:w-1/2 space-y-4">
-                      {data.analysisBestPairs.slice(0, 3).map((pair, idx) => (
+                      {pairList.slice(0, 3).map((pair, idx) => (
                         <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
                           <div>
                             <p className="font-bold text-on-surface flex items-center gap-2">
@@ -1821,7 +1980,7 @@ export default function Dashboard() {
                           </p>
                         </div>
                       ))}
-                      {data.analysisBestPairs.length > 3 && (
+                      {pairList.length > 3 && (
                         <button 
                           onClick={() => openAnalysisModal('pairs')} 
                           className="w-full py-2 flex items-center justify-center gap-2 text-secondary font-bold text-sm bg-secondary/10 rounded-xl hover:bg-secondary/20 transition-colors"
@@ -1835,34 +1994,52 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-on-surface-variant text-sm">Nenhum par registrado no período.</p>
+                  <p className="text-on-surface-variant text-sm py-8 text-center italic">
+                    {pairFilter === 'positive' ? 'Nenhum par com lucro no período.' : 'Nenhum par com prejuízo no período.'}
+                  </p>
                 )}
               </div>
             </div>
 
             {/* Best Sessions */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#ffb4ab]">schedule</span>
-                Sessões
-              </h4>
+              <div className="flex justify-between items-center mb-6 md:mb-8">
+                <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#ffb4ab]">schedule</span>
+                  {sessionFilter === 'positive' ? 'Melhores Sessões' : 'Sessões com Perda'}
+                </h4>
+                <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
+                  <button 
+                    onClick={() => setSessionFilter('positive')}
+                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${sessionFilter === 'positive' ? 'bg-secondary text-on-secondary shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                  >
+                    Ganhos
+                  </button>
+                  <button 
+                    onClick={() => setSessionFilter('negative')}
+                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${sessionFilter === 'negative' ? 'bg-error text-white shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                  >
+                    Perdas
+                  </button>
+                </div>
+              </div>
               <div className="space-y-4">
-                {data.analysisBestSessions.length > 0 ? (
+                {sessionList.length > 0 ? (
                   <div className="flex flex-col xl:flex-row items-center gap-6">
                     <div className="w-full xl:w-1/2 h-[200px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={data.analysisBestSessions}
+                            data={sessionList}
                             cx="50%"
                             cy="50%"
                             innerRadius={60}
                             outerRadius={80}
                             paddingAngle={5}
-                            dataKey="wins"
+                            dataKey="total"
                             nameKey="name"
                           >
-                            {data.analysisBestSessions.map((entry, index) => (
+                            {sessionList.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5', '#fdd38b'][index % 5]} />
                             ))}
                           </Pie>
@@ -1871,7 +2048,7 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     </div>
                     <div className="w-full xl:w-1/2 space-y-4">
-                      {data.analysisBestSessions.slice(0, 3).map((session, idx) => (
+                      {sessionList.slice(0, 3).map((session, idx) => (
                         <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
                           <div>
                             <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
@@ -1885,7 +2062,7 @@ export default function Dashboard() {
                           </p>
                         </div>
                       ))}
-                      {data.analysisBestSessions.length > 3 && (
+                      {sessionList.length > 3 && (
                         <button 
                           onClick={() => openAnalysisModal('sessions')} 
                           className="w-full py-2 flex items-center justify-center gap-2 text-[#ffb4ab] font-bold text-sm bg-[#ffb4ab]/10 rounded-xl hover:bg-[#ffb4ab]/20 transition-colors"
@@ -1899,7 +2076,9 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-on-surface-variant text-sm">Nenhuma sessão registrada no período.</p>
+                  <p className="text-on-surface-variant text-sm py-8 text-center italic">
+                    {sessionFilter === 'positive' ? 'Nenhuma sessão com lucro no período.' : 'Nenhuma sessão com prejuízo no período.'}
+                  </p>
                 )}
               </div>
             </div>
@@ -1971,27 +2150,43 @@ export default function Dashboard() {
 
             {/* Best Days of Week */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">calendar_month</span>
-                Melhor Dia da Semana
-              </h4>
+              <div className="flex justify-between items-center mb-6 md:mb-8">
+                <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">calendar_month</span>
+                  {dayFilter === 'positive' ? 'Melhor Dia da Semana' : 'Dias com Perda'}
+                </h4>
+                <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
+                  <button 
+                    onClick={() => setDayFilter('positive')}
+                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${dayFilter === 'positive' ? 'bg-secondary text-on-secondary shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                  >
+                    Ganhos
+                  </button>
+                  <button 
+                    onClick={() => setDayFilter('negative')}
+                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${dayFilter === 'negative' ? 'bg-error text-white shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                  >
+                    Perdas
+                  </button>
+                </div>
+              </div>
               <div className="space-y-4">
-                {data.analysisBestDaysOfWeek.length > 0 ? (
+                {dayList.length > 0 ? (
                   <div className="flex flex-col xl:flex-row items-center gap-6">
                     <div className="w-full xl:w-1/2 h-[200px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={data.analysisBestDaysOfWeek}
+                            data={dayList}
                             cx="50%"
                             cy="50%"
                             innerRadius={60}
                             outerRadius={80}
                             paddingAngle={5}
-                            dataKey="wins"
+                            dataKey="total"
                             nameKey="name"
                           >
-                            {data.analysisBestDaysOfWeek.map((entry, index) => (
+                            {dayList.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={['#c3f5ff', '#ffb4ab', '#b4f2c0', '#f2b4e5'][index % 4]} />
                             ))}
                           </Pie>
@@ -2000,7 +2195,7 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     </div>
                     <div className="w-full xl:w-1/2 space-y-4">
-                      {data.analysisBestDaysOfWeek.slice(0, 3).map((day, idx) => (
+                      {dayList.slice(0, 3).map((day, idx) => (
                         <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
                           <div>
                             <p className="font-bold text-on-surface flex items-center gap-2">
@@ -2014,7 +2209,7 @@ export default function Dashboard() {
                           </p>
                         </div>
                       ))}
-                      {data.analysisBestDaysOfWeek.length > 3 && (
+                      {dayList.length > 3 && (
                         <button 
                           onClick={() => openAnalysisModal('days')} 
                           className="w-full py-2 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
@@ -2028,7 +2223,9 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-on-surface-variant text-sm">Nenhum dia registrado no período.</p>
+                  <p className="text-on-surface-variant text-sm py-8 text-center italic">
+                    {dayFilter === 'positive' ? 'Nenhum dia de semana com lucro no período.' : 'Nenhum dia de semana com prejuízo no período.'}
+                  </p>
                 )}
               </div>
             </div>
@@ -2060,27 +2257,43 @@ export default function Dashboard() {
             {/* Best Timeframes (Only show if OB is selected) */}
             {tradeTypeFilter === 'ob' && (
               <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-                <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">schedule</span>
-                  Melhores Timeframes
-                </h4>
+                <div className="flex justify-between items-center mb-6 md:mb-8">
+                  <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">schedule</span>
+                    {timeframeFilterState === 'positive' ? 'Melhores Timeframes' : 'Timeframes com Perda'}
+                  </h4>
+                  <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
+                    <button 
+                      onClick={() => setTimeframeFilterState('positive')}
+                      className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${timeframeFilterState === 'positive' ? 'bg-secondary text-on-secondary shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                    >
+                      Ganhos
+                    </button>
+                    <button 
+                      onClick={() => setTimeframeFilterState('negative')}
+                      className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${timeframeFilterState === 'negative' ? 'bg-error text-white shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                    >
+                      Perdas
+                    </button>
+                  </div>
+                </div>
                 <div className="space-y-4">
-                  {data.analysisBestTimeframes.length > 0 ? (
+                  {timeframeList.length > 0 ? (
                     <div className="flex flex-col xl:flex-row items-center gap-6">
                       <div className="w-full xl:w-1/2 h-[200px]">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
-                              data={data.analysisBestTimeframes}
+                              data={timeframeList}
                               cx="50%"
                               cy="50%"
                               innerRadius={60}
                               outerRadius={80}
                               paddingAngle={5}
-                              dataKey="wins"
+                              dataKey="total"
                               nameKey="name"
                             >
-                              {data.analysisBestTimeframes.map((entry, index) => (
+                              {timeframeList.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5'][index % 4]} />
                               ))}
                             </Pie>
@@ -2089,7 +2302,7 @@ export default function Dashboard() {
                         </ResponsiveContainer>
                       </div>
                       <div className="w-full xl:w-1/2 space-y-4">
-                        {data.analysisBestTimeframes.slice(0, 3).map((tf, idx) => (
+                        {timeframeList.slice(0, 3).map((tf, idx) => (
                           <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
                             <div>
                               <p className="font-bold text-on-surface flex items-center gap-2">
@@ -2103,7 +2316,7 @@ export default function Dashboard() {
                             </p>
                           </div>
                         ))}
-                        {data.analysisBestTimeframes.length > 3 && (
+                        {timeframeList.length > 3 && (
                           <button 
                             onClick={() => openAnalysisModal('timeframes')} 
                             className="w-full py-2 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
@@ -2117,7 +2330,9 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-on-surface-variant text-sm">Nenhum timeframe registrado no período.</p>
+                    <p className="text-on-surface-variant text-sm py-8 text-center italic">
+                      {timeframeFilterState === 'positive' ? 'Nenhum timeframe com lucro no período.' : 'Nenhum timeframe com prejuízo no período.'}
+                    </p>
                   )}
                 </div>
               </div>
