@@ -229,7 +229,7 @@ function parseMatchTradesCSV(csvText: string, accountId: string) {
       source:     'MATCHTRADES_CSV',
       accountId,
       type: 'forex',
-      session: 'Importado',
+      session:    detectSession(cols[2]?.trim()?.split(' ')[1] || ''),
       notes: '',
       psychology: ''
     });
@@ -325,7 +325,7 @@ function parseMatchTradesHTML(htmlText: string, accountId: string) {
       source:     'MATCHTRADES_HTML',
       accountId,
       type: 'forex',
-      session: 'Importado',
+      session:    detectSession(getText(2)?.split(' ')[1] || ''),
       notes: '',
       psychology: ''
     });
@@ -443,7 +443,7 @@ async function parseMT5HTML(file: File, accountId: string) {
       source:     'MT5_HTML',
       accountId,
       type: 'forex',
-      session: 'Importado',
+      session:    detectSession(getText(0)?.split(' ')[1] || ''),
       notes: '',
       psychology: ''
     });
@@ -538,6 +538,147 @@ export async function importTradeFile(file: File, accountId: string) {
   }
 
   throw new Error(`Formato "${ext}" não suportado. Aceites: .csv, .html`);
+}
+
+export function detectSession(entryTime: string, isOB = false): string {
+  if (!entryTime) return 'Importado';
+  
+  // Format entryTime to HH:MM (strip seconds if present)
+  const timePart = entryTime.split(' ')[1] || entryTime.split(' ')[0];
+  const timeMatch = timePart.match(/^(\d{2}):(\d{2})/);
+  if (!timeMatch) return 'Importado';
+  
+  const hour = parseInt(timeMatch[1], 10);
+  const min = parseInt(timeMatch[2], 10);
+  const tVal = hour * 60 + min;
+
+  if (isOB) {
+    // Opções Binárias: "Dia" ou "Noite" (Dia: 06:00 às 18:00)
+    if (hour >= 6 && hour < 18) {
+      return "Dia";
+    } else {
+      return "Noite";
+    }
+  }
+
+  // Detecção de Sessões de Forex personalizada
+  const sessionType = localStorage.getItem('app_session_type') || 'subdivided';
+  const appSessions = localStorage.getItem('app_sessions');
+  let userSessions = [
+    { id: 'asian', name: 'Sessão Asiática', start: '20:00', end: '04:00' },
+    { id: 'london', name: 'Sessão de Londres', start: '03:00', end: '11:00' },
+    { id: 'newyork', name: 'Sessão de Nova York', start: '08:00', end: '17:00' },
+  ];
+  
+  if (appSessions) {
+    try {
+      userSessions = JSON.parse(appSessions);
+    } catch (_) {}
+  }
+
+  for (const session of userSessions) {
+    const sMatch = session.start.match(/^(\d{2}):(\d{2})/);
+    const eMatch = session.end.match(/^(\d{2}):(\d{2})/);
+    if (!sMatch || !eMatch) continue;
+
+    const sHour = parseInt(sMatch[1], 10);
+    const sMin = parseInt(sMatch[2], 10);
+    const sVal = sHour * 60 + sMin;
+
+    const eHour = parseInt(eMatch[1], 10);
+    const eMin = parseInt(eMatch[2], 10);
+    const eVal = eHour * 60 + eMin;
+
+    let inSession = false;
+    if (sVal <= eVal) {
+      inSession = tVal >= sVal && tVal <= eVal;
+    } else {
+      inSession = tVal >= sVal || tVal <= eVal;
+    }
+
+    if (inSession) {
+      // Mapear o nome base da sessão em português coerente
+      let baseName = 'Londres';
+      const lowercaseName = session.name.toLowerCase();
+      if (session.id === 'asian' || lowercaseName.includes('asiática') || lowercaseName.includes('asiatica') || lowercaseName.includes('asian')) {
+        baseName = 'Asiática';
+      } else if (session.id === 'newyork' || lowercaseName.includes('nova york') || lowercaseName.includes('nova iorque') || lowercaseName.includes('new york') || lowercaseName.includes('newyork')) {
+        baseName = 'Nova Iorque';
+      } else if (session.id === 'london' || lowercaseName.includes('londres') || lowercaseName.includes('london')) {
+        baseName = 'Londres';
+      } else {
+        baseName = session.name;
+      }
+
+      if (sessionType === 'simple') {
+        return baseName;
+      } else {
+        const subs = (session as any).subdivisions || {
+          pre: { start: session.id === 'asian' ? '20:00' : session.id === 'london' ? '03:00' : '08:00', end: session.id === 'asian' ? '21:00' : session.id === 'london' ? '04:00' : '09:30', label: 'Pré-Mercado' },
+          intra: { start: session.id === 'asian' ? '21:00' : session.id === 'london' ? '04:00' : '09:30', end: session.id === 'asian' ? '02:00' : session.id === 'london' ? '09:00' : '14:30', label: 'Intra Mercado' },
+          noop: { start: session.id === 'asian' ? '02:00' : session.id === 'london' ? '09:00' : '14:30', end: session.id === 'asian' ? '03:00' : session.id === 'london' ? '10:00' : '16:00', label: 'Zona Não Operável' },
+          close: { start: session.id === 'asian' ? '03:00' : session.id === 'london' ? '10:00' : '16:00', end: session.id === 'asian' ? '04:00' : session.id === 'london' ? '11:00' : '17:00', label: 'Fechamento' },
+        };
+
+        for (const sub of Object.values(subs) as any[]) {
+          const subSMatch = sub.start.match(/^(\d{2}):(\d{2})/);
+          const subEMatch = sub.end.match(/^(\d{2}):(\d{2})/);
+          if (!subSMatch || !subEMatch) continue;
+
+          const subSHour = parseInt(subSMatch[1], 10);
+          const subSMin = parseInt(subSMatch[2], 10);
+          const subSVal = subSHour * 60 + subSMin;
+
+          const subEHour = parseInt(subEMatch[1], 10);
+          const subEMin = parseInt(subEMatch[2], 10);
+          const subEVal = subEHour * 60 + subEMin;
+
+          let inSub = false;
+          if (subSVal <= subEVal) {
+            inSub = tVal >= subSVal && tVal <= subEVal;
+          } else {
+            inSub = tVal >= subSVal || tVal <= subEVal;
+          }
+
+          if (inSub) {
+            return `${baseName} (${sub.label})`;
+          }
+        }
+
+        // Subdividida: calcular os minutos decorridos e percentual (como fallback)
+        let duration = 0;
+        let elapsed = 0;
+
+        if (sVal <= eVal) {
+          duration = eVal - sVal;
+          elapsed = tVal - sVal;
+        } else {
+          duration = (1440 - sVal) + eVal;
+          if (tVal >= sVal) {
+            elapsed = tVal - sVal;
+          } else {
+            elapsed = (1440 - sVal) + tVal;
+          }
+        }
+
+        const pct = duration > 0 ? elapsed / duration : 0;
+        let subPhase = 'Intra Mercado';
+        if (pct < 0.20) {
+          subPhase = 'Pré-Mercado';
+        } else if (pct < 0.65) {
+          subPhase = 'Intra Mercado';
+        } else if (pct < 0.80) {
+          subPhase = 'Zona Não Operável';
+        } else {
+          subPhase = 'Fechamento';
+        }
+
+        return `${baseName} (${subPhase})`;
+      }
+    }
+  }
+
+  return 'Importado';
 }
 
 export { parseMatchTradesCSV, parseMatchTradesHTML, parseMT5HTML, calcSummary, verificarIntegridade };

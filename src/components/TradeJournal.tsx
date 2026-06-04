@@ -7,7 +7,7 @@ import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import { DatePicker } from './DatePicker';
-import { importTradeFile } from '../utils/tradeParsers';
+import { importTradeFile, detectSession } from '../utils/tradeParsers';
 
 export default function TradeJournal({ currentView = 'list', onViewChange }: { currentView?: 'list' | 'form' | 'detail', onViewChange?: (view: 'list' | 'form' | 'detail') => void }) {
   const { formatCurrency } = useCurrency();
@@ -118,6 +118,18 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
       setSessionType(savedSessionType);
     }
   }, []);
+
+  // Auto-detect session on entryTime or type change in manual entry or editing
+  useEffect(() => {
+    if (view === 'form') {
+      const isOB = (tradeType === 'ob');
+      const autoSession = detectSession(tradeData.entryTime, isOB);
+      setTradeData(prev => {
+        if (prev.session === autoSession) return prev;
+        return { ...prev, session: autoSession };
+      });
+    }
+  }, [tradeData.entryTime, tradeType, view]);
 
   const handleViewChange = (newView: 'list' | 'form' | 'detail') => {
     setView(newView);

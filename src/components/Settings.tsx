@@ -79,9 +79,42 @@ export default function Settings() {
   });
   const [accounts, setAccounts] = useState<any[]>([]);
   const [sessions, setSessions] = useState([
-    { id: 'asian', name: 'Sessão Asiática', start: '20:00', end: '04:00' },
-    { id: 'london', name: 'Sessão de Londres', start: '03:00', end: '11:00' },
-    { id: 'newyork', name: 'Sessão de Nova York', start: '08:00', end: '17:00' },
+    { 
+      id: 'asian', 
+      name: 'Sessão Asiática', 
+      start: '20:00', 
+      end: '04:00',
+      subdivisions: {
+        pre: { start: '20:00', end: '21:00', label: 'Pré-Mercado' },
+        intra: { start: '21:00', end: '02:00', label: 'Intra Mercado' },
+        noop: { start: '02:00', end: '03:00', label: 'Zona Não Operável' },
+        close: { start: '03:00', end: '04:00', label: 'Fechamento' },
+      }
+    },
+    { 
+      id: 'london', 
+      name: 'Sessão de Londres', 
+      start: '03:00', 
+      end: '11:00',
+      subdivisions: {
+        pre: { start: '03:00', end: '04:00', label: 'Pré-Mercado' },
+        intra: { start: '04:00', end: '09:00', label: 'Intra Mercado' },
+        noop: { start: '09:00', end: '10:00', label: 'Zona Não Operável' },
+        close: { start: '10:00', end: '11:00', label: 'Fechamento' },
+      }
+    },
+    { 
+      id: 'newyork', 
+      name: 'Sessão de Nova York', 
+      start: '08:00', 
+      end: '17:00',
+      subdivisions: {
+        pre: { start: '08:00', end: '09:30', label: 'Pré-Mercado' },
+        intra: { start: '09:30', end: '14:30', label: 'Intra Mercado' },
+        noop: { start: '14:30', end: '16:00', label: 'Zona Não Operável' },
+        close: { start: '16:00', end: '17:00', label: 'Fechamento' },
+      }
+    },
   ]);
 
   const [modalConfig, setModalConfig] = useState<{
@@ -174,7 +207,41 @@ export default function Settings() {
     if (savedObjectives) setObjectives(JSON.parse(savedObjectives));
 
     const savedSessions = localStorage.getItem('app_sessions');
-    if (savedSessions) setSessions(JSON.parse(savedSessions));
+    if (savedSessions) {
+      try {
+        const parsed = JSON.parse(savedSessions);
+        const migrated = parsed.map((s: any) => {
+          if (!s.subdivisions) {
+            let subs = {
+              pre: { start: '20:00', end: '21:00', label: 'Pré-Mercado' },
+              intra: { start: '21:00', end: '02:00', label: 'Intra Mercado' },
+              noop: { start: '02:00', end: '03:00', label: 'Zona Não Operável' },
+              close: { start: '03:00', end: '04:00', label: 'Fechamento' },
+            };
+            if (s.id === 'london') {
+              subs = {
+                pre: { start: '03:00', end: '04:00', label: 'Pré-Mercado' },
+                intra: { start: '04:00', end: '09:00', label: 'Intra Mercado' },
+                noop: { start: '09:00', end: '10:00', label: 'Zona Não Operável' },
+                close: { start: '10:00', end: '11:00', label: 'Fechamento' },
+              };
+            } else if (s.id === 'newyork') {
+              subs = {
+                pre: { start: '08:00', end: '09:30', label: 'Pré-Mercado' },
+                intra: { start: '09:30', end: '14:30', label: 'Intra Mercado' },
+                noop: { start: '14:30', end: '16:00', label: 'Zona Não Operável' },
+                close: { start: '16:00', end: '17:00', label: 'Fechamento' },
+              };
+            }
+            return { ...s, subdivisions: subs };
+          }
+          return s;
+        });
+        setSessions(migrated);
+      } catch (_) {
+        setSessions(JSON.parse(savedSessions));
+      }
+    }
 
     if (!auth.currentUser) return;
 
@@ -351,6 +418,28 @@ export default function Settings() {
 
   const handleSessionChange = (id: string, field: 'start' | 'end', value: string) => {
     setSessions(sessions.map(s => s.id === id ? { ...s, [field]: value } : s));
+  };
+
+  const handleSubdivisionChange = (sessionId: string, subKey: string, field: 'start' | 'end', value: string) => {
+    setSessions(sessions.map(s => {
+      if (s.id !== sessionId) return s;
+      const sub = s.subdivisions || {
+        pre: { start: '20:00', end: '21:00', label: 'Pré-Mercado' },
+        intra: { start: '21:00', end: '02:00', label: 'Intra Mercado' },
+        noop: { start: '02:00', end: '03:00', label: 'Zona Não Operável' },
+        close: { start: '03:00', end: '04:00', label: 'Fechamento' },
+      };
+      return {
+        ...s,
+        subdivisions: {
+          ...sub,
+          [subKey]: {
+            ...sub[subKey],
+            [field]: value
+          }
+        }
+      };
+    }));
   };
 
   const handleSave = async () => {
@@ -1356,37 +1445,83 @@ export default function Settings() {
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
-                      {sessions.map(session => (
-                        <div key={session.id} className="flex flex-col md:flex-row md:items-center gap-4 p-4 bg-surface-container border border-outline-variant/10 rounded-lg">
-                          <div className="flex-1">
-                            <p className="text-on-surface font-bold text-sm">{session.name}</p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-on-surface-variant text-xs">Início:</span>
-                              <input 
-                                type="time" 
-                                value={session.start}
-                                onChange={(e) => handleSessionChange(session.id, 'start', e.target.value)}
-                                className="bg-surface-container-highest border border-outline-variant/20 text-on-surface px-3 py-1.5 rounded text-sm outline-none focus:border-primary transition-colors"
-                                style={{ colorScheme: 'dark' }}
-                              />
+                    <div className="space-y-4">
+                      {sessions.map(session => {
+                        const subs = session.subdivisions || {
+                          pre: { start: '20:00', end: '21:00', label: 'Pré-Mercado' },
+                          intra: { start: '21:00', end: '02:00', label: 'Intra Mercado' },
+                          noop: { start: '02:00', end: '03:00', label: 'Zona Não Operável' },
+                          close: { start: '03:00', end: '04:00', label: 'Fechamento' },
+                        };
+
+                        return (
+                          <div key={session.id} className="p-4 bg-surface-container border border-outline-variant/10 rounded-xl space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-outline-variant/5">
+                              <p className="text-on-surface font-black text-sm uppercase tracking-wide text-primary">{session.name}</p>
+                              <span className="text-[10px] bg-secondary/15 text-secondary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                {sessionType === 'simple' ? 'Sessão Simples' : 'Sessão Subdividida'}
+                              </span>
                             </div>
-                            <span className="text-on-surface-variant">-</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-on-surface-variant text-xs">Fim:</span>
-                              <input 
-                                type="time" 
-                                value={session.end}
-                                onChange={(e) => handleSessionChange(session.id, 'end', e.target.value)}
-                                className="bg-surface-container-highest border border-outline-variant/20 text-on-surface px-3 py-1.5 rounded text-sm outline-none focus:border-primary transition-colors"
-                                style={{ colorScheme: 'dark' }}
-                              />
-                            </div>
+                            
+                            {sessionType === 'simple' ? (
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 pt-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-on-surface-variant text-xs font-semibold">Início:</span>
+                                  <input 
+                                    type="time" 
+                                    value={session.start}
+                                    onChange={(e) => handleSessionChange(session.id, 'start', e.target.value)}
+                                    className="bg-surface-container-highest border border-outline-variant/20 text-on-surface px-3 py-1.5 rounded-lg text-sm outline-none focus:border-primary transition-colors"
+                                    style={{ colorScheme: 'dark' }}
+                                  />
+                                </div>
+                                <span className="text-on-surface-variant hidden sm:inline">-</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-on-surface-variant text-xs font-semibold">Fim:</span>
+                                  <input 
+                                    type="time" 
+                                    value={session.end}
+                                    onChange={(e) => handleSessionChange(session.id, 'end', e.target.value)}
+                                    className="bg-surface-container-highest border border-outline-variant/20 text-on-surface px-3 py-1.5 rounded-lg text-sm outline-none focus:border-primary transition-colors"
+                                    style={{ colorScheme: 'dark' }}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                {Object.entries(subs).map(([subKey, sub]: [string, any]) => (
+                                  <div key={subKey} className="bg-surface-container-highest/60 border border-outline-variant/10 rounded-lg p-3">
+                                    <p className="text-on-surface font-semibold text-xs mb-2.5 text-secondary">{sub.label}</p>
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 flex items-center gap-1.5">
+                                        <span className="text-on-surface-variant text-[10px] font-medium">Início:</span>
+                                        <input 
+                                          type="time" 
+                                          value={sub.start}
+                                          onChange={(e) => handleSubdivisionChange(session.id, subKey, 'start', e.target.value)}
+                                          className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-2 py-1 rounded text-xs outline-none focus:border-primary transition-colors"
+                                          style={{ colorScheme: 'dark' }}
+                                        />
+                                      </div>
+                                      <span className="text-on-surface-variant text-xs">-</span>
+                                      <div className="flex-1 flex items-center gap-1.5">
+                                        <span className="text-on-surface-variant text-[10px] font-medium">Fim:</span>
+                                        <input 
+                                          type="time" 
+                                          value={sub.end}
+                                          onChange={(e) => handleSubdivisionChange(session.id, subKey, 'end', e.target.value)}
+                                          className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-2 py-1 rounded text-xs outline-none focus:border-primary transition-colors"
+                                          style={{ colorScheme: 'dark' }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
               </motion.div>
