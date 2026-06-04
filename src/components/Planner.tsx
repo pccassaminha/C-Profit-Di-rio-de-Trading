@@ -34,6 +34,8 @@ export default function Planner() {
   const [editingEntry, setEditingEntry] = useState<PlanningEntry | null>(null);
   const [isNoteForm, setIsNoteForm] = useState(false);
   const [expandedWeeks, setExpandedWeeks] = useState<string[]>([]);
+  const [readingModalEntry, setReadingModalEntry] = useState<PlanningEntry | null>(null);
+  const [readerTheme, setReaderTheme] = useState<'dark' | 'light'>('light');
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -111,12 +113,12 @@ export default function Planner() {
     return [...new Set([...urls, ...tvUrls])];
   };
 
-  const formatContent = (text: string) => {
+  const formatContent = (text: string, theme: 'dark' | 'light' = 'dark') => {
     // Escapar tags HTML para evitar XSS básico
     let formatted = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
     // Identificar emojis de números
-    formatted = formatted.replace(/([1-9]️⃣)/g, '<span class="inline-flex items-center justify-center w-6 h-6 bg-primary text-on-primary rounded-full font-bold mr-2">$1</span>');
+    formatted = formatted.replace(/([1-9]️⃣)/g, `<span class="inline-flex items-center justify-center w-6 h-6 ${theme === 'dark' ? 'bg-primary text-on-primary' : 'bg-primary text-white'} rounded-full font-bold mr-2">$1</span>`);
 
     // Identificar Forte/Fraco
     formatted = formatted.replace(/\bForte\b/gi, '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-black uppercase tracking-wider">Forte</span>');
@@ -127,7 +129,11 @@ export default function Planner() {
     formatted = formatted.replace(/\bRisk-off\b/gi, '<span class="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-xs font-black border border-rose-500/30">RISK-OFF</span>');
 
     // Identificar cabeçalhos
-    formatted = formatted.replace(/^(#+)\s+(.+)$/gm, '<h3 class="text-on-surface font-bold text-lg mt-6 mb-3 font-headline border-b border-outline-variant/20 pb-2">$2</h3>');
+    const h3Class = theme === 'dark' 
+      ? 'text-white font-black text-xl mt-6 mb-3 font-headline border-b border-outline-variant/20 pb-2' 
+      : 'text-neutral-900 font-black text-xl mt-6 mb-3 font-headline border-b border-neutral-300 pb-2';
+    
+    formatted = formatted.replace(/^(#+)\s+(.+)$/gm, `<h3 class="${h3Class}">$2</h3>`);
 
     return formatted;
   };
@@ -317,17 +323,63 @@ export default function Planner() {
                               {isExpanded && (
                                 <div className="mt-8 pt-8 border-t border-outline-variant/20 animate-in fade-in slide-in-from-top-4 duration-300">
                                   <div className="space-y-6">
-                                    <div 
-                                      className="text-on-surface-variant text-sm md:text-base leading-relaxed font-body whitespace-pre-wrap selection:bg-primary/30"
-                                      dangerouslySetInnerHTML={{ __html: formatContent(entry.content) }}
-                                    />
+                                    {/* Barra de Ferramentas / Modo Leitura */}
+                                    <div className="flex justify-between items-center bg-surface-container-high/40 p-3 rounded-2xl border border-outline-variant/10">
+                                      <span className="text-[11px] font-mono text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5 ml-2">
+                                        <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                                        Leitura de Documento Ativa
+                                      </span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setReadingModalEntry(entry);
+                                        }}
+                                        className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-primary bg-primary/15 hover:bg-primary/25 px-5 py-2.5 rounded-xl transition-all shadow-md active:scale-95 whitespace-nowrap"
+                                      >
+                                        <StickyNote size={14} className="text-primary" />
+                                        <span>Modo Leitura (Cheia)</span>
+                                      </button>
+                                    </div>
+
+                                    {/* Folha de Documento Realista */}
+                                    <div className="bg-[#0b0b0e] border border-outline-variant/30 rounded-2xl shadow-2xl relative overflow-hidden p-6 md:p-12 border-t-4 border-t-primary/80">
+                                      {/* Marca d'água / Layout de Relatório Oficial */}
+                                      <div className="absolute top-4 right-6 pointer-events-none text-[9px] font-black tracking-[0.25em] text-primary/10 select-none uppercase">
+                                        Profit Strategy Paper
+                                      </div>
+                                      
+                                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 mb-8 border-b border-outline-variant/10 gap-2">
+                                        <div className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+                                          <span className="font-black text-primary">ID:</span> {entry.id.substring(0, 8)} 
+                                          <span className="opacity-30">|</span> 
+                                          <span className="font-black text-secondary">CLASSIFICAÇÃO:</span> {entry.sentiment === 'risk-on' ? 'BULLISH (RISK-ON)' : entry.sentiment === 'risk-off' ? 'BEARISH (RISK-OFF)' : 'NEUTRAL'}
+                                        </div>
+                                        <div className="text-[10px] text-on-surface-variant/80 uppercase tracking-wider font-mono">
+                                          {entry.createdAt?.toDate ? format(entry.createdAt.toDate(), "eeee, dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Pendente...'}
+                                        </div>
+                                      </div>
+
+                                      {/* Título do Documento / Tópico */}
+                                      <div className="mb-8">
+                                        <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight leading-tight mb-2">
+                                          {entry.title}
+                                        </h1>
+                                        <p className="text-xs text-primary font-mono uppercase tracking-widest">Documento oficial de execução / planejamento diário</p>
+                                      </div>
+
+                                      {/* O Conteúdo Formatado com letras mais brancas e contraste forte */}
+                                      <div 
+                                        className="text-neutral-50 text-base md:text-[17px] leading-relaxed font-body whitespace-pre-wrap selection:bg-primary/40 antialiased space-y-4"
+                                        dangerouslySetInnerHTML={{ __html: formatContent(entry.content, 'dark') }}
+                                      />
+                                    </div>
 
                                     {/* Seção SMC com Imagens */}
                                     {images.length > 0 && (
                                       <div className="mt-10 pt-10 border-t border-outline-variant/20">
                                         <h4 className="text-on-surface font-black text-sm uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
                                           <ImageIcon size={16} className="text-primary" />
-                                          Análise Técnica SMC
+                                          ANEXOS & ANÁLISE GRÁFICA SMC
                                         </h4>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                           {images.map((url, idx) => (
@@ -433,6 +485,118 @@ export default function Planner() {
                   <Send size={24} />
                   {editingEntry ? 'Salvar Alterações' : (isNoteForm ? 'Salvar Nota Diária' : 'Adicionar Novo Plano')}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal do Modo Leitura de Alta Fidelidade (Folha de Documento Real) */}
+      {readingModalEntry && (
+        <div className="fixed inset-0 z-[120] flex flex-col justify-between bg-black/95 backdrop-blur-lg p-3 md:p-6 overflow-y-auto">
+          {/* Barra de Ações Superior do Leitor */}
+          <div className="w-full max-w-5xl mx-auto flex items-center justify-between py-4 border-b border-white/10 mb-6 shrink-0 print:hidden text-white">
+            <div className="flex items-center gap-3">
+              <span className="p-2 rounded-lg bg-primary/10 text-primary">
+                <StickyNote size={20} />
+              </span>
+              <div>
+                <p className="text-xs text-neutral-400 font-mono uppercase tracking-[0.15em]">Lendo Documento</p>
+                <h3 className="text-sm font-black text-white truncate max-w-[150px] sm:max-w-md">{readingModalEntry.title}</h3>
+              </div>
+            </div>
+
+            {/* Controles de Vista */}
+            <div className="flex items-center gap-2">
+              {/* Seletor de Tema da Folha */}
+              <div className="bg-neutral-900 border border-neutral-800 p-0.5 rounded-xl flex items-center shadow-inner">
+                <button
+                  onClick={() => setReaderTheme('light')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${readerTheme === 'light' ? 'bg-white text-black shadow' : 'text-neutral-400 hover:text-white'}`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#FAF9F5] border border-neutral-300"></span>
+                  Claro (Marfim)
+                </button>
+                <button
+                  onClick={() => setReaderTheme('dark')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${readerTheme === 'dark' ? 'bg-[#18181b] text-white shadow' : 'text-neutral-400 hover:text-white'}`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#0c0c0f] border border-neutral-700"></span>
+                  Escuro (Breu)
+                </button>
+              </div>
+
+              {/* Botão de Imprimir */}
+              <button
+                onClick={() => window.print()}
+                className="bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-white px-3 py-1.5 h-9 rounded-xl transition-all font-bold text-xs flex items-center gap-1.5"
+                title="Imprimir / Salvar PDF"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>PDF / PRINT</span>
+              </button>
+
+              {/* Fechar */}
+              <button 
+                onClick={() => setReadingModalEntry(null)}
+                className="bg-primary hover:bg-primary/90 text-on-primary p-2 rounded-xl transition-all h-9 w-9 flex items-center justify-center"
+                title="Fechar Leitor"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* A Folha Física em Si */}
+          <div className="flex-1 w-full max-w-4xl mx-auto flex items-start justify-center pb-12">
+            <div 
+              className={`w-full rounded-2xl md:rounded-[2.5rem] shadow-[0_30px_70px_rgba(0,0,0,0.8)] relative overflow-hidden transition-colors duration-300 p-8 md:p-16 border ${
+                readerTheme === 'light' 
+                  ? 'bg-[#FAF9F5] text-neutral-900 border-neutral-200' 
+                  : 'bg-[#0c0c0f] text-neutral-100 border-neutral-800'
+              }`}
+              style={{ minHeight: '800px' }}
+            >
+              {/* Decoradores fofos de folha real */}
+              <div className="absolute top-8 left-8 flex items-center gap-2 pointer-events-none select-none opacity-40">
+                <span className={`w-3.5 h-3.5 rounded-full ${readerTheme === 'light' ? 'bg-neutral-300' : 'bg-neutral-800'}`}></span>
+                <span className={`text-[10px] font-mono font-bold tracking-widest ${readerTheme === 'light' ? 'text-neutral-500' : 'text-neutral-400'}`}>DOCUMENT_CLASS: PLAN_PRO</span>
+              </div>
+              <div className="absolute top-8 right-8 pointer-events-none select-none opacity-40 font-mono text-[9px] tracking-[0.25em] uppercase">
+                Profit Journal Strategy Page
+              </div>
+
+              {/* Divisor superior */}
+              <div className={`flex justify-between items-center pb-6 mb-10 border-b gap-3 mt-4 ${readerTheme === 'light' ? 'border-neutral-200 text-neutral-500' : 'border-neutral-800 text-neutral-400'} font-mono text-xs uppercase tracking-widest`}>
+                <span>Sessão Estudo & Planejamento</span>
+                <span>{readingModalEntry.isDailyNote ? '• Nota Diária' : '• Plano de Trade'}</span>
+              </div>
+
+              {/* Título Oficial */}
+              <div className="mb-10 text-center md:text-left">
+                <p className="text-xs text-primary font-mono font-black uppercase tracking-[0.2em] mb-2 animate-pulse">Relatório Executivo de Mercado</p>
+                <h1 className={`text-4xl md:text-5xl font-black tracking-tight leading-tight mb-4 ${readerTheme === 'light' ? 'text-neutral-900' : 'text-white'}`}>
+                  {readingModalEntry.title}
+                </h1>
+                <div className={`inline-flex items-center gap-2 font-mono text-xs px-3 py-1.5 rounded-full ${readerTheme === 'light' ? 'bg-neutral-100 text-neutral-600' : 'bg-neutral-900 text-neutral-400'}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                  Criado em: {readingModalEntry.createdAt?.toDate ? format(readingModalEntry.createdAt.toDate(), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR }) : 'Processando...'}
+                </div>
+              </div>
+
+              {/* O Conteúdo Super Legível */}
+              <div 
+                className={`text-base md:text-[18px] leading-relaxed font-body whitespace-pre-wrap selection:bg-primary/20 space-y-6 antialiased ${
+                  readerTheme === 'light' ? 'text-neutral-800 font-medium' : 'text-slate-100 font-normal'
+                }`}
+                dangerouslySetInnerHTML={{ __html: formatContent(readingModalEntry.content, readerTheme) }}
+              />
+
+              {/* Rodapé Interno do Documento */}
+              <div className={`mt-16 pt-8 border-t flex flex-col sm:flex-row justify-between items-center text-[11px] font-mono gap-4 ${
+                readerTheme === 'light' ? 'border-neutral-200 text-neutral-400' : 'border-neutral-800 text-neutral-500'
+              }`}>
+                <span>© {new Date().getFullYear()} PROFIT APPLET • DIREITOS DE TRADING RESERVADOS</span>
+                <span className="uppercase font-black text-primary">Confidencial • Uso do Usuário</span>
               </div>
             </div>
           </div>
