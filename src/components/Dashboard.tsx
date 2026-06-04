@@ -2001,153 +2001,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Best Sessions */}
-            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-              <div className="flex justify-between items-center mb-6 md:mb-8">
-                <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#ffb4ab]">schedule</span>
-                  {sessionFilter === 'positive' ? 'Melhores Sessões' : 'Sessões com Perda'}
-                </h4>
-                <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
-                  <button 
-                    onClick={() => setSessionFilter('positive')}
-                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${sessionFilter === 'positive' ? 'bg-secondary text-on-secondary shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
-                  >
-                    Ganhos
-                  </button>
-                  <button 
-                    onClick={() => setSessionFilter('negative')}
-                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${sessionFilter === 'negative' ? 'bg-error text-white shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
-                  >
-                    Perdas
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-4">
-                {sessionList.length > 0 ? (
-                  <div className="flex flex-col xl:flex-row items-center gap-6">
-                    <div className="w-full xl:w-1/2 h-[200px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={sessionList}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="total"
-                            nameKey="name"
-                          >
-                            {sessionList.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5', '#fdd38b'][index % 5]} />
-                            ))}
-                          </Pie>
-                          <Tooltip contentStyle={{ backgroundColor: '#1e1e24', border: 'none', borderRadius: '8px', color: '#e2e2e9' }} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="w-full xl:w-1/2 space-y-4">
-                      {sessionList.slice(0, 3).map((session, idx) => (
-                        <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
-                          <div>
-                            <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
-                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5', '#fdd38b'][idx % 5] }}></span>
-                              <span className="truncate">{session.name}</span>
-                            </p>
-                            <p className="text-xs text-on-surface-variant">Win Rate: {session.winRate.toFixed(1)}% ({session.wins}/{session.total})</p>
-                          </div>
-                          <p className={`font-bold shrink-0 ${session.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
-                            {session.pnl >= 0 ? '+' : ''}{formatCurrency(session.pnl)}
-                          </p>
-                        </div>
-                      ))}
-                      {sessionList.length > 3 && (
-                        <button 
-                          onClick={() => openAnalysisModal('sessions')} 
-                          className="w-full py-2 flex items-center justify-center gap-2 text-[#ffb4ab] font-bold text-sm bg-[#ffb4ab]/10 rounded-xl hover:bg-[#ffb4ab]/20 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">
-                            open_in_new
-                          </span>
-                          Ver Todos
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-on-surface-variant text-sm py-8 text-center italic">
-                    {sessionFilter === 'positive' ? 'Nenhuma sessão com lucro no período.' : 'Nenhuma sessão com prejuízo no período.'}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Predominant Psychology */}
-            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-tertiary">psychology</span>
-                Psicológicos Predominantes
-              </h4>
-              <div className="space-y-4">
-                {data.analysisPredominantPsychology.length > 0 ? (
-                  <div className="flex flex-col xl:flex-row items-center gap-6">
-                    <div className="w-full xl:w-1/2 h-[200px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={data.analysisPredominantPsychology.map(([name, value]) => ({ name, value }))}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
-                            nameKey="name"
-                          >
-                            {data.analysisPredominantPsychology.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={['#f2b4e5', '#c3f5ff', '#b4f2c0', '#ffb4ab'][index % 4]} />
-                            ))}
-                          </Pie>
-                          <Tooltip contentStyle={{ backgroundColor: '#1e1e24', border: 'none', borderRadius: '8px', color: '#e2e2e9' }} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="w-full xl:w-1/2 space-y-4">
-                      {data.analysisPredominantPsychology.slice(0, 3).map(([state, count], idx) => (
-                        <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
-                          <div className="flex items-center gap-3">
-                            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#f2b4e5', '#c3f5ff', '#b4f2c0', '#ffb4ab'][idx % 4] }}></span>
-                            <span className="text-2xl shrink-0">
-                              {state === 'Calmo' && '🧘'}
-                              {state === 'Entusiasmado' && '⚡'}
-                              {state === 'Ansioso' && '😰'}
-                              {state === 'Cansado' && '😴'}
-                            </span>
-                            <p className="font-bold text-on-surface uppercase text-sm truncate">{state}</p>
-                          </div>
-                          <p className="font-bold text-on-surface-variant shrink-0">{count} trades</p>
-                        </div>
-                      ))}
-                      {data.analysisPredominantPsychology.length > 3 && (
-                        <button 
-                          onClick={() => openAnalysisModal('psychology')} 
-                          className="w-full py-2 flex items-center justify-center gap-2 text-tertiary font-bold text-sm bg-tertiary/10 rounded-xl hover:bg-tertiary/20 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">
-                            open_in_new
-                          </span>
-                          Ver Todos
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-on-surface-variant text-sm">Nenhum estado psicológico registrado no período.</p>
-                )}
-              </div>
-            </div>
-
             {/* Best Days of Week */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
               <div className="flex justify-between items-center mb-6 md:mb-8">
@@ -2230,26 +2083,149 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Maiores Perdas por Ativo */}
-            <div className="bg-surface-container-low border border-error/20 rounded-2xl p-6 md:p-8">
+            {/* Predominant Psychology */}
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
               <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-error">trending_down</span>
-                Maiores Perdas por Ativo
+                <span className="material-symbols-outlined text-tertiary">psychology</span>
+                Psicológicos Predominantes
               </h4>
               <div className="space-y-4">
-                {worstPairs.length > 0 ? worstPairs.map((pair, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl border-l-4 border-l-error">
-                    <div>
-                      <p className="font-bold text-on-surface">{pair.name}</p>
-                      <p className="text-xs text-on-surface-variant">{pair.total} trades realizados</p>
+                {data.analysisPredominantPsychology.length > 0 ? (
+                  <div className="flex flex-col xl:flex-row items-center gap-6">
+                    <div className="w-full xl:w-1/2 h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={data.analysisPredominantPsychology.map(([name, value]) => ({ name, value }))}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                            nameKey="name"
+                          >
+                            {data.analysisPredominantPsychology.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={['#f2b4e5', '#c3f5ff', '#b4f2c0', '#ffb4ab'][index % 4]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ backgroundColor: '#1e1e24', border: 'none', borderRadius: '8px', color: '#e2e2e9' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-error">-{formatCurrency(Math.abs(pair.pnl))}</p>
-                      <p className="text-[10px] text-on-surface-variant">Lucro total negativo</p>
+                    <div className="w-full xl:w-1/2 space-y-4">
+                      {data.analysisPredominantPsychology.slice(0, 3).map(([state, count], idx) => (
+                        <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#f2b4e5', '#c3f5ff', '#b4f2c0', '#ffb4ab'][idx % 4] }}></span>
+                            <span className="text-2xl shrink-0">
+                              {state === 'Calmo' && '🧘'}
+                              {state === 'Entusiasmado' && '⚡'}
+                              {state === 'Ansioso' && '😰'}
+                              {state === 'Cansado' && '😴'}
+                            </span>
+                            <p className="font-bold text-on-surface uppercase text-sm truncate">{state}</p>
+                          </div>
+                          <p className="font-bold text-on-surface-variant shrink-0">{count} trades</p>
+                        </div>
+                      ))}
+                      {data.analysisPredominantPsychology.length > 3 && (
+                        <button 
+                          onClick={() => openAnalysisModal('psychology')} 
+                          className="w-full py-2 flex items-center justify-center gap-2 text-tertiary font-bold text-sm bg-tertiary/10 rounded-xl hover:bg-tertiary/20 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            open_in_new
+                          </span>
+                          Ver Todos
+                        </button>
+                      )}
                     </div>
                   </div>
-                )) : (
-                  <p className="text-on-surface-variant text-sm">Nenhuma perda registrada no período.</p>
+                ) : (
+                  <p className="text-on-surface-variant text-sm">Nenhum estado psicológico registrado no período.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Best Sessions */}
+            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 lg:col-span-2">
+              <div className="flex justify-between items-center mb-6 md:mb-8">
+                <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#ffb4ab]">schedule</span>
+                  {sessionFilter === 'positive' ? 'Melhores Sessões' : 'Sessões com Perda'}
+                </h4>
+                <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
+                  <button 
+                    onClick={() => setSessionFilter('positive')}
+                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${sessionFilter === 'positive' ? 'bg-secondary text-on-secondary shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                  >
+                    Ganhos
+                  </button>
+                  <button 
+                    onClick={() => setSessionFilter('negative')}
+                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all ${sessionFilter === 'negative' ? 'bg-error text-white shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+                  >
+                    Perdas
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {sessionList.length > 0 ? (
+                  <div className="flex flex-col xl:flex-row items-center gap-6">
+                    <div className="w-full xl:w-1/2 h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={sessionList}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="total"
+                            nameKey="name"
+                          >
+                            {sessionList.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5', '#fdd38b'][index % 5]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ backgroundColor: '#1e1e24', border: 'none', borderRadius: '8px', color: '#e2e2e9' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="w-full xl:w-1/2 space-y-4">
+                      {sessionList.slice(0, 3).map((session, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
+                          <div>
+                            <p className="font-bold text-on-surface flex items-center gap-2 text-sm">
+                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#ffb4ab', '#b4f2c0', '#c3f5ff', '#f2b4e5', '#fdd38b'][idx % 5] }}></span>
+                              <span className="truncate">{session.name}</span>
+                            </p>
+                            <p className="text-xs text-on-surface-variant">Win Rate: {session.winRate.toFixed(1)}% ({session.wins}/{session.total})</p>
+                          </div>
+                          <p className={`font-bold shrink-0 ${session.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
+                            {session.pnl >= 0 ? '+' : ''}{formatCurrency(session.pnl)}
+                          </p>
+                        </div>
+                      ))}
+                      {sessionList.length > 3 && (
+                        <button 
+                          onClick={() => openAnalysisModal('sessions')} 
+                          className="w-full py-2 flex items-center justify-center gap-2 text-[#ffb4ab] font-bold text-sm bg-[#ffb4ab]/10 rounded-xl hover:bg-[#ffb4ab]/20 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            open_in_new
+                          </span>
+                          Ver Todos
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-on-surface-variant text-sm py-8 text-center italic">
+                    {sessionFilter === 'positive' ? 'Nenhuma sessão com lucro no período.' : 'Nenhuma sessão com prejuízo no período.'}
+                  </p>
                 )}
               </div>
             </div>
