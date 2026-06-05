@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Flame, Gauge, TrendingUp, Grid, Layers2, Activity } from 'lucide-react';
+import { Calendar, Flame, Gauge, TrendingUp, Grid, Layers2, Activity, LineChart } from 'lucide-react';
 
 interface WidgetProps {
   widgetType: 'events' | 'forex-heat-map' | 'market-quotes' | 'technical-analysis' | 'stock-heatmap' | 'crypto-coins-heatmap' | 'ticker-tape';
