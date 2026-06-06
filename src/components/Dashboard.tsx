@@ -1539,7 +1539,6 @@ export default function Dashboard() {
                 Resultado de {capitalize(prevMonthName)}
               </h4>
               <div className="flex-1 flex flex-col items-center justify-center py-4">
-                <p className="text-on-surface-variant text-xs md:text-sm mb-2">Lucro/Prejuízo Realizado</p>
                 <p className={`font-black text-2xl md:text-3xl ${data.prevMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center justify-center gap-1.5`}>
                   <span className="material-symbols-outlined text-xl md:text-2xl">
                     {data.prevMonthPnl >= 0 ? 'trending_up' : 'trending_down'}
@@ -1559,7 +1558,6 @@ export default function Dashboard() {
                 Resultado de {capitalize(currentMonthName)}
               </h4>
               <div className="flex-1 flex flex-col items-center justify-center py-4">
-                <p className="text-on-surface-variant text-xs md:text-sm mb-2">Resultado Acumulado do Mês</p>
                 <p className={`font-black text-2xl md:text-3xl ${data.currentMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center justify-center gap-1.5`}>
                   <span className="material-symbols-outlined text-xl md:text-2xl">
                     {data.currentMonthPnl >= 0 ? 'trending_up' : 'trending_down'}
