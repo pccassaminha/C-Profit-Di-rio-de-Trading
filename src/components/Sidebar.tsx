@@ -33,7 +33,6 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
     { id: 'payments', icon: 'payments', label: 'Pagamentos' },
     { id: 'withdrawals', icon: 'account_balance_wallet', label: 'Levantamentos' },
     { id: 'panorama', icon: 'explore', label: 'Panorama Global' },
-    { id: 'charts', icon: 'monitoring', label: 'Análise Gráfica' },
     { id: 'community', icon: 'groups', label: 'Comunidade' },
     { id: 'affiliates_user', icon: 'handshake', label: 'Área de Afiliado' },
   ];

@@ -54,7 +54,6 @@ export default function MobileBottomNav({ activeTab, setActiveTab }: MobileBotto
   // Secondary items shown inside the "More" drawer
   const secondaryItems = [
     { id: 'panorama', icon: 'explore', label: 'Panorama Global', desc: 'Análise, calendários e feeds técnicos' },
-    { id: 'charts', icon: 'monitoring', label: 'Análise Gráfica', desc: 'Estação avançada e interativa TradingView' },
     { id: 'withdrawals', icon: 'account_balance_wallet', label: 'Levantamentos', desc: 'Gerencie saques e aportes' },
     { id: 'affiliates_user', icon: 'handshake', label: 'Painel do Afiliado', desc: 'Gere receita indicando traders' },
     { id: 'payments', icon: 'payments', label: 'Faturas e Registros', desc: 'Histórico de transações' },

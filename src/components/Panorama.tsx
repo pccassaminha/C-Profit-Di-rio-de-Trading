@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Flame, Gauge, TrendingUp, Grid, Layers2, Activity, LineChart } from 'lucide-react';
+import Charts from './Charts';
 
 interface WidgetProps {
   widgetType: 'events' | 'forex-heat-map' | 'market-quotes' | 'technical-analysis' | 'stock-heatmap' | 'crypto-coins-heatmap' | 'ticker-tape';
@@ -137,7 +138,7 @@ function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
 }
 
 export default function Panorama() {
-  const [layoutMode, setLayoutMode] = useState<'grid' | 'tabs'>('grid');
+  const [layoutMode, setLayoutMode] = useState<'grid' | 'tabs' | 'charts'>('grid');
   const [activeTab, setActiveTab] = useState<'calendar' | 'heatmap' | 'technical' | 'quotes'>('calendar');
   const [calendarSource, setCalendarSource] = useState<'tradingview' | 'investing'>(() => {
     const saved = localStorage.getItem('panorama_calendar_source');
@@ -361,6 +362,17 @@ export default function Panorama() {
           >
             <Layers2 size={15} />
             Abas de Foco
+          </button>
+          <button
+            onClick={() => setLayoutMode('charts')}
+            className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold uppercase tracking-wider text-[11px] transition-all cursor-pointer ${
+              layoutMode === 'charts'
+                ? 'bg-primary text-background shadow-lg shadow-primary/20'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            }`}
+          >
+            <LineChart size={15} />
+            Gráfico
           </button>
         </div>
       </div>
@@ -765,6 +777,13 @@ export default function Panorama() {
             )}
           </div>
 
+        </div>
+      )}
+
+      {/* RENDER CHARTS ONLY MODE */}
+      {layoutMode === 'charts' && (
+        <div className="w-full bg-transparent overflow-hidden transition-all animate-in fade-in duration-300">
+          <Charts />
         </div>
       )}
 

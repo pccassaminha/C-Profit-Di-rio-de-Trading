@@ -16,7 +16,6 @@ import AdminPanel from './components/AdminPanel';
 import Support from './components/Support';
 import Planner from './components/Planner';
 import UserAffiliate from './components/UserAffiliate';
-import Charts from './components/Charts';
 import GlobalChatWidget from './components/GlobalChatWidget';
 import MobileBottomNav from './components/MobileBottomNav';
 import { useTrades } from './hooks/useTrades';
@@ -194,10 +193,7 @@ export default function App() {
           </div>
         )}
         <main className="flex-1 overflow-y-auto pb-24 md:pb-6">
-          <div style={{ display: activeTab === 'charts' ? 'block' : 'none' }}>
-            <Charts />
-          </div>
-          {activeTab !== 'charts' && renderContent()}
+          {renderContent()}
         </main>
       </div>
 
