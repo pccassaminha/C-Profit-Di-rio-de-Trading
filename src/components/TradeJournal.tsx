@@ -931,7 +931,6 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                             </div>
                             <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
                               <div className="hidden md:block text-right">
-                                <p className="text-xs text-on-surface-variant">Sessão</p>
                                 <p className="text-sm font-bold text-on-surface">{trade.session}</p>
                               </div>
                               {/* R:R hidden as per user request to avoid layout deformation */}
@@ -942,7 +941,6 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                               </div>
                               */}
                               <div className="text-right">
-                                <p className="text-xs text-on-surface-variant">P&L</p>
                                 <p className={`font-bold ${trade.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
                                   {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl)}
                                 </p>
