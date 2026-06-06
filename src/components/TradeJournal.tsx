@@ -22,6 +22,19 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     localStorage.setItem('journalListMode', listMode);
   }, [listMode]);
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (expandedTradeId && listMode === 'list') {
+      const elementId = `day-group-${expandedTradeId.replace(/\//g, '-')}`;
+      const timer = setTimeout(() => {
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [expandedTradeId, listMode]);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(new Date());
   const [accounts, setAccounts] = useState<any[]>([]);
   
@@ -866,7 +879,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 const isExpanded = expandedTradeId === date;
 
                 return (
-                  <div key={date} className="bg-surface-container-low border border-outline-variant/20 rounded-2xl overflow-hidden transition-all">
+                  <div key={date} id={`day-group-${date.replace(/\//g, '-')}`} className={`bg-surface-container-low border ${isExpanded ? 'border-primary/50 shadow-xl shadow-primary/5 scale-[1.01]' : 'border-outline-variant/20'} rounded-2xl overflow-hidden transition-all duration-300`}>
                     <div 
                       className="p-4 md:p-6 cursor-pointer hover:bg-surface-container transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
                       onClick={() => setExpandedTradeId(isExpanded ? null : date)}
