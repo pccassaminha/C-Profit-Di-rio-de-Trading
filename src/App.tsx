@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth } from './firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import Dashboard from './components/Dashboard';
@@ -67,12 +68,32 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setIsAuthReady(true);
       if (!currentUser) {
         setShowAuth(false); // Reset to landing when logged out
         setAuthInitialMode('login');
+      } else {
+        // Automatically sync setting files from Firestore to localStorage on mount
+        try {
+          const uDoc = await getDoc(doc(db, 'usuarios', currentUser.uid));
+          if (uDoc.exists()) {
+            const uData = uDoc.data();
+            if (uData.settings) {
+              const s = uData.settings;
+              if (s.dateFormat) localStorage.setItem('app_date_format', s.dateFormat);
+              if (s.sessionType) localStorage.setItem('app_session_type', s.sessionType);
+              if (s.defaultTradeType) localStorage.setItem('app_default_trade_type', s.defaultTradeType);
+              if (s.defaultCommunityFeed) localStorage.setItem('app_default_community_feed', s.defaultCommunityFeed);
+              if (s.showCommunityFilter !== undefined) localStorage.setItem('app_show_community_filter', s.showCommunityFilter.toString());
+              if (s.visibleMarkets) localStorage.setItem('app_visible_markets', s.visibleMarkets);
+              if (s.sessions) localStorage.setItem('app_sessions', JSON.stringify(s.sessions));
+            }
+          }
+        } catch (error) {
+          console.error("Error loading settings from Firestore in App.tsx:", error);
+        }
       }
     });
     return () => unsubscribe();

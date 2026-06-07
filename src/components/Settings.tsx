@@ -51,6 +51,7 @@ export interface Objective {
 
 export default function Settings() {
   const { currency, setCurrency } = useCurrency();
+  const [isLoaded, setIsLoaded] = useState(false);
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
   const [sessionType, setSessionType] = useState<'simple' | 'subdivided'>('subdivided');
   const [defaultTradeType, setDefaultTradeType] = useState<'ask' | 'forex' | 'ob'>('ask');
@@ -243,9 +244,12 @@ export default function Settings() {
       }
     }
 
-    if (!auth.currentUser) return;
+    if (!auth.currentUser) {
+      setIsLoaded(true);
+      return;
+    }
 
-    // Load User Profile / Billing Info
+    // Load User Profile / Billing Info and Settings from Firestore
     const loadProfile = async () => {
       try {
         const profileDoc = await getDocs(query(collection(db, 'user_profiles'), where('userId', '==', auth.currentUser?.uid)));
@@ -261,7 +265,7 @@ export default function Settings() {
           setRegistrationId(getNumericId(auth.currentUser?.uid || ''));
         }
 
-        // Load Maestro/User doc from usuarios collection
+        // Load Maestro/User doc and user settings from Firestore
         if (auth.currentUser) {
           const uDoc = await getDoc(doc(db, 'usuarios', auth.currentUser.uid));
           if (uDoc.exists()) {
@@ -271,10 +275,43 @@ export default function Settings() {
             if (uData.partnerEmail) {
               setPartnerSaved(true);
             }
+            if (uData.settings) {
+              const s = uData.settings;
+              if (s.dateFormat) {
+                setDateFormat(s.dateFormat);
+                localStorage.setItem('app_date_format', s.dateFormat);
+              }
+              if (s.sessionType) {
+                setSessionType(s.sessionType);
+                localStorage.setItem('app_session_type', s.sessionType);
+              }
+              if (s.defaultTradeType) {
+                setDefaultTradeType(s.defaultTradeType);
+                localStorage.setItem('app_default_trade_type', s.defaultTradeType);
+              }
+              if (s.defaultCommunityFeed) {
+                setDefaultCommunityFeed(s.defaultCommunityFeed);
+                localStorage.setItem('app_default_community_feed', s.defaultCommunityFeed);
+              }
+              if (s.showCommunityFilter !== undefined) {
+                setShowCommunityFilter(s.showCommunityFilter);
+                localStorage.setItem('app_show_community_filter', s.showCommunityFilter.toString());
+              }
+              if (s.visibleMarkets) {
+                setVisibleMarkets(s.visibleMarkets);
+                localStorage.setItem('app_visible_markets', s.visibleMarkets);
+              }
+              if (s.sessions) {
+                setSessions(s.sessions);
+                localStorage.setItem('app_sessions', JSON.stringify(s.sessions));
+              }
+            }
           }
         }
       } catch (error) {
-        console.error("Error loading profile:", error);
+        console.error("Error loading profile or settings:", error);
+      } finally {
+        setIsLoaded(true);
       }
     };
     loadProfile();
@@ -415,6 +452,46 @@ export default function Settings() {
       }
     }
   }, [accounts, objectives]);
+
+  // Auto-save settings when changes occur (only after initial profile and settings load is complete)
+  useEffect(() => {
+    if (!isLoaded || !auth.currentUser) return;
+
+    // Immediately save to localStorage for snappy local reactivity
+    localStorage.setItem('app_date_format', dateFormat);
+    localStorage.setItem('app_session_type', sessionType);
+    localStorage.setItem('app_default_trade_type', defaultTradeType);
+    localStorage.setItem('app_default_community_feed', defaultCommunityFeed);
+    localStorage.setItem('app_show_community_filter', showCommunityFilter.toString());
+    localStorage.setItem('app_visible_markets', visibleMarkets);
+    localStorage.setItem('app_sessions', JSON.stringify(sessions));
+
+    // Debounce backing up to Firestore (1 second delay is perfect for typing time inputs)
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const uid = auth.currentUser?.uid;
+        if (!uid) return;
+        
+        await updateDoc(doc(db, 'usuarios', uid), {
+          settings: {
+            dateFormat,
+            sessionType,
+            defaultTradeType,
+            defaultCommunityFeed,
+            showCommunityFilter,
+            visibleMarkets,
+            sessions
+          }
+        });
+        console.log("Configurações salvas automaticamente no Firestore!");
+      } catch (err) {
+        console.error("Erro ao auto-salvar configurações no Firestore:", err);
+      }
+    }, 1000);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [dateFormat, sessionType, defaultTradeType, defaultCommunityFeed, showCommunityFilter, visibleMarkets, sessions, isLoaded]);
+
 
   const handleSessionChange = (id: string, field: 'start' | 'end', value: string) => {
     setSessions(sessions.map(s => s.id === id ? { ...s, [field]: value } : s));
@@ -1009,8 +1086,14 @@ export default function Settings() {
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8">
       <div>
-        <h2 className="text-on-surface font-bold text-2xl font-headline mb-2">Configurações</h2>
-        <p className="text-on-surface-variant text-sm">Personalize suas preferências regionais e horários de operação.</p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h2 className="text-on-surface font-bold text-2xl font-headline mb-2">Configurações</h2>
+          <span className="text-xs bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20 px-2.5 py-1 rounded-full flex items-center gap-1.5 select-none mb-2 font-semibold">
+            <span className="w-2 h-2 bg-[#10b981] rounded-full animate-pulse"></span>
+            Salvamento Automático Ativo (Auto-save)
+          </span>
+        </div>
+        <p className="text-on-surface-variant text-sm">Personalize suas preferências regionais e horários de operação. As suas alterações são salvas automaticamente em tempo real.</p>
       </div>
 
       <div className="space-y-4">
