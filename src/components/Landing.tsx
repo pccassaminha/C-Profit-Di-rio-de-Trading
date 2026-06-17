@@ -51,19 +51,22 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
       
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-[5%] h-[100px] bg-background/85 backdrop-blur-[20px] border-b border-outline">
-        <a href="#" onClick={(e) => {e.preventDefault(); window.scrollTo(0,0)}} className="flex items-center gap-[16px] text-none hover:opacity-90 transition-opacity">
-          <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[44px] drop-shadow-md rounded-[8px]" />
-          <span className="font-headline text-[22px] font-extrabold text-on-surface tracking-tight uppercase">Profit</span>
+        <a href="#" onClick={(e) => {e.preventDefault(); window.scrollTo(0,0)}} className="flex items-center gap-2 md:gap-[16px] text-none hover:opacity-90 transition-opacity shrink-0">
+          <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[32px] md:h-[44px] drop-shadow-md rounded-[8px]" />
+          <span className="font-headline text-[18px] md:text-[22px] font-extrabold text-on-surface tracking-tight uppercase">Profit</span>
         </a>
-        <ul className="hidden md:flex items-center gap-[36px] list-none">
+        <ul className="hidden lg:flex items-center gap-[36px] list-none">
           <li><a href="#recursos" className="text-[13px] font-medium tracking-[0.08em] uppercase text-on-surface-variant hover:text-primary transition-colors">Recursos</a></li>
           <li><a href="#planos" className="text-[13px] font-medium tracking-[0.08em] uppercase text-on-surface-variant hover:text-primary transition-colors">Planos</a></li>
           <li><a href="#sobre" className="text-[13px] font-medium tracking-[0.08em] uppercase text-on-surface-variant hover:text-primary transition-colors">Sobre</a></li>
           <li><a href="#afiliados" className="text-[13px] font-medium tracking-[0.08em] uppercase text-[#00f5a0] hover:text-[#00f5a0]/80 transition-colors">Afiliados</a></li>
         </ul>
-        <div className="flex items-center gap-[16px]">
-          <button onClick={onLoginClick} className="bg-transparent border-none text-on-surface-variant font-body text-[14px] font-medium cursor-pointer hover:text-on-surface transition-colors">Entrar</button>
-          <button onClick={onRegisterClick} className="bg-primary text-on-primary border-none py-[10px] px-[22px] rounded-[8px] font-body text-[13px] font-bold tracking-[0.06em] uppercase cursor-pointer transition-all hover:bg-primary-fixed-dim hover:-translate-y-[1px] hover:shadow-[0_8px_30px_rgba(0,245,160,0.3)]">Começar Agora</button>
+        <div className="flex items-center gap-3 md:gap-[16px] shrink-0">
+          <button onClick={onLoginClick} className="bg-transparent border-none text-on-surface-variant font-body text-[13px] md:text-[14px] font-medium cursor-pointer hover:text-on-surface transition-colors">Entrar</button>
+          <button onClick={onRegisterClick} className="bg-primary text-on-primary border-none py-2 px-3 md:py-[10px] md:px-[22px] rounded-[8px] font-body text-[11px] md:text-[13px] font-bold tracking-[0.06em] uppercase cursor-pointer transition-all hover:bg-primary-fixed-dim hover:-translate-y-[1px] hover:shadow-[0_8px_30px_rgba(0,245,160,0.3)] whitespace-nowrap">
+            <span className="sm:hidden">Começar</span>
+            <span className="hidden sm:inline">Começar Agora</span>
+          </button>
         </div>
       </nav>
 
