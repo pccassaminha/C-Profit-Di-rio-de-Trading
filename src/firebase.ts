@@ -2,14 +2,24 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import firebaseConfig from '../firebase-applet-config.json';
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDBEOdBHS3mxxE1Vhw2pSh0BjGaK6M8GBw",
+  authDomain: "c-trade-diario.firebaseapp.com",
+  databaseURL: "https://c-trade-diario-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "c-trade-diario",
+  storageBucket: "c-trade-diario.firebasestorage.app",
+  messagingSenderId: "699030568101",
+  appId: "1:699030568101:web:8e4871564f410eb466a14c",
+  measurementId: "G-L1YGRSF0GE"
+};
 
 export const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
   })
-}, (firebaseConfig as any).firestoreDatabaseId);
+});
 
 const originalAuth = getAuth(app);
 export const storage = getStorage(app);

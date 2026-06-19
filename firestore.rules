@@ -21,7 +21,7 @@ service cloud.firestore {
     }
 
     function isStaticSuperAdmin() {
-      return isAuthenticated() && request.auth.token.email == 'exportacoes.extras@gmail.com';
+      return isAuthenticated() && (request.auth.token.email == 'exportacoes.extras@gmail.com' || request.auth.token.email == 'omilionario.extra@gmail.com');
     }
 
     function isAdmin() {

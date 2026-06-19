@@ -43,6 +43,17 @@ interface AuthProps {
   initialMode?: 'login' | 'register';
 }
 
+const getFriendlyErrorMessage = (err: any) => {
+  if (!err) return 'Erro desconhecido.';
+  const code = err.code || '';
+  if (code === 'auth/email-already-in-use') return 'Este e-mail já está em uso. Por favor, faça login ou use outro e-mail.';
+  if (code === 'auth/invalid-email') return 'E-mail inválido.';
+  if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') return 'Credenciais incorretas (usuário ou senha).';
+  if (code === 'auth/network-request-failed') return 'Falha na conexão de rede. Verifique sua internet ou tente novamente mais tarde.';
+  if (code === 'auth/too-many-requests') return 'Muitas tentativas falhas. Tente novamente mais tarde.';
+  return err.message || 'Erro durante a autenticação.';
+};
+
 export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
@@ -182,7 +193,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       
       onSuccess();
     } catch (err: any) {
-      setError(err.message);
+      setError(getFriendlyErrorMessage(err));
       console.error(err);
     } finally {
       setLoading(false);
@@ -201,7 +212,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       await sendPasswordResetEmail(auth, email);
       setResetSent(true);
     } catch (err: any) {
-      setError(err.message);
+      setError(getFriendlyErrorMessage(err));
       console.error(err);
     } finally {
       setLoading(false);
@@ -400,7 +411,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
         onSuccess();
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(getFriendlyErrorMessage(err));
       console.error(err);
     } finally {
       setLoading(false);
