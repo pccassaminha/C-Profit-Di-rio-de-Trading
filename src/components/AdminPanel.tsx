@@ -19,7 +19,7 @@ export default function AdminPanel() {
   const currentUser = auth.currentUser;
   
   // Super Admin check
-  const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com' || userPlan?.role === 'admin';
+  const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com' || currentUser?.email === 'omilionario.extra@gmail.com' || userPlan?.role === 'admin';
 
   const [activeTab, setActiveTab ] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast' | 'maestros' | 'affiliates'>('users');
   const [affiliateTab, setAffiliateTab] = useState<'overview' | 'config' | 'commissions' | 'payouts' | 'trials'>('overview');

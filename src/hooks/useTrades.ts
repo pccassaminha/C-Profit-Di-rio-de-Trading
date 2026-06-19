@@ -103,7 +103,7 @@ export const useTrades = (manualTrades: any[] = []) => {
 
   const isSuperAdmin = useMemo(() => {
     const email = auth.currentUser?.email;
-    return userPlan?.role === 'admin' || email === 'exportacoes.extras@gmail.com';
+    return userPlan?.role === 'admin' || email === 'exportacoes.extras@gmail.com' || email === 'omilionario.extra@gmail.com';
   }, [userPlan, auth.currentUser?.email]);
 
   const finalUserPlan = useMemo(() => {

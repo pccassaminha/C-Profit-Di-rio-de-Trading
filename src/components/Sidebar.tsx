@@ -7,7 +7,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
   const currentUser = auth.currentUser;
   
   // Super Admin check - only this email can see the admin panel
-  const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com' || userPlan?.role === 'admin';
+  const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com' || currentUser?.email === 'omilionario.extra@gmail.com' || userPlan?.role === 'admin';
 
   const getPlanDisplay = (type: string | undefined) => {
     if (!type) return 'Iniciante';
