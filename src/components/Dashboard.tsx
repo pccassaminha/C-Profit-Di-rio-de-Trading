@@ -1160,7 +1160,12 @@ export default function Dashboard() {
   const [sessionFilter, setSessionFilter] = useState<'positive' | 'negative'>('positive');
   const [dayFilter, setDayFilter] = useState<'positive' | 'negative'>('positive');
   const [timeframeFilterState, setTimeframeFilterState] = useState<'positive' | 'negative'>('positive');
-  const [hideObjectives, setHideObjectives] = useState(false);
+  const [hideObjectives, setHideObjectives] = useState(() => localStorage.getItem('app_hide_objectives_warning') === 'true');
+
+  const handleDismissObjectives = () => {
+    setHideObjectives(true);
+    localStorage.setItem('app_hide_objectives_warning', 'true');
+  };
 
   // Memoized lists for detailed analysis section based on the selected positive/negative filter
   const setupList = useMemo(() => {
@@ -1400,9 +1405,13 @@ export default function Dashboard() {
 
       {/* Monthly Comparison */}
       <div className="space-y-8 md:space-y-12">
-        <div className="flex flex-row justify-between items-center gap-4 mb-4 md:mb-6">
-          <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Visão geral dos objetivos</h3>
-        </div>
+        {!hideObjectives && (
+          <>
+            <div className="flex flex-row justify-between items-center gap-4 mb-4 md:mb-6">
+              <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Visão geral dos objetivos</h3>
+            </div>
+          </>
+        )}
 
         {((data.hasProfitTarget || data.hasMaxLoss || data.hasDailyLoss) && objectives.some(o => !o.hidden)) ? (
           <div className="flex flex-col gap-6 md:gap-8">
@@ -1510,8 +1519,15 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="bg-surface-container-low border border-outline-variant/15 rounded-3xl p-8 text-center space-y-4 max-w-2xl mx-auto">
+          ) : !hideObjectives ? (
+            <div className="bg-surface-container-low border border-outline-variant/15 rounded-3xl p-8 text-center space-y-4 max-w-2xl mx-auto relative">
+              <button 
+                onClick={handleDismissObjectives} 
+                className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full w-10 h-10 flex items-center justify-center transition-colors"
+                title="Ocultar aviso"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
               <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto text-3xl">
                 🎯
               </div>
@@ -1523,7 +1539,7 @@ export default function Dashboard() {
                 Acesse a página de <strong>Configurações</strong> &gt; aba <strong>Objetivos e Limites Mensais</strong> para definir as suas metas e passar a acompanhar o seu progresso neste painel.
               </p>
             </div>
-          )
+          ) : null
         }
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 md:mb-6 mt-8 md:mt-12">
