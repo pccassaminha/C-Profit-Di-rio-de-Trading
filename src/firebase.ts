@@ -9,7 +9,7 @@ export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
   })
-}, firebaseConfig.firestoreDatabaseId);
+}, (firebaseConfig as any).firestoreDatabaseId);
 
 const originalAuth = getAuth(app);
 export const storage = getStorage(app);
