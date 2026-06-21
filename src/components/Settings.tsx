@@ -530,35 +530,6 @@ export default function Settings() {
     localStorage.setItem('app_objectives', JSON.stringify(objectives));
     localStorage.setItem('app_sessions', JSON.stringify(sessions));
 
-    // Save objectives to Firestore to guarantee zero-drift and cloud sync across custom domains
-    if (auth.currentUser && objectives.length > 0) {
-      try {
-        const qObj = query(collection(db, 'objectives'), where('userId', '==', auth.currentUser.uid));
-        const snapObj = await getDocs(qObj);
-        
-        // Delete current ones to avoid duplication
-        const deletePromises = snapObj.docs.map(d => deleteDoc(d.ref));
-        await Promise.all(deletePromises);
-        
-        // Save fresh copies with standard attributes
-        const addPromises = objectives.map(obj => 
-          addDoc(collection(db, 'objectives'), {
-            userId: auth.currentUser?.uid,
-            type: obj.type,
-            targetId: obj.targetId,
-            profitTarget: obj.profitTarget,
-            maxLoss: obj.maxLoss,
-            dailyLoss: obj.dailyLoss,
-            maxLossPeriod: obj.maxLossPeriod || 'Mês',
-            hidden: !!obj.hidden
-          })
-        );
-        await Promise.all(addPromises);
-      } catch (err) {
-        console.error("Error saving objectives batch to Firestore during settings save:", err);
-      }
-    }
-
     // Save Billing Profile
     if (auth.currentUser) {
       try {

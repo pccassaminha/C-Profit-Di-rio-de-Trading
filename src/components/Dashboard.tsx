@@ -1405,12 +1405,10 @@ export default function Dashboard() {
 
       {/* Monthly Comparison */}
       <div className="space-y-8 md:space-y-12">
-        {!hideObjectives && (
-          <>
-            <div className="flex flex-row justify-between items-center gap-4 mb-4 md:mb-6">
-              <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Visão geral dos objetivos</h3>
-            </div>
-          </>
+        {(((data.hasProfitTarget || data.hasMaxLoss || data.hasDailyLoss) && objectives.some(o => !o.hidden)) || !hideObjectives) && (
+          <div className="flex flex-row justify-between items-center gap-4 mb-4 md:mb-6">
+            <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Visão geral dos objetivos</h3>
+          </div>
         )}
 
         {((data.hasProfitTarget || data.hasMaxLoss || data.hasDailyLoss) && objectives.some(o => !o.hidden)) ? (
