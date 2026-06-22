@@ -66,6 +66,16 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
   const [phoneDialCode, setPhoneDialCode] = useState('+244');
   const [phoneLocal, setPhoneLocal] = useState('');
   const [selectedPlan, setSelectedPlan] = useState(initialPlan);
+  const [couponCode, setCouponCode] = useState('');
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [couponFeedback, setCouponFeedback] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialPlan) {
@@ -74,19 +84,21 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
   }, [initialPlan]);
 
   const BASE_PLANS = [
-    { id: 'trial_30', name: 'Teste (30 Dias)', rawPrice: 500, defaultTag: 'Grátis c/ Convite', defaultPrice: '500 Kz' },
-    { id: 'mensal_6', name: 'Plano Mensal', rawPrice: 5000, defaultTag: 'Básico', defaultPrice: '5.000 Kz' },
-    { id: 'trimestral_6', name: 'Trimestral', rawPrice: 15000, defaultTag: '-33% OFF', defaultPrice: '15.000 Kz' },
-    { id: 'semestral_8', name: 'Semestral', rawPrice: 30000, defaultTag: 'Best Choice', defaultPrice: '30.000 Kz' },
-    { id: 'anual_16', name: 'Anual', rawPrice: 60000, defaultTag: 'Premium', defaultPrice: '60.000 Kz' }
+    { id: 'trial_30', name: 'Teste (30 Dias)', rawPrice: 500, defaultTag: 'Grátis c/ Convite', defaultPrice: '500 Kz', oldPrice: 500 },
+    { id: 'mensal_6', name: 'Plano Mensal', rawPrice: 5000, defaultTag: 'Básico', defaultPrice: '5.000 Kz', oldPrice: 7500 },
+    { id: 'trimestral_6', name: 'Trimestral', rawPrice: 15000, defaultTag: '-33% OFF', defaultPrice: '15.000 Kz', oldPrice: 22500 },
+    { id: 'semestral_8', name: 'Semestral', rawPrice: 30000, defaultTag: 'Best Choice', defaultPrice: '30.000 Kz', oldPrice: 45000 },
+    { id: 'anual_16', name: 'Anual', rawPrice: 60000, defaultTag: 'Premium', defaultPrice: '60.000 Kz', oldPrice: 90000 }
   ];
 
   const REGISTRATION_PLANS = BASE_PLANS.map(plan => {
     let finalPriceNum = plan.rawPrice;
     let tag = plan.defaultTag;
 
+    let hasCouponApplied = false;
     if (appliedCoupon && plan.rawPrice >= 5000) {
       if (appliedCoupon.targetPlan === 'all' || appliedCoupon.targetPlan === plan.id) {
+        hasCouponApplied = true;
         if (appliedCoupon.discountType === 'percentage') {
           finalPriceNum = plan.rawPrice - (plan.rawPrice * (appliedCoupon.discountValue / 100));
         } else if (appliedCoupon.discountType === 'fixed') {
@@ -95,7 +107,6 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
         
         if (finalPriceNum < 0) finalPriceNum = 0;
         
-        // Show 83% OFF explicitly for the super coupon, else show the user % 
         if (appliedCoupon.code === 'CPROFIT83%OFF') {
           tag = '-83% SUPERCUPOM';
         } else if (appliedCoupon.discountType === 'percentage') {
@@ -110,24 +121,15 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
       ...plan,
       price: finalPriceNum === plan.rawPrice ? plan.defaultPrice : `${finalPriceNum.toLocaleString('pt-BR')} Kz`,
       tag,
-      hasDiscount: finalPriceNum < plan.rawPrice,
-      originalStr: plan.defaultPrice
+      hasDiscount: hasCouponApplied,
+      originalStr: hasCouponApplied ? `${plan.oldPrice.toLocaleString('pt-BR')} Kz` : plan.defaultPrice,
+      savings: hasCouponApplied ? (plan.oldPrice - finalPriceNum) : undefined
     };
   });
 
   useEffect(() => {
     setPhoneNumber(phoneDialCode + phoneLocal.replace(/\D/g, ''));
   }, [phoneDialCode, phoneLocal]);
-  const [couponCode, setCouponCode] = useState('');
-  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
-  const [couponFeedback, setCouponFeedback] = useState<{type: 'success' | 'error', message: string} | null>(null);
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLogin) {
@@ -795,6 +797,11 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
                                    <span>{plan.price}</span>
                                  )}
                                </span>
+                               {plan.savings && plan.savings > 0 ? (
+                                  <div className="mt-1.5 text-[8px] font-bold text-[#00f5a0] bg-[#00f5a0]/10 border border-[#00f5a0]/20 px-1.5 py-0.5 rounded shadow-sm self-start uppercase">
+                                    Poupa {(plan.savings || 0).toLocaleString('pt-BR')} Kz
+                                  </div>
+                               ) : null}
                             </div>
                          </button>
                        ))}
