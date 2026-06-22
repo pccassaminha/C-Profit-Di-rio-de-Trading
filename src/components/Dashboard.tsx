@@ -1816,7 +1816,7 @@ export default function Dashboard() {
           <button onClick={handleNextMonth} className="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors text-2xl">chevron_right</button>
         </div>
         <div className="w-full overflow-x-auto">
-          <div className="min-w-[500px]">
+          <div className="min-w-[900px] lg:min-w-full">
             <div className="grid grid-cols-7 text-center border-b border-outline-variant/20">
               {['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO'].map(day => (
                 <div key={day} className="py-4 text-xs md:text-sm font-bold text-on-surface-variant border-r border-outline-variant/20 last:border-0 hidden md:block">{day}</div>
