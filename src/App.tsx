@@ -44,6 +44,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
+  const [authInitialPlan, setAuthInitialPlan] = useState<string>('mensal_6');
   const [publicPage, setPublicPage] = useState<string>('landing');
   
   const { isExpired, userPlan } = useTrades();
@@ -99,8 +100,11 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = (isNewUser?: boolean) => {
     setShowAuth(false);
+    if (isNewUser) {
+      setActiveTab('payments');
+    }
   };
 
   if (!isAuthReady) {
@@ -118,7 +122,7 @@ export default function App() {
 
   if (!user) {
     if (showAuth) {
-      return <Auth onSuccess={handleAuthSuccess} initialMode={authInitialMode} />;
+      return <Auth onSuccess={handleAuthSuccess} initialMode={authInitialMode} initialPlan={authInitialPlan} />;
     }
     if (publicPage === 'termos') {
       return <Termos onBack={() => setPublicPage('landing')} />;
@@ -135,8 +139,9 @@ export default function App() {
           setAuthInitialMode('login');
           setShowAuth(true);
         }} 
-        onRegisterClick={() => {
+        onRegisterClick={(planId?: string) => {
           setAuthInitialMode('register');
+          if (planId) setAuthInitialPlan(planId);
           setShowAuth(true);
         }}
         onNavigate={setPublicPage}

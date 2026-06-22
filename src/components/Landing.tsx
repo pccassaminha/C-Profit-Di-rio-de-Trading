@@ -5,7 +5,7 @@ import Plans from './Plans';
 
 interface LandingProps {
   onLoginClick: () => void;
-  onRegisterClick: () => void;
+  onRegisterClick: (planId?: string) => void;
   onNavigate?: (page: string) => void;
 }
 
@@ -63,7 +63,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
         </ul>
         <div className="flex items-center gap-3 md:gap-[16px] shrink-0">
           <button onClick={onLoginClick} className="bg-transparent border-none text-on-surface-variant font-body text-[13px] md:text-[14px] font-medium cursor-pointer hover:text-on-surface transition-colors">Entrar</button>
-          <button onClick={onRegisterClick} className="bg-primary text-on-primary border-none py-2 px-3 md:py-[10px] md:px-[22px] rounded-[8px] font-body text-[11px] md:text-[13px] font-bold tracking-[0.06em] uppercase cursor-pointer transition-all hover:bg-primary-fixed-dim hover:-translate-y-[1px] hover:shadow-[0_8px_30px_rgba(0,245,160,0.3)] whitespace-nowrap">
+          <button onClick={() => onRegisterClick()} className="bg-primary text-on-primary border-none py-2 px-3 md:py-[10px] md:px-[22px] rounded-[8px] font-body text-[11px] md:text-[13px] font-bold tracking-[0.06em] uppercase cursor-pointer transition-all hover:bg-primary-fixed-dim hover:-translate-y-[1px] hover:shadow-[0_8px_30px_rgba(0,245,160,0.3)] whitespace-nowrap">
             <span className="sm:hidden">Começar</span>
             <span className="hidden sm:inline">Começar Agora</span>
           </button>
@@ -92,7 +92,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
         </p>
 
         <div className="flex items-center gap-[24px] flex-wrap justify-center animate-in slide-in-from-bottom-6 duration-700 delay-300 fill-mode-both">
-          <button onClick={onRegisterClick} className="bg-primary text-on-primary border-none py-[16px] px-[36px] rounded-[10px] font-headline text-[14px] font-bold tracking-[0.08em] uppercase cursor-pointer transition-all inline-flex items-center gap-[10px] hover:bg-primary-fixed-dim hover:-translate-y-[2px] hover:shadow-[0_12px_40px_rgba(0,245,160,0.35)] group">
+          <button onClick={() => onRegisterClick()} className="bg-primary text-on-primary border-none py-[16px] px-[36px] rounded-[10px] font-headline text-[14px] font-bold tracking-[0.08em] uppercase cursor-pointer transition-all inline-flex items-center gap-[10px] hover:bg-primary-fixed-dim hover:-translate-y-[2px] hover:shadow-[0_12px_40px_rgba(0,245,160,0.35)] group">
             Criar Conta Agora
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="transition-transform group-hover:translate-x-[3px]">
               <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -684,10 +684,10 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
 
               <div className="pt-4 flex flex-col sm:flex-row gap-4">
                 <button 
-                  onClick={onRegisterClick}
+                  onClick={() => onRegisterClick()}
                   className="flex-grow bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background font-black py-4 px-6 rounded-2xl text-xs uppercase tracking-widest transition-all text-center animate-pulse"
                 >
-                  Registar &amp; Começar Agora
+                  Registar & Começar Agora
                 </button>
               </div>
             </div>

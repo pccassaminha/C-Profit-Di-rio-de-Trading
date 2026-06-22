@@ -59,7 +59,7 @@ const parsePhoneNumberInput = (phoneVal: string) => {
   return { dialCode: '+244', localNumber: cleaned };
 };
 
-export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { forcedExpired?: boolean, hideHeader?: boolean, onAuthRequired?: () => void }) {
+export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { forcedExpired?: boolean, hideHeader?: boolean, onAuthRequired?: (planId?: string) => void }) {
   const { userPlan, globalSettings } = useTrades();
   const [payments, setPayments] = useState<any[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState<any>(null);
@@ -676,7 +676,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                       return;
                     }
                     if (!auth.currentUser && onAuthRequired) {
-                      onAuthRequired();
+                      onAuthRequired(plan.id);
                     } else if (!plan.current) {
                       setShowPaymentModal(plan);
                     }

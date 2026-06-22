@@ -39,8 +39,9 @@ const COUNTRIES = [
 ];
 
 interface AuthProps {
-  onSuccess: () => void;
+  onSuccess: (isNewUser?: boolean) => void;
   initialMode?: 'login' | 'register';
+  initialPlan?: string;
 }
 
 const getFriendlyErrorMessage = (err: any) => {
@@ -54,7 +55,7 @@ const getFriendlyErrorMessage = (err: any) => {
   return err.message || 'Erro durante a autenticação.';
 };
 
-export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
+export default function Auth({ onSuccess, initialMode = 'login', initialPlan = 'mensal_6' }: AuthProps) {
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,11 +65,63 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [phoneDialCode, setPhoneDialCode] = useState('+244');
   const [phoneLocal, setPhoneLocal] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState(initialPlan);
+
+  useEffect(() => {
+    if (initialPlan) {
+      setSelectedPlan(initialPlan);
+    }
+  }, [initialPlan]);
+
+  const BASE_PLANS = [
+    { id: 'trial_30', name: 'Teste (30 Dias)', rawPrice: 500, defaultTag: 'Grátis c/ Convite', defaultPrice: '500 Kz' },
+    { id: 'mensal_6', name: 'Plano Mensal', rawPrice: 5000, defaultTag: 'Básico', defaultPrice: '5.000 Kz' },
+    { id: 'trimestral_6', name: 'Trimestral', rawPrice: 15000, defaultTag: '-33% OFF', defaultPrice: '15.000 Kz' },
+    { id: 'semestral_8', name: 'Semestral', rawPrice: 30000, defaultTag: 'Best Choice', defaultPrice: '30.000 Kz' },
+    { id: 'anual_16', name: 'Anual', rawPrice: 60000, defaultTag: 'Premium', defaultPrice: '60.000 Kz' }
+  ];
+
+  const REGISTRATION_PLANS = BASE_PLANS.map(plan => {
+    let finalPriceNum = plan.rawPrice;
+    let tag = plan.defaultTag;
+
+    if (appliedCoupon && plan.rawPrice >= 5000) {
+      if (appliedCoupon.targetPlan === 'all' || appliedCoupon.targetPlan === plan.id) {
+        if (appliedCoupon.discountType === 'percentage') {
+          finalPriceNum = plan.rawPrice - (plan.rawPrice * (appliedCoupon.discountValue / 100));
+        } else if (appliedCoupon.discountType === 'fixed') {
+          finalPriceNum = plan.rawPrice - appliedCoupon.discountValue;
+        }
+        
+        if (finalPriceNum < 0) finalPriceNum = 0;
+        
+        // Show 83% OFF explicitly for the super coupon, else show the user % 
+        if (appliedCoupon.code === 'CPROFIT83%OFF') {
+          tag = '-83% SUPERCUPOM';
+        } else if (appliedCoupon.discountType === 'percentage') {
+          tag = `-${appliedCoupon.discountValue}% OFF`;
+        } else if (appliedCoupon.discountType === 'fixed') {
+          tag = `-${appliedCoupon.discountValue} Kz`;
+        }
+      }
+    }
+
+    return {
+      ...plan,
+      price: finalPriceNum === plan.rawPrice ? plan.defaultPrice : `${finalPriceNum.toLocaleString('pt-BR')} Kz`,
+      tag,
+      hasDiscount: finalPriceNum < plan.rawPrice,
+      originalStr: plan.defaultPrice
+    };
+  });
 
   useEffect(() => {
     setPhoneNumber(phoneDialCode + phoneLocal.replace(/\D/g, ''));
   }, [phoneDialCode, phoneLocal]);
   const [couponCode, setCouponCode] = useState('');
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [couponFeedback, setCouponFeedback] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -166,6 +219,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
           email: result.user.email,
           createdAt: new Date().toISOString(),
           plan_type: resolvedPlanType,
+          intendedPlan: selectedPlan,
           expiry_date: resolvedExpiryDate,
           account_limit: 2,
           role: 'user',
@@ -189,9 +243,10 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
             createdAt: new Date().toISOString()
           });
         }
+        onSuccess(true); // new user
+      } else {
+        onSuccess(false); // existing user
       }
-      
-      onSuccess();
     } catch (err: any) {
       setError(getFriendlyErrorMessage(err));
       console.error(err);
@@ -216,6 +271,69 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponFeedback(null);
+      setAppliedCoupon(null);
+      return;
+    }
+    setIsApplyingCoupon(true);
+    setCouponFeedback(null);
+    setAppliedCoupon(null);
+    try {
+      const uppercaseCode = couponCode.trim().toUpperCase();
+
+      // 1. Check if it's a promotional coupon
+      const qCoupons = query(collection(db, 'coupons'), where('code', '==', uppercaseCode));
+      const couponSnap = await getDocs(qCoupons);
+      
+      if (!couponSnap.empty) {
+        const couponDoc = couponSnap.docs[0].data();
+        if (couponDoc.active) {
+          setAppliedCoupon({ id: couponSnap.docs[0].id, ...couponDoc });
+          setCouponFeedback({ type: 'success', message: `Cupom ${couponDoc.discountValue}${couponDoc.discountType === 'percentage' ? '%' : 'Kz'} aplicado!` });
+          return;
+        } else {
+          setCouponFeedback({ type: 'error', message: 'Cupom de desconto inativo.' });
+          return;
+        }
+      } else if (uppercaseCode === 'CPROFIT83%OFF') {
+        setAppliedCoupon({
+          id: 'descontode83_static',
+          code: 'CPROFIT83%OFF',
+          active: true,
+          discountType: 'percentage',
+          discountValue: 50,
+          targetPlan: 'all'
+        });
+        setCouponFeedback({ type: 'success', message: 'Cupom 83% OFF aplicado com sucesso!' });
+        return;
+      }
+
+      // 2. Check if it's a referral code
+      const qRef = query(collection(db, 'usuarios'), where('refCode', '==', uppercaseCode));
+      const userRefSnap = await getDocs(qRef);
+      
+      if (!userRefSnap.empty) {
+        setCouponFeedback({ type: 'success', message: 'Código de convite válido!' });
+        return;
+      } else {
+        const parentUserDoc = await getDoc(doc(db, 'usuarios', couponCode.trim()));
+        if (parentUserDoc.exists()) {
+          setCouponFeedback({ type: 'success', message: 'Código de indicação válido!' });
+          return;
+        }
+      }
+
+      setCouponFeedback({ type: 'error', message: 'Cupom ou código inválido.' });
+    } catch (err) {
+      console.error(err);
+      setCouponFeedback({ type: 'error', message: 'Erro ao validar.' });
+    } finally {
+      setIsApplyingCoupon(false);
     }
   };
 
@@ -283,9 +401,8 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
             throw loginErr;
           }
         }
-
-        const userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser!.uid));
-        onSuccess();
+        
+        onSuccess(false); // existing user
       } else {
         // Create the user in Firebase Auth FIRST! This immediately authenticates the session
         // and allows the coupon and referral resolution queries to execute without permission errors.
@@ -376,6 +493,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
           phoneNumber: phoneNumber,
           createdAt: new Date().toISOString(),
           plan_type: resolvedPlanType,
+          intendedPlan: selectedPlan,
           expiry_date: resolvedExpiryDate,
           account_limit: 2,
           role: 'user',
@@ -408,7 +526,7 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
             createdAt: new Date().toISOString()
           });
         }
-        onSuccess();
+        onSuccess(true); // new user
       }
     } catch (err: any) {
       setError(getFriendlyErrorMessage(err));
@@ -610,15 +728,80 @@ export default function Auth({ onSuccess, initialMode = 'login' }: AuthProps) {
                         type="text" 
                         value={couponCode}
                         onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                        placeholder="Ex: Código de amigo ou cupom de desconto (Opcional)"
-                        className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl pl-12 pr-6 py-4 text-on-surface outline-none focus:border-primary transition-all font-bold placeholder:text-on-surface-variant/30 uppercase"
+                        placeholder="Ex: Código de amigo ou cupom (Opcional)"
+                        className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl pl-12 pr-28 py-4 text-on-surface outline-none focus:border-primary transition-all font-bold placeholder:text-on-surface-variant/30 uppercase text-sm"
                       />
+                      <button
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        disabled={!couponCode.trim() || isApplyingCoupon}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-surface-container-high border border-outline-variant/20 text-on-surface px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-surface-container-highest transition-colors disabled:opacity-50"
+                      >
+                        {isApplyingCoupon ? '...' : 'Aplicar'}
+                      </button>
                     </div>
+                    {couponFeedback && (
+                      <div className={`text-xs font-bold pl-2 ${couponFeedback.type === 'success' ? 'text-primary' : 'text-rose-500'}`}>
+                        {couponFeedback.message}
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
 
 
+
+              <AnimatePresence mode="wait">
+                {!isLogin && !isForgotPassword && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-3 overflow-hidden pb-2 pt-2"
+                  >
+                    <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50 block">Escolha o seu Plano</label>
+                    <div className="grid grid-cols-2 gap-2">
+                       {REGISTRATION_PLANS.map(plan => (
+                         <button
+                           key={plan.id}
+                           type="button"
+                           onClick={() => setSelectedPlan(plan.id)}
+                           className={`relative border rounded-xl p-3 text-left transition-all flex flex-col items-start gap-1 ${
+                             selectedPlan === plan.id 
+                               ? 'border-primary bg-primary/10 shadow-[0_0_15px_rgba(0,245,160,0.15)] shadow-primary/10' 
+                               : 'border-outline-variant/10 bg-surface-container hover:bg-surface-container-high'
+                           }`}
+                         >
+                            {plan.tag && (
+                                <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-[4px] absolute -top-2 right-2 border ${
+                                  selectedPlan === plan.id 
+                                    ? 'bg-primary text-background border-primary' 
+                                    : 'bg-surface-container-high text-on-surface-variant border-outline-variant/30'
+                                }`}>
+                                  {plan.tag}
+                                </span>
+                            )}
+                            <div className="flex flex-col w-full mt-1">
+                               <span className={`text-[10px] font-black tracking-widest uppercase ${selectedPlan === plan.id ? 'text-primary' : 'text-on-surface'}`}>
+                                 {plan.name}
+                               </span>
+                               <span className={`text-xs font-bold font-mono mt-0.5 ${selectedPlan === plan.id ? 'text-white' : 'text-on-surface-variant/70'}`}>
+                                 {plan.hasDiscount ? (
+                                   <div className="flex flex-col gap-0 items-start">
+                                     <span className="line-through text-[9px] opacity-60 font-medium">{plan.originalStr}</span>
+                                     <span className={`${selectedPlan === plan.id ? 'text-white' : 'text-[#00f5a0]'}`}>{plan.price}</span>
+                                   </div>
+                                 ) : (
+                                   <span>{plan.price}</span>
+                                 )}
+                               </span>
+                            </div>
+                         </button>
+                       ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50">E-mail Profissional</label>
