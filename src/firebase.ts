@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -22,6 +22,7 @@ export const db = initializeFirestore(app, {
 });
 
 const originalAuth = getAuth(app);
+setPersistence(originalAuth, browserLocalPersistence).catch(console.error);
 export const storage = getStorage(app);
 
 // Proxied Auth to support Partner Mode (Portfolio Partner Acesso Total)

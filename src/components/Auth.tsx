@@ -385,8 +385,10 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
             localStorage.removeItem('partnerMainUserDisplayName');
             localStorage.removeItem('partnerMainUserPhotoURL');
           }
-        } catch (partnerErr) {
-          console.error("Partner log lookup failed under submissive flow:", partnerErr);
+        } catch (partnerErr: any) {
+          if (partnerErr.code !== 'permission-denied') {
+            console.warn("Partner log lookup failed under submissive flow:", partnerErr);
+          }
         }
 
         try {
