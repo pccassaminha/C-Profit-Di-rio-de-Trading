@@ -368,7 +368,7 @@ export default function Dashboard() {
     });
     unsubscribes.push(unsubWithdrawals);
 
-    // Objectives with smart one-time migration and real-time syncing
+    // Objectives
     const qDbObjectives = query(collection(db, 'objectives'), where('userId', '==', auth.currentUser.uid));
     const unsubObjectives = onSnapshot(qDbObjectives, (snapshot) => {
       const dbObjectives = snapshot.docs.map(doc => ({
@@ -381,51 +381,9 @@ export default function Dashboard() {
         maxLossPeriod: doc.data().maxLossPeriod || 'Mês',
         hidden: !!doc.data().hidden
       }));
-      
-      const alreadySynced = localStorage.getItem('app_objectives_synced') === 'true';
-      
-      if (dbObjectives.length > 0) {
-        setObjectives(dbObjectives);
-        localStorage.setItem('app_objectives', JSON.stringify(dbObjectives));
-        localStorage.setItem('app_objectives_synced', 'true');
-      } else {
-        const savedObjectives = localStorage.getItem('app_objectives');
-        if (savedObjectives) {
-          const parsed = JSON.parse(savedObjectives);
-          if (parsed.length > 0) {
-            // Keep local objectives in state so they do not disappear
-            setObjectives(parsed);
-            
-            // If the server lacks documents but we have local objectives, self-heal by syncing up to Firestore
-            if (!isMigratingObjectives) {
-              isMigratingObjectives = true;
-              const promises = parsed.map((obj: any) => {
-                return addDoc(collection(db, 'objectives'), {
-                  userId: auth.currentUser?.uid,
-                  type: obj.type,
-                  targetId: obj.targetId,
-                  profitTarget: obj.profitTarget,
-                  maxLoss: obj.maxLoss,
-                  dailyLoss: obj.dailyLoss,
-                  maxLossPeriod: obj.maxLossPeriod || 'Mês',
-                  hidden: !!obj.hidden
-                });
-              });
-              Promise.all(promises).then(() => {
-                localStorage.setItem('app_objectives_synced', 'true');
-                isMigratingObjectives = false;
-              }).catch(err => {
-                console.error("Migration/Self-heal error in Dashboard:", err);
-                isMigratingObjectives = false;
-              });
-            }
-          } else {
-            setObjectives([]);
-          }
-        } else {
-          setObjectives([]);
-        }
-      }
+      setObjectives(dbObjectives);
+    }, (error) => {
+      console.error("Error fetching objectives in Dashboard:", error);
     });
     unsubscribes.push(unsubObjectives);
 
