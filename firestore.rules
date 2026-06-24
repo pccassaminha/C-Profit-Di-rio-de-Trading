@@ -67,7 +67,7 @@ service cloud.firestore {
     // User Profiles / Billing
     match /user_profiles/{profileId} {
       allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isStaticSuperAdmin());
+      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow delete: if isStaticSuperAdmin();
@@ -158,7 +158,7 @@ service cloud.firestore {
 
     match /usuarios/{userId} {
       allow get: if isAuthenticated();
-      allow list: if isAuthenticated() || (resource.data.partnerEmail != "" && resource.data.partnerPassword != "");
+      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isOwner(userId) || isAdmin() || isPartner(userId);
       allow delete: if isAdmin();
