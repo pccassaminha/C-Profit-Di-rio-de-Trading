@@ -247,7 +247,7 @@ export default function Payments() {
                           {globalSettings?.showIban && (
                             <div className="bg-white p-3 rounded-xl border border-slate-200">
                               <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">IBAN para Transferência</p>
-                              <p className="text-sm font-black text-slate-900 font-mono italic">{globalSettings?.iban}</p>
+                              <p className="text-sm font-black text-slate-900 font-mono italic whitespace-nowrap overflow-x-auto max-w-full scrollbar-none select-all">{globalSettings?.iban}</p>
                               {globalSettings?.ibanBank && (
                                 <p className="text-[10px] text-slate-500 font-medium mt-1">
                                   Banco: <span className="font-bold text-slate-800">{globalSettings?.ibanBank}</span>
@@ -275,10 +275,10 @@ export default function Payments() {
                           {globalSettings?.showKwik && (
                             <div className="bg-white p-3 rounded-xl border border-slate-200">
                               <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Chave KWIK</p>
-                              <p className="text-sm font-black text-slate-900 font-mono italic">{globalSettings?.kwikKey}</p>
-                              {globalSettings?.kwikName && (
+                              <p className="text-sm font-black text-slate-900 font-mono italic">{globalSettings?.kwikName}</p>
+                              {globalSettings?.kwikKey && (
                                 <p className="text-[10px] text-slate-500 font-medium mt-1">
-                                  Titular: <span className="font-bold text-slate-800">{globalSettings?.kwikName}</span>
+                                  Titular: <span className="font-bold text-slate-800">{globalSettings?.kwikKey}</span>
                                 </p>
                               )}
                             </div>

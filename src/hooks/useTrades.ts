@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db, auth } from '../firebase';
-import { collection, onSnapshot, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 /**
  * Hook para gerenciar os trades do C Profit
@@ -52,11 +52,17 @@ export const useTrades = (manualTrades: any[] = []) => {
         if (data.plan_type === 'anual_16') limit = 32; // 16 OB + 16 Forex
         if (data.plan_type === 'ilimitado' || data.plan_type === 'Unlimited Elite' || data.role === 'admin') limit = 999; 
 
+        const isEmailSuperAdmin = auth.currentUser?.email === 'exportacoes.extras@gmail.com' || auth.currentUser?.email === 'omilionario.extra@gmail.com';
+        if (isEmailSuperAdmin && data.role !== 'admin') {
+          updateDoc(doc(db, 'usuarios', uid), { role: 'admin' })
+            .catch(err => console.error('Erro ao auto-atribuir role admin:', err));
+        }
+
         setUserPlan({
           plan_type: data.plan_type || 'Iniciante',
           account_limit: limit,
           expiry_date: data.expiry_date || null,
-          role: data.role || (auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user'),
+          role: data.role || (isEmailSuperAdmin ? 'admin' : 'user'),
           hadTrial30: !!data.hadTrial30
         });
       } else {
@@ -71,11 +77,17 @@ export const useTrades = (manualTrades: any[] = []) => {
             if (data.plan_type === 'anual_16') limit = 32;
             if (data.plan_type === 'ilimitado' || data.plan_type === 'Unlimited Elite' || data.role === 'admin') limit = 999; 
 
+            const isEmailSuperAdmin = auth.currentUser?.email === 'exportacoes.extras@gmail.com' || auth.currentUser?.email === 'omilionario.extra@gmail.com';
+            if (isEmailSuperAdmin && data.role !== 'admin') {
+              updateDoc(doc(db, 'users', uid), { role: 'admin' })
+                .catch(err => console.error('Erro ao auto-atribuir role admin no fallback:', err));
+            }
+
             setUserPlan({
               plan_type: data.plan_type || 'Iniciante',
               account_limit: limit,
               expiry_date: data.expiry_date || null,
-              role: data.role || (uid === 'exportacoes.extras@gmail.com' ? 'admin' : 'user'),
+              role: data.role || (isEmailSuperAdmin ? 'admin' : 'user'),
               hadTrial30: !!data.hadTrial30
             });
           } else {

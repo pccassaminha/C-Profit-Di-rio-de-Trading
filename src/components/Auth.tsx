@@ -308,7 +308,7 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
           code: 'CPROFIT83%OFF',
           active: true,
           discountType: 'percentage',
-          discountValue: 50,
+          discountValue: 83,
           targetPlan: 'all'
         });
         setCouponFeedback({ type: 'success', message: 'Cupom 83% OFF aplicado com sucesso!' });
@@ -440,7 +440,7 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
               id: 'descontode83_static',
               code: 'CPROFIT83%OFF',
               discountType: 'percentage',
-              discountValue: 50,
+              discountValue: 83,
               targetPlan: 'all',
               partnerRef: 'Plataforma',
               active: true

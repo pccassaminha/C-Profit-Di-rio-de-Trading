@@ -165,7 +165,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
           code: 'CPROFIT83%OFF',
           active: true,
           discountType: 'percentage',
-          discountValue: 50,
+          discountValue: 83,
           targetPlan: 'all'
         });
         const successMsg = 'Cupom "CPROFIT83%OFF" de 83% de DESCONTO aplicado com sucesso!';
@@ -338,8 +338,8 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
            }
         }
      } else if (userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30') {
-        // Auto 50% OFF trial conversion discount
-        discountPercentage = 50;
+        // Auto 83% OFF trial conversion discount
+        discountPercentage = 83;
      }
 
      const originalPriceNum = parsePriceToNumber(plan.price);
@@ -947,8 +947,8 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                     <div className="space-y-6">
                       {paymentMethod === 'kwik' && globalSettings?.showKwik !== false && (
                         <div className="space-y-2 group cursor-pointer" onClick={() => {
-                          if (globalSettings?.kwikKey) {
-                            navigator.clipboard.writeText(globalSettings.kwikKey);
+                          if (globalSettings?.kwikName) {
+                            navigator.clipboard.writeText(globalSettings.kwikName);
                             alert('Chave KWIK copiada para a área de transferência!');
                           }
                         }}>
@@ -960,12 +960,12 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                             <span className="text-[8px] font-black text-primary uppercase bg-primary/10 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Clicar para Copiar</span>
                           </div>
                           <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col text-center items-center justify-center">
-                            {globalSettings?.kwikName && (
+                            {globalSettings?.kwikKey && (
                               <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
-                                Titular: <span className="text-on-surface">{globalSettings.kwikName}</span>
+                                Titular: <span className="text-on-surface">{globalSettings.kwikKey}</span>
                               </span>
                             )}
-                            <span className="text-base font-black text-primary font-mono tracking-tight break-all">{globalSettings?.kwikKey || 'Chave não configurada'}</span>
+                            <span className="text-base font-black text-primary font-mono tracking-tight whitespace-nowrap">{globalSettings?.kwikName || 'Chave não configurada'}</span>
                             <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center justify-center gap-1.5 border-t border-outline-variant/10 pt-1.5 w-full">
                               <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>
                               Kwik: <span className="text-on-surface font-semibold">Chave de Transferência Instantânea</span>
@@ -992,7 +992,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                                 Titular: <span className="text-on-surface">{globalSettings.ibanName}</span>
                               </span>
                             )}
-                            <span className="text-xl md:text-2xl font-black text-on-surface font-mono tracking-tight break-all">{globalSettings?.iban || 'A carregar...'}</span>
+                            <span className="text-xs min-[360px]:text-sm min-[440px]:text-base sm:text-lg md:text-xl font-black text-on-surface font-mono tracking-tighter whitespace-nowrap max-w-full block py-1 select-all">{globalSettings?.iban || 'A carregar...'}</span>
                             {globalSettings?.ibanBank && (
                               <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center justify-center gap-1.5 border-t border-outline-variant/10 pt-1.5 w-full">
                                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>

@@ -21,7 +21,17 @@ service cloud.firestore {
     }
 
     function isStaticSuperAdmin() {
-      return isAuthenticated() && (request.auth.token.email == 'exportacoes.extras@gmail.com' || request.auth.token.email == 'omilionario.extra@gmail.com');
+      return isAuthenticated() && (
+        (request.auth.token != null && 
+         request.auth.token.keys().hasAll(['email']) && 
+         (request.auth.token.email.lower() == 'exportacoes.extras@gmail.com' || request.auth.token.email.lower() == 'omilionario.extra@gmail.com')) ||
+        (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && 
+         (get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.email == 'exportacoes.extras@gmail.com' || 
+          get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.email == 'omilionario.extra@gmail.com')) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email == 'exportacoes.extras@gmail.com' || 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email == 'omilionario.extra@gmail.com'))
+      );
     }
 
     function isAdmin() {
@@ -36,22 +46,27 @@ service cloud.firestore {
     }
 
     function isPartner(userId) {
-      return isAuthenticated() && (
-        (exists(/databases/$(database)/documents/usuarios/$(userId)) && 
-         get(/databases/$(database)/documents/usuarios/$(userId)).data.partnerEmail == request.auth.token.email) ||
-        (exists(/databases/$(database)/documents/users/$(userId)) && 
-         get(/databases/$(database)/documents/users/$(userId)).data.partnerEmail == request.auth.token.email)
-      );
+      return isAuthenticated() && 
+        request.auth.token != null && 
+        request.auth.token.keys().hasAll(['email']) && (
+          (exists(/databases/$(database)/documents/usuarios/$(userId)) && 
+           get(/databases/$(database)/documents/usuarios/$(userId)).data.partnerEmail == request.auth.token.email) ||
+          (exists(/databases/$(database)/documents/users/$(userId)) && 
+           get(/databases/$(database)/documents/users/$(userId)).data.partnerEmail == request.auth.token.email)
+        );
     }
 
     function canReadData() {
       return isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
         isAdmin() || 
-        (exists(/databases/$(database)/documents/usuarios/$(resource.data.userId)) && 
-         get(/databases/$(database)/documents/usuarios/$(resource.data.userId)).data.partnerEmail == request.auth.token.email) ||
-        (exists(/databases/$(database)/documents/users/$(resource.data.userId)) && 
-         get(/databases/$(database)/documents/users/$(resource.data.userId)).data.partnerEmail == request.auth.token.email)
+        (request.auth.token != null && 
+         request.auth.token.keys().hasAll(['email']) && (
+          (exists(/databases/$(database)/documents/usuarios/$(resource.data.userId)) && 
+           get(/databases/$(database)/documents/usuarios/$(resource.data.userId)).data.partnerEmail == request.auth.token.email) ||
+          (exists(/databases/$(database)/documents/users/$(resource.data.userId)) && 
+           get(/databases/$(database)/documents/users/$(resource.data.userId)).data.partnerEmail == request.auth.token.email)
+        ))
       );
     }
 

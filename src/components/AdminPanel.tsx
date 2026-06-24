@@ -318,13 +318,21 @@ export default function AdminPanel() {
           await addDoc(collection(db, 'coupons'), {
             code: 'CPROFIT83%OFF',
             discountType: 'percentage',
-            discountValue: 50,
+            discountValue: 83,
             targetPlan: 'all',
             partnerRef: 'Plataforma',
             active: true,
             createdAt: new Date().toISOString()
           });
           console.log('Cupão CPROFIT83%OFF criado com sucesso!');
+        } else {
+          const couponDoc = snap.docs[0];
+          if (couponDoc.data().discountValue !== 83) {
+            await updateDoc(doc(db, 'coupons', couponDoc.id), {
+              discountValue: 83
+            });
+            console.log('Cupão CPROFIT83%OFF atualizado para 83% de desconto!');
+          }
         }
       } catch (err) {
         console.error('Erro ao auto-criar cupão CPROFIT83%OFF:', err);
@@ -1558,8 +1566,8 @@ export default function AdminPanel() {
                   <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Chave KWIK</label>
                   <input 
                     type="text" 
-                    value={settings.kwikKey || ''}
-                    onChange={(e) => setSettings({ ...settings, kwikKey: e.target.value })}
+                    value={settings.kwikName || ''}
+                    onChange={(e) => setSettings({ ...settings, kwikName: e.target.value })}
                     className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
                     placeholder="Ex: Nº de Telemóvel ou Chave KWIK"
                   />
@@ -1568,8 +1576,8 @@ export default function AdminPanel() {
                   <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Titular da Conta (KWIK)</label>
                   <input 
                     type="text" 
-                    value={settings.kwikName || ''}
-                    onChange={(e) => setSettings({ ...settings, kwikName: e.target.value })}
+                    value={settings.kwikKey || ''}
+                    onChange={(e) => setSettings({ ...settings, kwikKey: e.target.value })}
                     className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
                     placeholder="Ex: Nome Completo do Titular"
                   />
