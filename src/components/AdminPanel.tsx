@@ -71,34 +71,37 @@ export default function AdminPanel() {
   const [selectedCouponFilter, setSelectedCouponFilter] = useState('');
   const [showReferralsReport, setShowReferralsReport] = useState(false);
 
-  const [settings, setSettings] = useState(initialSettings || {
-    whatsappNumber: '',
-    expressNumber: '',
-    iban: '',
-    ibanName: '',
-    ibanBank: '',
-    multicaixaEntity: '',
-    multicaixaReference: '',
-    multicaixaName: '',
-    showIban: true,
-    showMulticaixa: true,
-    showExpress: true,
-    showKwik: true,
-    kwikKey: '',
-    kwikName: '',
-    multicaixaLogoUrl: ''
+  const [settings, setSettings] = useState(() => {
+    const defaults = {
+      whatsappNumber: '',
+      expressNumber: '',
+      iban: '',
+      ibanName: '',
+      ibanBank: '',
+      multicaixaEntity: '',
+      multicaixaReference: '',
+      multicaixaName: '',
+      showIban: true,
+      showMulticaixa: true,
+      showExpress: true,
+      showKwik: true,
+      kwikKey: '',
+      kwikName: '',
+      multicaixaLogoUrl: ''
+    };
+    return initialSettings ? { ...defaults, ...initialSettings } : defaults;
   });
 
   useEffect(() => {
     if (initialSettings) {
-      setSettings({
+      setSettings(prev => ({
+        showIban: true,
+        showMulticaixa: true,
         showExpress: true,
-        expressNumber: '',
         showKwik: true,
-        kwikKey: '',
-        kwikName: '',
+        ...prev,
         ...initialSettings
-      });
+      }));
     }
   }, [initialSettings]);
 
@@ -304,20 +307,30 @@ export default function AdminPanel() {
     const unsubCoupons = onSnapshot(qCoupons, (snapshot) => {
       const fetchedCoupons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCoupons(fetchedCoupons);
-      
-      const hasDesconto50 = fetchedCoupons.some((c: any) => c.code === 'CPROFIT83%OFF');
-      if (!hasDesconto50) {
-        addDoc(collection(db, 'coupons'), {
-          code: 'CPROFIT83%OFF',
-          discountType: 'percentage',
-          discountValue: 50,
-          targetPlan: 'all',
-          partnerRef: 'Plataforma',
-          active: true,
-          createdAt: new Date().toISOString()
-        }).catch(err => console.error('Erro ao auto-criar cupão CPROFIT83%OFF:', err));
-      }
     });
+
+    // Auto-create default coupon once on mount/admin load if not exists
+    const checkAndCreateDefaultCoupon = async () => {
+      try {
+        const q = query(collection(db, 'coupons'), where('code', '==', 'CPROFIT83%OFF'));
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          await addDoc(collection(db, 'coupons'), {
+            code: 'CPROFIT83%OFF',
+            discountType: 'percentage',
+            discountValue: 50,
+            targetPlan: 'all',
+            partnerRef: 'Plataforma',
+            active: true,
+            createdAt: new Date().toISOString()
+          });
+          console.log('Cupão CPROFIT83%OFF criado com sucesso!');
+        }
+      } catch (err) {
+        console.error('Erro ao auto-criar cupão CPROFIT83%OFF:', err);
+      }
+    };
+    checkAndCreateDefaultCoupon();
 
     // Listen to referrals
     const unsubReferrals = onSnapshot(query(collection(db, 'referrals'), orderBy('createdAt', 'desc')), (snapshot) => {
@@ -514,9 +527,14 @@ export default function AdminPanel() {
   };
 
   const handleSaveSettings = async () => {
-    await setDoc(doc(db, 'settings', 'global'), settings);
-    alert('Configurações salvas!');
-    setShowBillingModal(false);
+    try {
+      await setDoc(doc(db, 'settings', 'global'), settings);
+      alert('Configurações salvas!');
+      setShowBillingModal(false);
+    } catch (err: any) {
+      console.error('Erro ao salvar as configurações:', err);
+      alert('Erro ao salvar configurações: ' + (err.message || err));
+    }
   };
 
   const handleSaveCommunityConfig = async () => {
@@ -1438,7 +1456,7 @@ export default function AdminPanel() {
                 <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">WhatsApp de Suporte</label>
                 <input 
                   type="text" 
-                  value={settings.whatsappNumber}
+                  value={settings.whatsappNumber || ''}
                   onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
                   className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
                   placeholder="Ex: 244921319200"
@@ -1450,7 +1468,7 @@ export default function AdminPanel() {
                 <div className="flex gap-4 items-center">
                   <input 
                     type="text" 
-                    value={settings.multicaixaLogoUrl}
+                    value={settings.multicaixaLogoUrl || ''}
                     onChange={(e) => setSettings({ ...settings, multicaixaLogoUrl: e.target.value })}
                     className="flex-1 bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
                     placeholder="https://..."
@@ -1477,7 +1495,7 @@ export default function AdminPanel() {
                   <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">IBAN de Depósito</label>
                   <input 
                     type="text" 
-                    value={settings.iban}
+                    value={settings.iban || ''}
                     onChange={(e) => setSettings({ ...settings, iban: e.target.value })}
                     className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
                   />
@@ -1508,7 +1526,7 @@ export default function AdminPanel() {
                   <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Entidade MCX (Código)</label>
                   <input 
                     type="text" 
-                    value={settings.multicaixaEntity}
+                    value={settings.multicaixaEntity || ''}
                     onChange={(e) => setSettings({ ...settings, multicaixaEntity: e.target.value })}
                     className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
                   />
@@ -1517,7 +1535,7 @@ export default function AdminPanel() {
                   <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Referência MCX</label>
                   <input 
                     type="text" 
-                    value={settings.multicaixaReference}
+                    value={settings.multicaixaReference || ''}
                     onChange={(e) => setSettings({ ...settings, multicaixaReference: e.target.value })}
                     className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
                   />
