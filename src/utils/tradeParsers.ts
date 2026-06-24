@@ -50,7 +50,8 @@ function parseMT5Date(str: string) {
 
 function toFloat(val: any) {
   if (val === null || val === undefined) return 0;
-  const cleaned = String(val).replace(',', '.').trim();
+  // Remover espaços em branco (incluindo non-breaking spaces) e substituir vírgula por ponto
+  const cleaned = String(val).replace(/[\s\u00A0]/g, '').replace(',', '.').trim();
   const parsed  = parseFloat(cleaned);
   return isNaN(parsed) ? 0 : parsed;
 }
@@ -373,6 +374,10 @@ async function parseMT5HTML(file: File, accountId: string) {
   const STOP_KEYWORDS = [
     'total net profit', 'gross profit', 'profit factor',
     'balance drawdown', 'recovery factor', 'total trades',
+    'lucro líquido total', 'lucro bruto', 'fator de lucro',
+    'rebaixamento do saldo', 'fator de recuperação', 'total de negociações',
+    'beneficio neto total', 'beneficio bruto', 'factor de beneficio',
+    'drawdown del balance', 'factor de recuperación', 'transacciones totales'
   ];
 
   const rows = doc.querySelectorAll('table tr');
@@ -385,7 +390,11 @@ async function parseMT5HTML(file: File, accountId: string) {
     const firstText = allCells[0]?.textContent?.trim().toLowerCase() || '';
 
     if (!parsing) {
-      if (rowText.includes('positions') && !rowText.includes('closed positions')) {
+      if (
+        (rowText.includes('positions') && !rowText.includes('closed positions')) ||
+        (rowText.includes('posições') && !rowText.includes('posições fechadas')) ||
+        (rowText.includes('posiciones') && !rowText.includes('posiciones cerradas'))
+      ) {
         parsing = true;
       }
       continue;
@@ -454,10 +463,10 @@ async function parseMT5HTML(file: File, accountId: string) {
   // Extrair "Total Net Profit" do bloco de estatísticas do MT5
   // para usar como fileSummary na verificação
   let fileSummary: any = null;
-  const totalMatch = cleanText.match(/Total Net Profit[^<]*<[^>]+>\s*<b>([-\d.]+)<\/b>/i);
+  const totalMatch = cleanText.match(/(?:Total Net Profit|Lucro Líquido Total|Beneficio Neto Total).*?<b>([-\d.\s]+)<\/b>/is);
   if (totalMatch) {
     fileSummary = {
-      profit:     parseFloat(totalMatch[1]),
+      profit:     parseFloat(totalMatch[1].replace(/\s/g, '')),
       commission: summary.totalCommission, // MT5 não separa comissões no bloco final
       swap:       summary.totalSwap,
     };
