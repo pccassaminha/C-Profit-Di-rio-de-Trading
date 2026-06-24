@@ -45,6 +45,7 @@ export default function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   const [authInitialPlan, setAuthInitialPlan] = useState<string>('mensal_6');
+  const [authInitialCoupon, setAuthInitialCoupon] = useState<string>('');
   const [publicPage, setPublicPage] = useState<string>('landing');
   
   const { isExpired, userPlan } = useTrades();
@@ -122,7 +123,7 @@ export default function App() {
 
   if (!user) {
     if (showAuth) {
-      return <Auth onSuccess={handleAuthSuccess} initialMode={authInitialMode} initialPlan={authInitialPlan} />;
+      return <Auth onSuccess={handleAuthSuccess} initialMode={authInitialMode} initialPlan={authInitialPlan} initialCoupon={authInitialCoupon} />;
     }
     if (publicPage === 'termos') {
       return <Termos onBack={() => setPublicPage('landing')} />;
@@ -139,9 +140,14 @@ export default function App() {
           setAuthInitialMode('login');
           setShowAuth(true);
         }} 
-        onRegisterClick={(planId?: string) => {
+        onRegisterClick={(planId?: string, couponCode?: string) => {
           setAuthInitialMode('register');
           if (planId) setAuthInitialPlan(planId);
+          if (couponCode) {
+            setAuthInitialCoupon(couponCode);
+          } else {
+            setAuthInitialCoupon('');
+          }
           setShowAuth(true);
         }}
         onNavigate={setPublicPage}

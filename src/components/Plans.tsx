@@ -59,7 +59,7 @@ const parsePhoneNumberInput = (phoneVal: string) => {
   return { dialCode: '+244', localNumber: cleaned };
 };
 
-export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { forcedExpired?: boolean, hideHeader?: boolean, onAuthRequired?: (planId?: string) => void }) {
+export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { forcedExpired?: boolean, hideHeader?: boolean, onAuthRequired?: (planId?: string, couponCode?: string) => void }) {
   const { userPlan, globalSettings } = useTrades();
   const [payments, setPayments] = useState<any[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState<any>(null);
@@ -88,12 +88,22 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     setPayerDialCode(val);
     setPayerPhone(val + payerPhoneLocal);
   };
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<any>({
+    id: 'descontode83_static',
+    code: 'CPROFIT83%OFF',
+    active: true,
+    discountType: 'percentage',
+    discountValue: 83,
+    targetPlan: 'all'
+  });
   const [paymentMethod, setPaymentMethod] = useState<'iban' | 'multicaixa' | 'express' | 'kwik'>('iban');
   const [expressCode, setExpressCode] = useState('');
   const [activeCouponsList, setActiveCouponsList] = useState<any[]>([]);
-  const [typedCoupon, setTypedCoupon] = useState('');
-  const [validationMsg, setValidationMsg] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+  const [typedCoupon, setTypedCoupon] = useState('CPROFIT83%OFF');
+  const [validationMsg, setValidationMsg] = useState<{ text: string, type: 'success' | 'error' } | null>({
+    text: 'Cupom "CPROFIT83%OFF" de 83% de DESCONTO aplicado de forma automática!',
+    type: 'success'
+  });
   const [hadTrial30, setHadTrial30] = useState(false);
   const [showModalCouponInput, setShowModalCouponInput] = useState(false);
   const [modalCouponCode, setModalCouponCode] = useState('');
@@ -676,7 +686,8 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                       return;
                     }
                     if (!auth.currentUser && onAuthRequired) {
-                      onAuthRequired(plan.id);
+                      const initialCoupon = plan.id === 'trial_30' ? '' : 'CPROFIT83%OFF';
+                      onAuthRequired(plan.id, initialCoupon);
                     } else if (!plan.current) {
                       setShowPaymentModal(plan);
                     }

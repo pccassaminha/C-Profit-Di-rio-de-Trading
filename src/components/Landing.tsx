@@ -5,7 +5,7 @@ import Plans from './Plans';
 
 interface LandingProps {
   onLoginClick: () => void;
-  onRegisterClick: (planId?: string) => void;
+  onRegisterClick: (planId?: string, couponCode?: string) => void;
   onNavigate?: (page: string) => void;
 }
 
@@ -963,7 +963,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                 <button
                   onClick={() => {
                     closePromoPopup();
-                    onRegisterClick();
+                    onRegisterClick('mensal_6', 'CPROFIT83%OFF');
                   }}
                   className="w-full py-4 rounded-xl bg-[#00f5a0] text-background text-xs font-black uppercase tracking-wider hover:opacity-95 transition-all text-center cursor-pointer shadow-[0_10px_30px_rgba(0,245,160,0.25)] flex items-center justify-center gap-2"
                 >
@@ -972,7 +972,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                 <button
                   onClick={() => {
                     closePromoPopup();
-                    onRegisterClick();
+                    onRegisterClick('trial_30');
                   }}
                   className="w-full py-4 rounded-xl bg-transparent hover:bg-cyan-500/10 border border-cyan-500/60 text-cyan-400 hover:text-white hover:border-cyan-500 text-xs font-black uppercase tracking-wider transition-all text-center cursor-pointer flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(6,182,212,0.15)]"
                 >

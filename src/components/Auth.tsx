@@ -42,6 +42,7 @@ interface AuthProps {
   onSuccess: (isNewUser?: boolean) => void;
   initialMode?: 'login' | 'register';
   initialPlan?: string;
+  initialCoupon?: string;
 }
 
 const getFriendlyErrorMessage = (err: any) => {
@@ -55,7 +56,7 @@ const getFriendlyErrorMessage = (err: any) => {
   return err.message || 'Erro durante a autenticação.';
 };
 
-export default function Auth({ onSuccess, initialMode = 'login', initialPlan = 'mensal_6' }: AuthProps) {
+export default function Auth({ onSuccess, initialMode = 'login', initialPlan = 'mensal_6', initialCoupon = '' }: AuthProps) {
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -82,6 +83,24 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
       setSelectedPlan(initialPlan);
     }
   }, [initialPlan]);
+
+  useEffect(() => {
+    if (initialCoupon) {
+      setCouponCode(initialCoupon);
+      const uppercaseCode = initialCoupon.trim().toUpperCase();
+      if (uppercaseCode === 'CPROFIT83%OFF') {
+        setAppliedCoupon({
+          id: 'descontode83_static',
+          code: 'CPROFIT83%OFF',
+          active: true,
+          discountType: 'percentage',
+          discountValue: 83,
+          targetPlan: 'all'
+        });
+        setCouponFeedback({ type: 'success', message: 'Cupom 83% OFF aplicado com sucesso!' });
+      }
+    }
+  }, [initialCoupon]);
 
   const BASE_PLANS = [
     { id: 'trial_30', name: 'Teste (30 Dias)', rawPrice: 500, defaultTag: 'Grátis c/ Convite', defaultPrice: '500 Kz', oldPrice: 500 },
