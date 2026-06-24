@@ -519,18 +519,8 @@ export default function Settings() {
     }));
   };
 
-  const handleSave = async () => {
+  const handleSaveBilling = async () => {
     setIsSaving(true);
-    localStorage.setItem('app_date_format', dateFormat);
-    localStorage.setItem('app_session_type', sessionType);
-    localStorage.setItem('app_default_trade_type', defaultTradeType);
-    localStorage.setItem('app_default_community_feed', defaultCommunityFeed);
-    localStorage.setItem('app_show_community_filter', showCommunityFilter.toString());
-    localStorage.setItem('app_visible_markets', visibleMarkets);
-    localStorage.setItem('app_objectives', JSON.stringify(objectives));
-    localStorage.setItem('app_sessions', JSON.stringify(sessions));
-
-    // Save Billing Profile
     if (auth.currentUser) {
       try {
         const profileQuery = query(collection(db, 'user_profiles'), where('userId', '==', auth.currentUser.uid));
@@ -551,8 +541,80 @@ export default function Settings() {
           const profileDocId = profileSnapshot.docs[0].id;
           await updateDoc(doc(db, 'user_profiles', profileDocId), profileData);
         }
+      } catch (error) {
+        console.error("Error saving billing profile:", error);
+      }
+    }
+    setTimeout(() => {
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: "Dados de faturamento salvos com sucesso!",
+        confirmText: "OK",
+        isError: false,
+        onConfirm: closeModal
+      });
+      setIsSaving(false);
+    }, 400);
+  };
 
-        // Save Partner settings in usuarios doc
+  const handleSaveRegional = async () => {
+    setIsSaving(true);
+    localStorage.setItem('app_date_format', dateFormat);
+    localStorage.setItem('app_currency', currency);
+    setTimeout(() => {
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: "Preferências regionais salvas com sucesso!",
+        confirmText: "OK",
+        isError: false,
+        onConfirm: closeModal
+      });
+      setIsSaving(false);
+    }, 400);
+  };
+
+  const handleSaveCommunity = async () => {
+    setIsSaving(true);
+    localStorage.setItem('app_default_trade_type', defaultTradeType);
+    localStorage.setItem('app_default_community_feed', defaultCommunityFeed);
+    localStorage.setItem('app_show_community_filter', showCommunityFilter.toString());
+    localStorage.setItem('app_visible_markets', visibleMarkets);
+    setTimeout(() => {
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: "Preferências da comunidade salvas com sucesso!",
+        confirmText: "OK",
+        isError: false,
+        onConfirm: closeModal
+      });
+      setIsSaving(false);
+    }, 400);
+  };
+
+  const handleSaveSessions = async () => {
+    setIsSaving(true);
+    localStorage.setItem('app_session_type', sessionType);
+    localStorage.setItem('app_sessions', JSON.stringify(sessions));
+    setTimeout(() => {
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: "Sessões de trading salvas com sucesso!",
+        confirmText: "OK",
+        isError: false,
+        onConfirm: closeModal
+      });
+      setIsSaving(false);
+    }, 400);
+  };
+
+  const handleSavePartner = async () => {
+    setIsSaving(true);
+    if (auth.currentUser) {
+      try {
         await updateDoc(doc(db, 'usuarios', auth.currentUser.uid), {
           partnerEmail: partnerEmail.trim(),
           partnerPassword: partnerPassword.trim()
@@ -562,21 +624,20 @@ export default function Settings() {
           await registerPartnerAuth(partnerEmail.trim(), partnerPassword.trim());
         }
       } catch (error) {
-        console.error("Error saving profile or partner settings:", error);
+        console.error("Error saving partner settings:", error);
       }
     }
-
-    setModalConfig({
-      isOpen: true,
-      title: "Sucesso",
-      message: "Configurações salvas com sucesso!",
-      confirmText: "OK",
-      onConfirm: () => {
-        closeModal();
-        window.location.reload();
-      }
-    });
-    setIsSaving(false);
+    setTimeout(() => {
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: "Dados de conexão salvos com sucesso!",
+        confirmText: "OK",
+        isError: false,
+        onConfirm: closeModal
+      });
+      setIsSaving(false);
+    }, 400);
   };
 
   const toggleAccountStatus = async (accountId: string, currentStatus: string) => {
@@ -1142,6 +1203,16 @@ export default function Settings() {
                   <p className="text-[10px] text-on-surface-variant mt-4 italic lowercase">
                     * estes dados serão utilizados para gerar os detalhes das suas faturas e recibos de pagamento.
                   </p>
+                  <div className="flex justify-end mt-6">
+                    <button 
+                      onClick={handleSaveBilling}
+                      disabled={isSaving}
+                      className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
+                    >
+                      <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
+                      {isSaving ? 'A guardar...' : 'Salvar Dados'}
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -1207,6 +1278,16 @@ export default function Settings() {
                         </div>
                       </div>
                     </div>
+                  <div className="flex justify-end mt-6">
+                    <button 
+                      onClick={handleSaveRegional}
+                      disabled={isSaving}
+                      className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
+                    >
+                      <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
+                      {isSaving ? 'A guardar...' : 'Salvar Preferências'}
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -1304,6 +1385,16 @@ export default function Settings() {
                         </div>
                       </div>
                     </div>
+                  <div className="flex justify-end mt-6">
+                    <button 
+                      onClick={handleSaveCommunity}
+                      disabled={isSaving}
+                      className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
+                    >
+                      <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
+                      {isSaving ? 'A guardar...' : 'Salvar Preferências'}
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -1578,6 +1669,16 @@ export default function Settings() {
                       })}
                     </div>
                   </div>
+                  <div className="flex justify-end mt-6">
+                    <button 
+                      onClick={handleSaveSessions}
+                      disabled={isSaving}
+                      className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
+                    >
+                      <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
+                      {isSaving ? 'A guardar...' : 'Salvar Sessões'}
+                    </button>
+                  </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1683,6 +1784,16 @@ export default function Settings() {
                   <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Desconectado</span>
                 </div>
               </div>
+                </div>
+                <div className="flex justify-end mt-6">
+                  <button 
+                    onClick={handleSavePartner}
+                    disabled={isSaving}
+                    className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
+                  >
+                    <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
+                    {isSaving ? 'A guardar...' : 'Salvar Conexão'}
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -1813,17 +1924,7 @@ export default function Settings() {
 
 
 
-        {/* Salvar */}
-        <div className="flex justify-end">
-          <button 
-            onClick={handleSave}
-            disabled={isSaving}
-            className="bg-primary text-on-primary font-bold px-8 py-3 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
-            {isSaving ? 'A guardar...' : 'Salvar Alterações'}
-          </button>
-        </div>
+
 
         {/* Reiniciar Sistema */}
         <div className="bg-error/5 border border-error/20 rounded-xl overflow-hidden mt-8">
