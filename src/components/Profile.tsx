@@ -1142,95 +1142,16 @@ export default function Profile() {
                   </div>
                 </div>
 
-                {/* REDES SOCIAIS CONFIG BLOCK */}
-                <div className="bg-surface-container/20 border border-outline-variant/10 rounded-2xl p-4 space-y-4">
-                  <div className="flex items-center justify-between border-b border-outline-variant/10 pb-2">
-                    <div>
-                      <h4 className="text-xs font-black uppercase text-[#00f5a0]">Redes Sociais</h4>
-                      <p className="text-[10px] text-on-surface-variant">Configure até 3 links para apresentar aos outros traders</p>
-                    </div>
-                    {socialLinks.length < 3 && (
-                      <button
-                        type="button"
-                        onClick={handleAddSocialLink}
-                        className="py-1 px-3 bg-[#00f5a0]/10 hover:bg-[#00f5a0]/20 text-[#00f5a0] rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>+ Adicionar</span>
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-4">
-                    {socialLinks.map((link, idx) => (
-                      <div key={idx} className="bg-surface-container/50 p-3 rounded-xl border border-outline-variant/10 space-y-3 relative group text-left">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Rede Social #{idx + 1}</span>
-                          {socialLinks.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveSocialLink(idx)}
-                              className="text-red-400 hover:text-red-500 text-[10px] font-bold uppercase transition-colors px-1 cursor-pointer"
-                            >
-                              Remover
-                            </button>
-                          )}
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                          {/* Plataforma */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Plataforma</label>
-                            <select
-                              value={link.platform}
-                              onChange={(e) => handleSocialLinkChange(idx, 'platform', e.target.value)}
-                              className="w-full bg-[#1e2330] border border-outline-variant/20 rounded-lg px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
-                            >
-                              <option value="Instagram">Instagram</option>
-                              <option value="Facebook">Facebook</option>
-                              <option value="TikTok">TikTok</option>
-                              <option value="Canal YouTube">Canal YouTube</option>
-                              <option value="Outros">Outros</option>
-                            </select>
-                          </div>
-
-                          {/* Máscara / Nome da Conta */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Nome da Conta / Máscara</label>
-                            <input
-                              type="text"
-                              placeholder="Ex: @meu_instagram"
-                              value={link.mask}
-                              onChange={(e) => handleSocialLinkChange(idx, 'mask', e.target.value)}
-                              className="w-full bg-[#1e2330] border border-outline-variant/20 rounded-lg px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
-                            />
-                          </div>
-
-                          {/* Link URL */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Link de Perfil / URL</label>
-                            <input
-                              type="text"
-                              placeholder="Ex: https://instagram.com/user"
-                              value={link.url}
-                              onChange={(e) => handleSocialLinkChange(idx, 'url', e.target.value)}
-                              className="w-full bg-[#1e2330] border border-outline-variant/20 rounded-lg px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
+                {/* Cidade Atual inside the grid - spanning both columns on desktop */}
+                <div className="space-y-1.5 sm:col-span-2 bg-[#0d1425]/40 border border-outline-variant/10 rounded-2xl p-4">
                   <div className="flex justify-between items-center pb-0.5">
                     <label className="text-xs text-on-surface-variant font-bold uppercase tracking-wider">Cidade Atual</label>
-                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-semibold text-error">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-semibold text-error select-none">
                       <input 
                         type="checkbox" 
                         checked={isLiveInPrivate} 
                         onChange={(e) => setIsLiveInPrivate(e.target.checked)}
-                        className="rounded border-outline-variant text-[#00f5a0] focus:ring-[#00f5a0] bg-[#1a2035] w-3.5 h-3.5"
+                        className="rounded border-outline-variant text-[#00f5a0] focus:ring-[#00f5a0] bg-[#1a2035] w-3.5 h-3.5 cursor-pointer"
                       />
                       <span>Tornar Privado</span>
                     </label>
@@ -1240,8 +1161,88 @@ export default function Profile() {
                     value={liveIn}
                     placeholder="Ex: Luanda"
                     onChange={(e) => setLiveIn(e.target.value)}
-                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-primary text-on-surface"
+                    className="w-full bg-[#11192e] border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#00f5a0] text-on-surface"
                   />
+                </div>
+              </div>
+
+              {/* REDES SOCIAIS CONFIG BLOCK - placed completely outside the 2-column grid, spanning full width with premium styling and spacious padding */}
+              <div className="bg-[#0c1322] border border-outline-variant/20 rounded-[24px] p-6 space-y-5 shadow-inner">
+                <div className="flex items-center justify-between border-b border-outline-variant/15 pb-3">
+                  <div>
+                    <h4 className="text-sm font-black uppercase text-[#00f5a0] tracking-wider">Redes Sociais</h4>
+                    <p className="text-[11px] text-on-surface-variant mt-0.5">Configure até 3 links para apresentar aos outros traders no seu perfil</p>
+                  </div>
+                  {socialLinks.length < 3 && (
+                    <button
+                      type="button"
+                      onClick={handleAddSocialLink}
+                      className="py-1.5 px-4 bg-[#00f5a0]/10 hover:bg-[#00f5a0]/20 text-[#00f5a0] border border-[#00f5a0]/20 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    >
+                      <span>+ Adicionar</span>
+                    </button>
+                  )}
+                </div>
+                
+                <div className="space-y-4">
+                  {socialLinks.map((link, idx) => (
+                    <div key={idx} className="bg-[#11192e] p-4.5 rounded-xl border border-outline-variant/15 space-y-3.5 relative group text-left transition-all hover:border-[#00f5a0]/30 shadow-sm">
+                      <div className="flex items-center justify-between gap-2 border-b border-outline-variant/10 pb-1.5">
+                        <span className="text-[10px] font-black text-[#00f5a0]/70 uppercase tracking-widest">Rede Social #{idx + 1}</span>
+                        {socialLinks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSocialLink(idx)}
+                            className="text-red-400 hover:text-red-500 text-[10px] font-bold uppercase transition-colors px-1 cursor-pointer"
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                        {/* Plataforma */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Plataforma</label>
+                          <select
+                            value={link.platform}
+                            onChange={(e) => handleSocialLinkChange(idx, 'platform', e.target.value)}
+                            className="w-full bg-[#0a101f] border border-outline-variant/20 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0] cursor-pointer"
+                          >
+                            <option className="bg-[#0a101f] text-on-surface" value="Instagram">Instagram</option>
+                            <option className="bg-[#0a101f] text-on-surface" value="Facebook">Facebook</option>
+                            <option className="bg-[#0a101f] text-on-surface" value="TikTok">TikTok</option>
+                            <option className="bg-[#0a101f] text-on-surface" value="Canal YouTube">Canal YouTube</option>
+                            <option className="bg-[#0a101f] text-on-surface" value="Outros">Outros</option>
+                          </select>
+                        </div>
+
+                        {/* Máscara / Nome da Conta */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Nome da Conta / Máscara</label>
+                          <input
+                            type="text"
+                            placeholder="Ex: @meu_instagram"
+                            value={link.mask}
+                            onChange={(e) => handleSocialLinkChange(idx, 'mask', e.target.value)}
+                            className="w-full bg-[#0a101f] border border-outline-variant/20 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
+                          />
+                        </div>
+
+                        {/* Link URL */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-on-surface-variant font-bold uppercase block pl-1">Link de Perfil / URL</label>
+                          <input
+                            type="text"
+                            placeholder="Ex: https://instagram.com/user"
+                            value={link.url}
+                            onChange={(e) => handleSocialLinkChange(idx, 'url', e.target.value)}
+                            className="w-full bg-[#0a101f] border border-outline-variant/20 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-[#00f5a0]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
