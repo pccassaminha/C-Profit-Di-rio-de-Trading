@@ -475,7 +475,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       ? `\n- Valor USDT Calculado: *${usdtConv.amount.toFixed(2)} USDT* (Câmbio: 1 USDT = ${usdtConv.rate.toFixed(2)} Kz)`
       : '';
 
-    const text = `Olá Maestro! Meu nome é *${payerName || 'Cliente'}*.
+    const text = `Olá Suporte C Profit ! Meu nome é *${payerName || 'Cliente'}*.
 
 Acabei de solicitar a assinatura do plano *${planName}* (Valor: ${dynamicPrice} Kz) através de *${methodDisplay}*.${expressDetail}${usdtDetail}
 

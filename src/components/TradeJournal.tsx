@@ -1475,15 +1475,15 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                   <select 
                     value={tradeData.timeframe}
                     onChange={(e) => setTradeData({...tradeData, timeframe: e.target.value})}
-                    className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface"
+                    className="w-full bg-[#0f1b30] border border-outline-variant/20 rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-[#f0f4ff] cursor-pointer outline-none"
                   >
-                    <option value="M1">M1</option>
-                    <option value="M5">M5</option>
-                    <option value="M15">M15</option>
-                    <option value="M30">M30</option>
-                    <option value="H1">H1</option>
-                    <option value="H4">H4</option>
-                    <option value="D1">D1</option>
+                    <option className="bg-[#0f1b30] text-[#f0f4ff]" value="M1">M1</option>
+                    <option className="bg-[#0f1b30] text-[#f0f4ff]" value="M5">M5</option>
+                    <option className="bg-[#0f1b30] text-[#f0f4ff]" value="M15">M15</option>
+                    <option className="bg-[#0f1b30] text-[#f0f4ff]" value="M30">M30</option>
+                    <option className="bg-[#0f1b30] text-[#f0f4ff]" value="H1">H1</option>
+                    <option className="bg-[#0f1b30] text-[#f0f4ff]" value="H4">H4</option>
+                    <option className="bg-[#0f1b30] text-[#f0f4ff]" value="D1">D1</option>
                   </select>
                 </div>
               )}
@@ -1494,41 +1494,41 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 <select 
                   value={tradeData.session}
                   onChange={(e) => setTradeData({...tradeData, session: e.target.value})}
-                  className="w-full bg-surface-container-highest border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-on-surface"
+                  className="w-full bg-[#0f1b30] border border-outline-variant/20 rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 text-[#f0f4ff] cursor-pointer outline-none"
                 >
                   {tradeType === 'ob' ? (
                     <>
-                      <option value="Dia">Dia</option>
-                      <option value="Noite">Noite</option>
+                      <option className="bg-[#0f1b30] text-[#f0f4ff]" value="Dia">Dia</option>
+                      <option className="bg-[#0f1b30] text-[#f0f4ff]" value="Noite">Noite</option>
                     </>
                   ) : sessionType === 'simple' ? (
                     <>
-                      <option value="Londres">Londres</option>
-                      <option value="Nova Iorque">Nova Iorque</option>
-                      <option value="Asiática">Asiática</option>
-                      <option value="Importado">Importado</option>
+                      <option className="bg-[#0f1b30] text-[#f0f4ff]" value="Londres">Londres</option>
+                      <option className="bg-[#0f1b30] text-[#f0f4ff]" value="Nova Iorque">Nova Iorque</option>
+                      <option className="bg-[#0f1b30] text-[#f0f4ff]" value="Asiática">Asiática</option>
+                      <option className="bg-[#0f1b30] text-[#f0f4ff]" value="Importado">Importado</option>
                     </>
                   ) : (
                     <>
-                      <optgroup label="Londres">
-                        <option>Londres (Pré-Mercado)</option>
-                        <option>Londres (Intra Mercado)</option>
-                        <option>Londres (Zona Não Operável)</option>
-                        <option>Londres (Fechamento)</option>
+                      <optgroup label="Londres" className="bg-[#0f1b30] text-[#00f5a0] font-bold">
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Londres (Pré-Mercado)</option>
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Londres (Intra Mercado)</option>
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Londres (Zona Não Operável)</option>
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Londres (Fechamento)</option>
                       </optgroup>
-                      <optgroup label="Nova Iorque">
-                        <option>Nova Iorque (Pré-Mercado)</option>
-                        <option>Nova Iorque (Intra Mercado)</option>
-                        <option>Nova Iorque (Zona Não Operável)</option>
-                        <option>Nova Iorque (Fechamento)</option>
+                      <optgroup label="Nova Iorque" className="bg-[#0f1b30] text-[#00f5a0] font-bold">
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Nova Iorque (Pré-Mercado)</option>
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Nova Iorque (Intra Mercado)</option>
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Nova Iorque (Zona Não Operável)</option>
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Nova Iorque (Fechamento)</option>
                       </optgroup>
-                      <optgroup label="Asiática">
-                        <option>Asiática (Pré-Mercado)</option>
-                        <option>Asiática (Intra Mercado)</option>
-                        <option>Asiática (Zona Não Operável)</option>
-                        <option>Asiática (Fechamento)</option>
+                      <optgroup label="Asiática" className="bg-[#0f1b30] text-[#00f5a0] font-bold">
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Asiática (Pré-Mercado)</option>
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Asiática (Intra Mercado)</option>
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Asiática (Zona Não Operável)</option>
+                        <option className="bg-[#0f1b30] text-[#f0f4ff]">Asiática (Fechamento)</option>
                       </optgroup>
-                      <option>Importado</option>
+                      <option className="bg-[#0f1b30] text-[#f0f4ff]">Importado</option>
                     </>
                   )}
                 </select>
