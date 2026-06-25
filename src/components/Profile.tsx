@@ -202,6 +202,12 @@ export default function Profile() {
   const [allCommunityUsers, setAllCommunityUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const displayName = `${firstName} ${lastName}`.trim() || user?.displayName || 'Membro do C Profit';
+  const isEditingRef = useRef(isEditing);
+  useEffect(() => {
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
+
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -218,100 +224,136 @@ export default function Profile() {
   });
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      if (user) {
-        try {
-          // Tentar primeiro no novo caminho 'usuarios' (SaaS)
-          let userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-          
-          // Se não encontrar, tenta no antigo 'users'
-          if (!userDoc.exists()) {
-            userDoc = await getDoc(doc(db, 'users', user.uid));
-          }
-
-            if (userDoc.exists()) {
-              const data = userDoc.data();
-              if (data.firstName) setFirstName(data.firstName);
-              if (data.lastName) setLastName(data.lastName);
-              if (data.contactEmail) setContactEmail(data.contactEmail);
-              if (data.phoneNumber) setPhoneNumber(data.phoneNumber);
-              if (data.photoURL) setPhotoURL(data.photoURL);
-              if (data.isPrivate !== undefined) setIsPrivate(data.isPrivate);
-              if (data.bio) setBio(data.bio);
-              if (data.coverURL) setCoverURL(data.coverURL);
-              if (data.liveIn) setLiveIn(data.liveIn);
-              
-              if (data.socialLinks) {
-                setSocialLinks(data.socialLinks);
-              } else {
-                setSocialLinks([{ platform: 'Instagram', url: '', mask: '' }]);
-              }
-
-              if (data.isLiveInPrivate !== undefined) setIsLiveInPrivate(data.isLiveInPrivate);
-              if (data.isPhoneNumberPrivate !== undefined) setIsPhoneNumberPrivate(data.isPhoneNumberPrivate);
-              if (data.isEmailPrivate !== undefined) setIsEmailPrivate(data.isEmailPrivate);
-            }
-        } catch (err) {
-          console.warn("Operating in offline/cached mode for profile details:", err);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-    fetchUserData();
-
-    if (user) {
-      // Real-time followers/following counter from Firestore list snapshot
-      const unsubFollowers = onSnapshot(collection(db, 'usuarios', user.uid, 'followers'), (snap) => {
-        setFollowersCount(snap.size);
-      }, (err) => {
-        console.warn("Followers count error or offline mode active.", err);
-      });
-      const unsubFollowing = onSnapshot(collection(db, 'usuarios', user.uid, 'following'), (snap) => {
-        setFollowingCount(snap.size);
-      }, (err) => {
-        console.warn("Following count error or offline mode active.", err);
-      });
-
-      // Real-time feed list for user posts
-      const q = query(
-        collection(db, 'community_posts'),
-        where('userId', '==', user.uid)
-      );
-      const unsubPosts = onSnapshot(q, (snapshot) => {
-        const postsList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        // Sort by createdAt descending safely
-        postsList.sort((a: any, b: any) => {
-          const timeA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()) : 0;
-          const timeB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()) : 0;
-          return timeB - timeA;
-        });
-        setMyPosts(postsList);
-      }, (err) => {
-        console.warn("Users posts snapshot offline mode alert.", err);
-      });
-
-      // Load other community users for friends list suggestion
-      const unsubAllUsers = onSnapshot(collection(db, 'usuarios'), (snap) => {
-        const list = snap.docs.map(d => ({
-          id: d.id,
-          ...d.data()
-        }));
-        setAllCommunityUsers(list);
-      }, (err) => {
-        console.warn("All community users offline snapshot alert.", err);
-      });
-
-      return () => {
-        unsubFollowers();
-        unsubFollowing();
-        unsubPosts();
-        unsubAllUsers();
-      };
+    if (!user) {
+      setIsLoading(false);
+      return;
     }
+
+    setIsLoading(true);
+
+    // 1. Sincronização em tempo real do perfil do usuário ('usuarios')
+    const unsubUserDoc = onSnapshot(doc(db, 'usuarios', user.uid), (docSnap) => {
+      let data = docSnap.exists() ? docSnap.data() : null;
+
+      const applyData = (profileData: any) => {
+        // Se estiver editando, não sobrescrever estados dos inputs locais para não interromper digitação do usuário
+        if (!isEditingRef.current) {
+          if (profileData.firstName) setFirstName(profileData.firstName);
+          if (profileData.lastName) setLastName(profileData.lastName);
+          if (profileData.contactEmail) {
+            setContactEmail(profileData.contactEmail);
+          } else if (profileData.email) {
+            setContactEmail(profileData.email);
+          } else if (user?.email) {
+            setContactEmail(user.email);
+          }
+          if (profileData.phoneNumber) setPhoneNumber(profileData.phoneNumber);
+          if (profileData.isPrivate !== undefined) setIsPrivate(profileData.isPrivate);
+          if (profileData.bio) setBio(profileData.bio);
+          if (profileData.liveIn) setLiveIn(profileData.liveIn);
+          if (profileData.socialLinks) {
+            setSocialLinks(profileData.socialLinks);
+          } else {
+            setSocialLinks([{ platform: 'Instagram', url: '', mask: '' }]);
+          }
+          if (profileData.isLiveInPrivate !== undefined) setIsLiveInPrivate(profileData.isLiveInPrivate);
+          if (profileData.isPhoneNumberPrivate !== undefined) setIsPhoneNumberPrivate(profileData.isPhoneNumberPrivate);
+          if (profileData.isEmailPrivate !== undefined) setIsEmailPrivate(profileData.isEmailPrivate);
+        }
+        
+        // Fotos podem atualizar em background a qualquer momento
+        if (profileData.photoURL) setPhotoURL(profileData.photoURL);
+        if (profileData.coverURL) setCoverURL(profileData.coverURL);
+      };
+
+      if (data) {
+        applyData(data);
+        setIsLoading(false);
+      } else {
+        // Fallback para caminho antigo 'users'
+        getDoc(doc(db, 'users', user.uid)).then((oldSnap) => {
+          if (oldSnap.exists()) {
+            applyData(oldSnap.data());
+          } else {
+            // Se não houver documento, inicializar com dados do Auth
+            if (!isEditingRef.current) {
+              if (user.displayName) {
+                const parts = user.displayName.split(' ');
+                setFirstName(parts[0] || '');
+                setLastName(parts.slice(1).join(' ') || '');
+              }
+              if (user.email) {
+                setEmail(user.email);
+                setContactEmail(user.email);
+              }
+              if (user.photoURL) {
+                setPhotoURL(user.photoURL);
+              }
+            }
+          }
+          setIsLoading(false);
+        }).catch((err) => {
+          console.warn("Fallback getDoc error:", err);
+          setIsLoading(false);
+        });
+      }
+    }, (err) => {
+      console.warn("Real-time profile subscription failed:", err);
+      setIsLoading(false);
+    });
+
+    // 2. Real-time followers/following counter from list snapshot
+    const unsubFollowers = onSnapshot(collection(db, 'usuarios', user.uid, 'followers'), (snap) => {
+      setFollowersCount(snap.size);
+    }, (err) => {
+      console.warn("Followers count error or offline mode active.", err);
+    });
+
+    const unsubFollowing = onSnapshot(collection(db, 'usuarios', user.uid, 'following'), (snap) => {
+      setFollowingCount(snap.size);
+    }, (err) => {
+      console.warn("Following count error or offline mode active.", err);
+    });
+
+    // 3. Real-time feed list for user posts
+    const q = query(
+      collection(db, 'community_posts'),
+      where('userId', '==', user.uid)
+    );
+    const unsubPosts = onSnapshot(q, (snapshot) => {
+      const postsList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      // Sort by createdAt descending safely
+      postsList.sort((a: any, b: any) => {
+        const timeA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()) : 0;
+        const timeB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()) : 0;
+        return timeB - timeA;
+      });
+      setMyPosts(postsList);
+    }, (err) => {
+      console.warn("Users posts snapshot offline mode alert.", err);
+    });
+
+    // 4. Load other community users for friends list suggestion
+    const unsubAllUsers = onSnapshot(collection(db, 'usuarios'), (snap) => {
+      const list = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }));
+      setAllCommunityUsers(list);
+    }, (err) => {
+      console.warn("All community users offline snapshot alert.", err);
+    });
+
+    return () => {
+      unsubUserDoc();
+      unsubFollowers();
+      unsubFollowing();
+      unsubPosts();
+      unsubAllUsers();
+    };
   }, [user]);
 
   const closeModal = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
@@ -382,19 +424,23 @@ export default function Profile() {
         
         const userDocRef = doc(db, 'usuarios', user.uid);
         await setDoc(userDocRef, { photoURL: url }, { merge: true });
+        try {
+          await setDoc(doc(db, 'users', user.uid), { photoURL: url }, { merge: true });
+        } catch (e) {}
 
         // Update auth profile with a shorter URL to avoid 'Photo URL too long' error
         try {
           const shortUrl = url.startsWith('data:') 
-            ? `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'U')}&background=random`
+            ? `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`
             : url;
           await updateProfile(user, { photoURL: shortUrl });
+          await user.reload();
         } catch (authErr) {
           console.warn("Could not save photoURL in Auth:", authErr);
         }
 
         // Sync historical posts and comments
-        syncHistoricalProfileData(user.uid, url, user.displayName || '');
+        syncHistoricalProfileData(user.uid, url, displayName);
 
         setModalConfig({
           isOpen: true,
@@ -437,15 +483,16 @@ export default function Profile() {
       // Update auth profile with a shorter URL to avoid 'Photo URL too long' error
       try {
         const shortUrl = url.startsWith('data:') 
-          ? `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'U')}&background=random`
+          ? `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`
           : url;
         await updateProfile(user, { photoURL: shortUrl });
+        await user.reload();
       } catch (authErr) {
         console.warn("Could not save photoURL in Auth:", authErr);
       }
 
       // Sync historical posts and comments
-      syncHistoricalProfileData(user.uid, url, user.displayName || '');
+      syncHistoricalProfileData(user.uid, url, displayName);
 
       setIsPhotoModalOpen(false);
       setSelectedPhotoFile(null);
@@ -482,6 +529,9 @@ export default function Profile() {
         
         const userDocRef = doc(db, 'usuarios', user.uid);
         await setDoc(userDocRef, { coverURL: url }, { merge: true });
+        try {
+          await setDoc(doc(db, 'users', user.uid), { coverURL: url }, { merge: true });
+        } catch (e) {}
 
         setModalConfig({
           isOpen: true,
@@ -559,11 +609,13 @@ export default function Profile() {
       if (newDisplayName !== user.displayName || authUpdate.photoURL !== user.photoURL) {
         try {
           await updateProfile(user, authUpdate);
+          await user.reload();
         } catch (authErr) {
           console.warn("Could not save photoURL in Auth:", authErr);
           if (newDisplayName !== user.displayName) {
             // fallback to only name
             await updateProfile(user, { displayName: newDisplayName });
+            await user.reload();
           }
         }
       }
@@ -571,22 +623,27 @@ export default function Profile() {
       // Sync historical posts and comments when name or photo changes
       syncHistoricalProfileData(user.uid, photoURL, newDisplayName);
 
-      const profileData = {
+      const profileData: any = {
         nome: newDisplayName,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        contactEmail,
-        phoneNumber,
-        photoURL,
+        firstName: firstName.trim() || '',
+        lastName: lastName.trim() || '',
+        email: (email || user.email || '').trim(),
+        contactEmail: (contactEmail || '').trim(),
+        phoneNumber: (phoneNumber || '').trim(),
+        photoURL: photoURL || '',
         userId: user.uid,
-        isPrivate,
-        bio,
-        coverURL,
-        socialLinks: socialLinks || [],
-        liveIn,
-        isLiveInPrivate,
-        isPhoneNumberPrivate,
-        isEmailPrivate,
+        isPrivate: isPrivate ?? false,
+        bio: bio || '',
+        coverURL: coverURL || '',
+        socialLinks: (socialLinks || []).map(link => ({
+          platform: link.platform || 'Instagram',
+          url: link.url || '',
+          mask: link.mask || ''
+        })),
+        liveIn: liveIn || '',
+        isLiveInPrivate: isLiveInPrivate ?? false,
+        isPhoneNumberPrivate: isPhoneNumberPrivate ?? false,
+        isEmailPrivate: isEmailPrivate ?? false,
         updatedAt: new Date().toISOString()
       };
 
@@ -719,8 +776,8 @@ export default function Profile() {
         <div className="w-full max-w-4xl px-6 relative flex flex-col sm:flex-row items-center sm:items-end gap-5 -mt-16 sm:-mt-20 pb-5">
           <div className="relative group shrink-0 w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-surface shadow-2xl bg-surface-container overflow-hidden">
             <img 
-              src={photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'U')}&background=random`} 
-              alt={user?.displayName || 'Trader'}
+              src={photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`} 
+              alt={displayName}
               className="w-full h-full object-cover rounded-full"
               referrerPolicy="no-referrer"
             />
@@ -742,7 +799,7 @@ export default function Profile() {
           <div className="flex-1 text-center sm:text-left space-y-2 pb-2">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
               <h1 className="text-2xl sm:text-3xl font-black text-on-surface uppercase tracking-tight flex items-center justify-center sm:justify-start gap-1.5">
-                {user?.displayName || 'Membro do C Profit'}
+                {displayName}
                 <Award size={22} className="text-primary fill-primary animate-pulse" />
               </h1>
             </div>
@@ -967,14 +1024,14 @@ export default function Profile() {
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-3">
                             <img 
-                              src={photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'U')}&background=random`} 
+                              src={photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`} 
                               alt="avatar" 
                               className="w-9 h-9 rounded-xl object-cover"
                               referrerPolicy="no-referrer"
                             />
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-extrabold text-on-surface uppercase tracking-tight">{user?.displayName}</span>
+                                <span className="text-xs font-extrabold text-on-surface uppercase tracking-tight">{displayName}</span>
                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-lg border uppercase ${post.type === 'forex' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-secondary/10 text-secondary border-secondary/20'}`}>
                                   {post.type === 'forex' ? 'Forex' : 'Opções Binárias'}
                                 </span>
