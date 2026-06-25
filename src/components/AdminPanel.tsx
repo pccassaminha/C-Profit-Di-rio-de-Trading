@@ -90,7 +90,10 @@ export default function AdminPanel() {
       multicaixaLogoUrl: '',
       usdtQrCodeUrl: '',
       usdtAddress: '',
-      usdtLegend: ''
+      usdtLegend: '',
+      usdtExchangeRateMode: 'manual',
+      usdtManualRate: 1000,
+      usdtNetworkFee: 1
     };
     return initialSettings ? { ...defaults, ...initialSettings } : defaults;
   });
@@ -1324,6 +1327,15 @@ export default function AdminPanel() {
                           <span className="text-xs text-on-surface font-mono font-bold">{p.expressCode}</span>
                         </div>
                       )}
+                      {p.paymentMethod === 'multicaixa' && p.usdtAmount && (
+                        <div className="mt-1 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-xl w-fit">
+                          <span className="text-[9px] text-emerald-400 font-black tracking-wider uppercase font-mono block">QUANTIA USDT</span>
+                          <span className="text-xs text-on-surface font-mono font-bold">{p.usdtAmount} USDT</span>
+                          {p.usdtRate && (
+                            <span className="text-[9px] text-on-surface-variant block font-mono mt-0.5">Câmbio: 1$ = {p.usdtRate} Kz</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1601,6 +1613,58 @@ export default function AdminPanel() {
                               placeholder="Ex: Utilizar apenas a rede TRC20 para não haver engano"
                             />
                           </div>
+                        </div>
+
+                        {/* Definições de Câmbio USDT */}
+                        <div className="border-t border-outline-variant/10 pt-4 mt-2 space-y-4">
+                          <p className="text-xs font-black uppercase text-[#00f5a0] tracking-wider pl-1 font-mono flex items-center gap-1.5">
+                            <span>📊</span> Definições de Câmbio USDT (Kwanza ⇆ USDT)
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1 h-5 flex items-center">Modo de Câmbio</label>
+                              <select
+                                value={settings.usdtExchangeRateMode || 'manual'}
+                                onChange={(e) => setSettings({ ...settings, usdtExchangeRateMode: e.target.value })}
+                                className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-4 py-3 text-on-surface outline-none focus:border-[#00f5a0] text-sm font-bold text-white cursor-pointer"
+                              >
+                                <option value="manual">Taxa Fixa (Manual)</option>
+                                <option value="auto">Taxa Dinâmica (API em tempo real)</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1 h-5 flex items-center truncate">
+                                {settings.usdtExchangeRateMode === 'auto' ? 'Taxa Base (API USD/AOA)' : 'Taxa de Câmbio Fixa (USD/Kz)'}
+                              </label>
+                              <input
+                                type="number"
+                                disabled={settings.usdtExchangeRateMode === 'auto'}
+                                value={settings.usdtManualRate !== undefined ? settings.usdtManualRate : 1000}
+                                onChange={(e) => setSettings({ ...settings, usdtManualRate: Number(e.target.value) })}
+                                className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white disabled:opacity-50"
+                                placeholder="Ex: 1000"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1 h-5 flex items-center">Taxa de Rede / Gás (USDT)</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={settings.usdtNetworkFee !== undefined ? settings.usdtNetworkFee : 1}
+                                onChange={(e) => setSettings({ ...settings, usdtNetworkFee: Number(e.target.value) })}
+                                className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                                placeholder="Ex: 1.00"
+                              />
+                            </div>
+                          </div>
+                          {settings.usdtExchangeRateMode === 'auto' && (
+                            <p className="text-[10px] text-amber-400 font-medium pl-1 leading-relaxed">
+                              💡 A taxa de câmbio em tempo real será obtida automaticamente via API. A taxa de rede configurada (ex: 1 USDT) será adicionada ao valor total convertido para cobrir os custos de gás blockchain (ex: TRC20).
+                            </p>
+                          )}
                         </div>
                       </div>
                     )}

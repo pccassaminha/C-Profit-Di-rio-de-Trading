@@ -110,6 +110,8 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const [modalCouponCode, setModalCouponCode] = useState('');
   const [modalCouponError, setModalCouponError] = useState<string | null>(null);
   const [modalCouponSuccessMsg, setModalCouponSuccessMsg] = useState<string | null>(null);
+  const [liveUsdToAoa, setLiveUsdToAoa] = useState<number | null>(null);
+  const [loadingLiveRate, setLoadingLiveRate] = useState<boolean>(false);
 
   useEffect(() => {
     if (showPaymentModal) {
@@ -119,6 +121,43 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       setModalCouponSuccessMsg(null);
     }
   }, [showPaymentModal]);
+
+  useEffect(() => {
+    if (paymentMethod === 'multicaixa' && globalSettings?.usdtExchangeRateMode === 'auto' && !liveUsdToAoa) {
+      setLoadingLiveRate(true);
+      fetch('https://open.er-api.com/v6/latest/USD')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.rates && data.rates.AOA) {
+            setLiveUsdToAoa(data.rates.AOA);
+          }
+        })
+        .catch(err => {
+          console.error("Erro ao buscar taxa de câmbio USD/AOA:", err);
+        })
+        .finally(() => {
+          setLoadingLiveRate(false);
+        });
+    }
+  }, [paymentMethod, globalSettings, liveUsdToAoa]);
+
+  const getUsdtConversion = (priceInKz: number) => {
+    const rateMode = globalSettings?.usdtExchangeRateMode || 'manual';
+    const baseRate = rateMode === 'auto' && liveUsdToAoa ? liveUsdToAoa : (globalSettings?.usdtManualRate || 1000);
+    const networkFee = globalSettings?.usdtNetworkFee !== undefined ? globalSettings.usdtNetworkFee : 1;
+    
+    // Total USDT = (Kz / baseRate) + networkFee
+    const rawUsdt = priceInKz / baseRate;
+    const totalUsdt = rawUsdt + networkFee;
+    
+    return {
+      rate: baseRate,
+      amount: totalUsdt,
+      rawAmount: rawUsdt,
+      networkFee: networkFee,
+      rateMode: rateMode
+    };
+  };
 
   const hasUsedTrial = !!(
     userPlan?.hadTrial30 || 
@@ -254,11 +293,16 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
     const q = query(
       collection(db, 'payments'), 
-      where('userId', '==', auth.currentUser.uid),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', auth.currentUser.uid)
     );
     const unsub = onSnapshot(q, (snapshot) => {
-      setPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      list.sort((a: any, b: any) => {
+        const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.createdAt || 0).getTime();
+        const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+      setPayments(list);
     });
     return () => unsub();
   }, []);
@@ -419,9 +463,15 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       ? `\n- Código da Transação: *${expressCode.trim()}*` 
       : '';
 
+    const priceInKz = targetPlan ? parsePriceToNumber(dynamicPrice) : 0;
+    const usdtConv = targetPlan ? getUsdtConversion(priceInKz) : null;
+    const usdtDetail = (paymentMethod === 'multicaixa' && usdtConv)
+      ? `\n- Valor USDT Calculado: *${usdtConv.amount.toFixed(2)} USDT* (Câmbio: 1 USDT = ${usdtConv.rate.toFixed(2)} Kz)`
+      : '';
+
     const text = `Olá Maestro! Meu nome é *${payerName || 'Cliente'}*.
 
-Acabei de solicitar a assinatura do plano *${planName}* (Valor: ${dynamicPrice} Kz) através de *${methodDisplay}*.${expressDetail}
+Acabei de solicitar a assinatura do plano *${planName}* (Valor: ${dynamicPrice} Kz) através de *${methodDisplay}*.${expressDetail}${usdtDetail}
 
 *Meus Dados de Cadastro:*
 - Nome: ${payerName || 'Não especificado'}
@@ -463,6 +513,8 @@ Fico no aguardo, obrigado!`;
       const numericId = generateNumericId();
       const targetPlan = plans.find(p => p.id === showPaymentModal.id) || showPaymentModal;
       const dynamicPrice = getDiscountedPrice(targetPlan);
+      const priceInKz = parsePriceToNumber(dynamicPrice);
+      const usdtConv = getUsdtConversion(priceInKz);
 
       await addDoc(collection(db, 'payments'), {
         userId: auth.currentUser?.uid,
@@ -470,13 +522,17 @@ Fico no aguardo, obrigado!`;
         userEmail: auth.currentUser?.email || '',
         userPhone: payerPhone,
         planId: showPaymentModal.id,
-        amount: parsePriceToNumber(dynamicPrice),
+        amount: priceInKz,
         status: 'pending',
         transactionCode: numericId,
         proofUrl: 'WhatsApp Support',
         usedCoupon: appliedCoupon ? appliedCoupon.code : null,
         paymentMethod: paymentMethod,
         expressCode: paymentMethod === 'express' ? expressCode.trim() : null,
+        usdtAmount: paymentMethod === 'multicaixa' ? Number(usdtConv.amount.toFixed(2)) : null,
+        usdtRate: paymentMethod === 'multicaixa' ? usdtConv.rate : null,
+        usdtNetworkFee: paymentMethod === 'multicaixa' ? usdtConv.networkFee : null,
+        usdtRateMode: paymentMethod === 'multicaixa' ? usdtConv.rateMode : null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
@@ -1057,7 +1113,7 @@ Fico no aguardo, obrigado!`;
                         </div>
                       )}
 
-                      {paymentMethod === 'multicaixa' && globalSettings?.showMulticaixa && (
+                       {paymentMethod === 'multicaixa' && globalSettings?.showMulticaixa && (
                         <div className="space-y-4 pt-4 border-t border-outline-variant/10 animate-in fade-in duration-200">
                           <div className="flex items-center justify-between">
                             <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
@@ -1065,6 +1121,71 @@ Fico no aguardo, obrigado!`;
                               Pagamento via USDT
                             </label>
                           </div>
+
+                          {/* USDT Exchange Rate Calculation Box */}
+                          {(() => {
+                            const targetPlan = plans.find(p => p.id === showPaymentModal.id) || showPaymentModal;
+                            const dynamicPrice = getDiscountedPrice(targetPlan);
+                            const priceInKz = parsePriceToNumber(dynamicPrice);
+                            const conversion = getUsdtConversion(priceInKz);
+
+                            return (
+                              <div className="bg-surface-container-high/60 border border-[#00f5a0]/20 rounded-2xl p-4 space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Valor Convertido:</span>
+                                  <div className="flex items-center gap-1.5 bg-[#00f5a0]/10 border border-[#00f5a0]/20 px-3 py-1 rounded-xl">
+                                    <span className="text-base font-mono font-black text-[#00f5a0]">{conversion.amount.toFixed(2)}</span>
+                                    <span className="text-[10px] font-black text-[#00f5a0] uppercase tracking-wider">USDT</span>
+                                  </div>
+                                </div>
+
+                                <div className="border-t border-dashed border-outline-variant/10 my-2"></div>
+
+                                <div className="space-y-1 text-[11px] text-on-surface-variant font-medium">
+                                  <div className="flex justify-between">
+                                    <span>Preço em Kwanzas:</span>
+                                    <span className="text-on-surface font-semibold font-mono">{formatPrice(priceInKz)} Kz</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Taxa de Câmbio:</span>
+                                    <span className="text-on-surface font-semibold font-mono">
+                                      {loadingLiveRate ? 'A carregar taxa...' : `1 USDT = ${conversion.rate.toFixed(2)} Kz`}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Valor Equivalente:</span>
+                                    <span className="text-on-surface font-semibold font-mono">{conversion.rawAmount.toFixed(2)} USDT</span>
+                                  </div>
+                                  {conversion.networkFee > 0 && (
+                                    <div className="flex justify-between text-amber-400">
+                                      <span>Taxa de Rede (Gás):</span>
+                                      <span className="font-bold font-mono">+{conversion.networkFee.toFixed(2)} USDT</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between text-[#00f5a0] pt-0.5 border-t border-outline-variant/5">
+                                    <span>Tipo de Câmbio:</span>
+                                    <span className="font-bold uppercase text-[9px] tracking-wide flex items-center gap-1">
+                                      {conversion.rateMode === 'auto' ? '⚡ Tempo Real (API)' : '⚙️ Taxa Fixada'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="border-t border-dashed border-outline-variant/10 pt-2 flex items-center justify-between gap-2">
+                                  <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest opacity-60">Enviar Exatamente:</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(conversion.amount.toFixed(2));
+                                      alert('Quantia de ' + conversion.amount.toFixed(2) + ' USDT copiada para a área de transferência!');
+                                    }}
+                                    className="px-2.5 py-1 bg-surface-container border border-outline-variant/10 text-on-surface hover:text-[#00f5a0] text-[9px] font-black uppercase tracking-widest rounded-lg transition-all"
+                                  >
+                                    Copiar Quantia
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
 
                           {/* QR Code Section */}
                           {globalSettings?.usdtQrCodeUrl && (

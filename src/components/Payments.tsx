@@ -25,11 +25,16 @@ export default function Payments() {
     if (!auth.currentUser) return;
     const q = query(
       collection(db, 'payments'),
-      where('userId', '==', auth.currentUser.uid),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', auth.currentUser.uid)
     );
     const unsub = onSnapshot(q, (snapshot) => {
-      setPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      list.sort((a: any, b: any) => {
+        const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.createdAt || 0).getTime();
+        const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+      setPayments(list);
     });
     return () => unsub();
   }, []);
@@ -149,6 +154,9 @@ export default function Payments() {
                   </td>
                   <td className="p-6">
                     <p className="font-black text-sm text-primary">{p.amount?.toLocaleString() || '0'} Kz</p>
+                    {p.usdtAmount && (
+                      <p className="text-[10px] text-emerald-400 font-bold mt-0.5">🪙 {p.usdtAmount} USDT</p>
+                    )}
                   </td>
                   <td className="p-6">
                     <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border w-fit ${statusColors[p.status as keyof typeof statusColors] || ''}`}>

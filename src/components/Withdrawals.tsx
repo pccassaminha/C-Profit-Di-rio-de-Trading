@@ -59,11 +59,16 @@ export default function Withdrawals() {
     // --- WITHDRAWALS ---
     const withdrawalsQuery = query(
       collection(db, 'withdrawals'),
-      where('userId', '==', auth.currentUser.uid),
-      orderBy('date', 'desc')
+      where('userId', '==', auth.currentUser.uid)
     );
     unsubscribes.push(onSnapshot(withdrawalsQuery, (snapshot) => {
-      setWithdrawals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      list.sort((a: any, b: any) => {
+        const timeA = a.date?.seconds ? a.date.seconds * 1000 : new Date(a.date || 0).getTime();
+        const timeB = b.date?.seconds ? b.date.seconds * 1000 : new Date(b.date || 0).getTime();
+        return timeB - timeA;
+      });
+      setWithdrawals(list);
     }));
 
     return () => unsubscribes.forEach(unsub => unsub());
