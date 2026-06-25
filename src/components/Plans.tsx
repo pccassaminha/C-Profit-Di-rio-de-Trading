@@ -99,6 +99,8 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   });
   const [paymentMethod, setPaymentMethod] = useState<'iban' | 'multicaixa' | 'express' | 'kwik'>('iban');
   const [expressCode, setExpressCode] = useState('');
+  const [ibanCode, setIbanCode] = useState('');
+  const [kwikCode, setKwikCode] = useState('');
   const [activeCouponsList, setActiveCouponsList] = useState<any[]>([]);
   const [typedCoupon, setTypedCoupon] = useState('CPROFIT83%OFF');
   const [validationMsg, setValidationMsg] = useState<{ text: string, type: 'success' | 'error' } | null>({
@@ -461,6 +463,10 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
     const expressDetail = (paymentMethod === 'express' && expressCode) 
       ? `\n- Código da Transação: *${expressCode.trim()}*` 
+      : (paymentMethod === 'iban' && ibanCode)
+      ? `\n- Código da Transação: *${ibanCode.trim()}*`
+      : (paymentMethod === 'kwik' && kwikCode)
+      ? `\n- Código da Transação: *${kwikCode.trim()}*`
       : '';
 
     const priceInKz = targetPlan ? parsePriceToNumber(dynamicPrice) : 0;
@@ -500,6 +506,14 @@ Fico no aguardo, obrigado!`;
       alert('Por favor, insira o Código da Transação do Express.');
       return;
     }
+    if (paymentMethod === 'iban' && !ibanCode.trim()) {
+      alert('Por favor, insira o Código da Transação ou Operação do IBAN.');
+      return;
+    }
+    if (paymentMethod === 'kwik' && !kwikCode.trim()) {
+      alert('Por favor, insira o Código da Transação ou Operação do KWIK.');
+      return;
+    }
 
     // Smart duplicate prevention: check if there's already a pending payment request
     const pendingPayment = payments.find(p => p.status === 'pending');
@@ -528,7 +542,9 @@ Fico no aguardo, obrigado!`;
         proofUrl: 'WhatsApp Support',
         usedCoupon: appliedCoupon ? appliedCoupon.code : null,
         paymentMethod: paymentMethod,
-        expressCode: paymentMethod === 'express' ? expressCode.trim() : null,
+        expressCode: paymentMethod === 'express' ? expressCode.trim() :
+                     paymentMethod === 'iban' ? ibanCode.trim() :
+                     paymentMethod === 'kwik' ? kwikCode.trim() : null,
         usdtAmount: paymentMethod === 'multicaixa' ? Number(usdtConv.amount.toFixed(2)) : null,
         usdtRate: paymentMethod === 'multicaixa' ? usdtConv.rate : null,
         usdtNetworkFee: paymentMethod === 'multicaixa' ? usdtConv.networkFee : null,
@@ -1056,59 +1072,87 @@ Fico no aguardo, obrigado!`;
 
                     <div className="space-y-6">
                       {paymentMethod === 'kwik' && globalSettings?.showKwik !== false && (
-                        <div className="space-y-2 group cursor-pointer" onClick={() => {
-                          if (globalSettings?.kwikName) {
-                            navigator.clipboard.writeText(globalSettings.kwikName);
-                            alert('Chave KWIK copiada para a área de transferência!');
-                          }
-                        }}>
-                          <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
-                              <span className="text-xs">💸</span>
-                              Transferência por KWIK
-                            </label>
-                            <span className="text-[8px] font-black text-primary uppercase bg-primary/10 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Clicar para Copiar</span>
-                          </div>
-                          <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col text-center items-center justify-center">
-                            {globalSettings?.kwikKey && (
-                              <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
-                                Titular: <span className="text-on-surface">{globalSettings.kwikKey}</span>
+                        <div className="space-y-4 animate-in fade-in duration-200">
+                          <div className="space-y-2 group cursor-pointer" onClick={() => {
+                            if (globalSettings?.kwikName) {
+                              navigator.clipboard.writeText(globalSettings.kwikName);
+                              alert('Chave KWIK copiada para a área de transferência!');
+                            }
+                          }}>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+                                <span className="text-xs">💸</span>
+                                Transferência por KWIK
+                              </label>
+                              <span className="text-[8px] font-black text-primary uppercase bg-primary/10 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Clicar para Copiar</span>
+                            </div>
+                            <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col text-center items-center justify-center">
+                              {globalSettings?.kwikKey && (
+                                <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                                  Titular: <span className="text-on-surface">{globalSettings.kwikKey}</span>
+                                </span>
+                              )}
+                              <span className="text-base font-black text-primary font-mono tracking-tight whitespace-nowrap">{globalSettings?.kwikName || 'Chave não configurada'}</span>
+                              <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center justify-center gap-1.5 border-t border-outline-variant/10 pt-1.5 w-full">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>
+                                Kwik: <span className="text-on-surface font-semibold">Chave de Transferência Instantânea</span>
                               </span>
-                            )}
-                            <span className="text-base font-black text-primary font-mono tracking-tight whitespace-nowrap">{globalSettings?.kwikName || 'Chave não configurada'}</span>
-                            <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center justify-center gap-1.5 border-t border-outline-variant/10 pt-1.5 w-full">
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>
-                              Kwik: <span className="text-on-surface font-semibold">Chave de Transferência Instantânea</span>
-                            </span>
+                            </div>
+                          </div>
+
+                          {/* KWIK Operation/Transaction Code Input */}
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Inserir Código da Transação / Operação</label>
+                            <input 
+                              type="text" 
+                              value={kwikCode}
+                              onChange={(e) => setKwikCode(e.target.value)}
+                              placeholder="Ex: 08343843"
+                              className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all font-mono text-center"
+                            />
                           </div>
                         </div>
                       )}
 
                       {paymentMethod === 'iban' && globalSettings?.showIban && (
-                        <div className="space-y-2 group cursor-pointer" onClick={() => {
-                          navigator.clipboard.writeText(globalSettings.iban);
-                          alert('IBAN copiado para a área de transferência!');
-                        }}>
-                          <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
-                              <Landmark size={12} className="text-primary" />
-                              Transferência Bancária (IBAN)
-                            </label>
-                            <span className="text-[8px] font-black text-primary uppercase bg-primary/10 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Clicar para Copiar</span>
+                        <div className="space-y-4 animate-in fade-in duration-200">
+                          <div className="space-y-2 group cursor-pointer" onClick={() => {
+                            navigator.clipboard.writeText(globalSettings.iban);
+                            alert('IBAN copiado para a área de transferência!');
+                          }}>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+                                <Landmark size={12} className="text-primary" />
+                                Transferência Bancária (IBAN)
+                              </label>
+                              <span className="text-[8px] font-black text-primary uppercase bg-primary/10 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Clicar para Copiar</span>
+                            </div>
+                            <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col text-center items-center justify-center">
+                              {globalSettings?.ibanName && (
+                                <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                                  Titular: <span className="text-on-surface">{globalSettings.ibanName}</span>
+                                </span>
+                              )}
+                              <span className="text-xs min-[360px]:text-sm min-[440px]:text-base sm:text-lg md:text-xl font-black text-on-surface font-mono tracking-tighter whitespace-nowrap max-w-full block py-1 select-all">{globalSettings?.iban || 'A carregar...'}</span>
+                              {globalSettings?.ibanBank && (
+                                <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center justify-center gap-1.5 border-t border-outline-variant/10 pt-1.5 w-full">
+                                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>
+                                  Banco: <span className="text-on-surface font-semibold">{globalSettings.ibanBank}</span>
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 group-hover:border-primary/50 transition-all flex flex-col text-center items-center justify-center">
-                            {globalSettings?.ibanName && (
-                              <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
-                                Titular: <span className="text-on-surface">{globalSettings.ibanName}</span>
-                              </span>
-                            )}
-                            <span className="text-xs min-[360px]:text-sm min-[440px]:text-base sm:text-lg md:text-xl font-black text-on-surface font-mono tracking-tighter whitespace-nowrap max-w-full block py-1 select-all">{globalSettings?.iban || 'A carregar...'}</span>
-                            {globalSettings?.ibanBank && (
-                              <span className="text-[10px] text-on-surface-variant/80 font-medium font-sans mt-1.5 flex items-center justify-center gap-1.5 border-t border-outline-variant/10 pt-1.5 w-full">
-                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>
-                                Banco: <span className="text-on-surface font-semibold">{globalSettings.ibanBank}</span>
-                              </span>
-                            )}
+
+                          {/* IBAN Operation/Transaction Code Input */}
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Inserir Código da Transação / Operação</label>
+                            <input 
+                              type="text" 
+                              value={ibanCode}
+                              onChange={(e) => setIbanCode(e.target.value)}
+                              placeholder="Ex: 08343843"
+                              className="w-full bg-surface-container border border-outline-variant/20 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all font-mono text-center"
+                            />
                           </div>
                         </div>
                       )}

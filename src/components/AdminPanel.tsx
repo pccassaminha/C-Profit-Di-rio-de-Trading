@@ -1327,6 +1327,18 @@ export default function AdminPanel() {
                           <span className="text-xs text-on-surface font-mono font-bold">{p.expressCode}</span>
                         </div>
                       )}
+                      {p.paymentMethod === 'iban' && p.expressCode && (
+                        <div className="mt-1 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-xl w-fit">
+                          <span className="text-[9px] text-blue-400 font-black tracking-wider uppercase font-mono block">CÓDIGO IBAN</span>
+                          <span className="text-xs text-on-surface font-mono font-bold">{p.expressCode}</span>
+                        </div>
+                      )}
+                      {p.paymentMethod === 'kwik' && p.expressCode && (
+                        <div className="mt-1 bg-[#00f5a0]/10 border border-[#00f5a0]/20 px-2.5 py-1 rounded-xl w-fit">
+                          <span className="text-[9px] text-[#00f5a0] font-black tracking-wider uppercase font-mono block">CÓDIGO KWIK</span>
+                          <span className="text-xs text-on-surface font-mono font-bold">{p.expressCode}</span>
+                        </div>
+                      )}
                       {p.paymentMethod === 'multicaixa' && p.usdtAmount && (
                         <div className="mt-1 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-xl w-fit">
                           <span className="text-[9px] text-emerald-400 font-black tracking-wider uppercase font-mono block">QUANTIA USDT</span>
