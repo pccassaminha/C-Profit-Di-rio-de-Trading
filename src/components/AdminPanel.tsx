@@ -87,7 +87,10 @@ export default function AdminPanel() {
       showKwik: true,
       kwikKey: '',
       kwikName: '',
-      multicaixaLogoUrl: ''
+      multicaixaLogoUrl: '',
+      usdtQrCodeUrl: '',
+      usdtAddress: '',
+      usdtLegend: ''
     };
     return initialSettings ? { ...defaults, ...initialSettings } : defaults;
   });
@@ -110,6 +113,8 @@ export default function AdminPanel() {
       setShowDangerZone(false);
     }
   }, [activeTab]);
+
+  const [activePaymentTab, setActivePaymentTab] = useState<'iban' | 'usdt' | 'express' | 'kwik'>('iban');
 
   const [loading, setLoading] = useState(true);
 
@@ -1187,7 +1192,7 @@ export default function AdminPanel() {
                   <option value="express">Express</option>
                   <option value="iban">IBAN</option>
                   <option value="kwik">KWIK</option>
-                  <option value="mcx">MCX / Referência</option>
+                  <option value="mcx">USDT 🪙</option>
                 </select>
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
                    <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
@@ -1310,7 +1315,7 @@ export default function AdminPanel() {
                         Método: <span className="text-on-surface font-extrabold">{
                           p.paymentMethod === 'express' ? 'Express 📱' : 
                           p.paymentMethod === 'iban' ? 'IBAN 🏛️' : 
-                          p.paymentMethod === 'kwik' ? 'KWIK 💸' : 'MCX Referência 💳'
+                          p.paymentMethod === 'kwik' ? 'KWIK 💸' : 'USDT 🪙'
                         }</span>
                       </p>
                       {p.paymentMethod === 'express' && p.expressCode && (
@@ -1406,62 +1411,11 @@ export default function AdminPanel() {
             <p className="text-xs text-on-surface-variant mb-6"> Configure as opções de cobrança exibidas aos traders no momento do upgrade de plano.</p>
             
             <div className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface-container-low p-4 rounded-2xl border border-outline-variant/15">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="font-bold text-on-surface text-xs">Ativar IBAN</p>
-                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">Bancário</p>
-                  </div>
-                  <button 
-                    onClick={() => setSettings({ ...settings, showIban: !settings.showIban })}
-                    className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showIban ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
-                  >
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showIban ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="font-bold text-on-surface text-xs">Ativar MCX</p>
-                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">Referência</p>
-                  </div>
-                  <button 
-                    onClick={() => setSettings({ ...settings, showMulticaixa: !settings.showMulticaixa })}
-                    className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showMulticaixa ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
-                  >
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showMulticaixa ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="font-bold text-on-surface text-xs">Ativar Express</p>
-                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">Express 📱</p>
-                  </div>
-                  <button 
-                    onClick={() => setSettings({ ...settings, showExpress: settings.showExpress !== false ? false : true })}
-                    className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showExpress !== false ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
-                  >
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showExpress !== false ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="font-bold text-on-surface text-xs">Ativar KWIK</p>
-                    <p className="text-[9px] text-on-surface-variant uppercase tracking-tighter">KWIK 💸</p>
-                  </div>
-                  <button 
-                    onClick={() => setSettings({ ...settings, showKwik: settings.showKwik !== false ? false : true })}
-                    className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showKwik !== false ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
-                  >
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showKwik !== false ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">WhatsApp de Suporte</label>
+              {/* WhatsApp de Suporte - Sempre Visível */}
+              <div className="space-y-2 bg-surface-container-low/30 p-4 rounded-2xl border border-outline-variant/10">
+                <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono flex items-center gap-2">
+                  <span>💬</span> WhatsApp de Suporte Geral
+                </label>
                 <input 
                   type="text" 
                   value={settings.whatsappNumber || ''}
@@ -1471,117 +1425,281 @@ export default function AdminPanel() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Logo Multicaixa Express (URL)</label>
-                <div className="flex gap-4 items-center">
-                  <input 
-                    type="text" 
-                    value={settings.multicaixaLogoUrl || ''}
-                    onChange={(e) => setSettings({ ...settings, multicaixaLogoUrl: e.target.value })}
-                    className="flex-1 bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
-                    placeholder="https://..."
-                  />
-                  {settings.multicaixaLogoUrl && (
-                    <img src={settings.multicaixaLogoUrl} alt="Logo Preview" className="h-10 w-10 object-contain bg-white rounded-xl p-1 shrink-0 animate-in fade-in" />
+              {/* Navegação por Abas (Métodos de Pagamento) */}
+              <div className="flex border-b border-outline-variant/10 mb-4 gap-1 overflow-x-auto pb-1 scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setActivePaymentTab('iban')}
+                  className={`pb-3 px-4 text-xs font-black uppercase tracking-widest transition-all relative flex items-center gap-1.5 whitespace-nowrap ${
+                    activePaymentTab === 'iban'
+                      ? 'text-[#00f5a0]'
+                      : 'text-on-surface-variant hover:text-white'
+                  }`}
+                >
+                  <span>🏛️</span>
+                  <span>IBAN</span>
+                  {activePaymentTab === 'iban' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00f5a0] rounded-full" />
                   )}
-                </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePaymentTab('usdt')}
+                  className={`pb-3 px-4 text-xs font-black uppercase tracking-widest transition-all relative flex items-center gap-1.5 whitespace-nowrap ${
+                    activePaymentTab === 'usdt'
+                      ? 'text-[#00f5a0]'
+                      : 'text-on-surface-variant hover:text-white'
+                  }`}
+                >
+                  <span>🪙</span>
+                  <span>USDT</span>
+                  {activePaymentTab === 'usdt' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00f5a0] rounded-full" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePaymentTab('express')}
+                  className={`pb-3 px-4 text-xs font-black uppercase tracking-widest transition-all relative flex items-center gap-1.5 whitespace-nowrap ${
+                    activePaymentTab === 'express'
+                      ? 'text-[#00f5a0]'
+                      : 'text-on-surface-variant hover:text-white'
+                  }`}
+                >
+                  <span>📱</span>
+                  <span>Express</span>
+                  {activePaymentTab === 'express' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00f5a0] rounded-full" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePaymentTab('kwik')}
+                  className={`pb-3 px-4 text-xs font-black uppercase tracking-widest transition-all relative flex items-center gap-1.5 whitespace-nowrap ${
+                    activePaymentTab === 'kwik'
+                      ? 'text-[#00f5a0]'
+                      : 'text-on-surface-variant hover:text-white'
+                  }`}
+                >
+                  <span>💸</span>
+                  <span>KWIK</span>
+                  {activePaymentTab === 'kwik' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00f5a0] rounded-full" />
+                  )}
+                </button>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Telemóvel MCX Express (Destinatário)</label>
-                <input 
-                  type="text" 
-                  value={settings.expressNumber || ''}
-                  onChange={(e) => setSettings({ ...settings, expressNumber: e.target.value })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
-                  placeholder="Ex: 921167980"
-                />
-              </div>
+              {/* Painéis das Abas */}
+              <div className="min-h-[220px]">
+                {activePaymentTab === 'iban' && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl border border-outline-variant/15">
+                      <div>
+                        <p className="font-bold text-on-surface text-xs">Ativar IBAN Bancário</p>
+                        <p className="text-[10px] text-on-surface-variant">Habilitar transferências por IBAN como opção de upgrade</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setSettings({ ...settings, showIban: !settings.showIban })}
+                        className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showIban ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showIban ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
+                      </button>
+                    </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-1 md:col-span-2">
-                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">IBAN de Depósito</label>
-                  <input 
-                    type="text" 
-                    value={settings.iban || ''}
-                    onChange={(e) => setSettings({ ...settings, iban: e.target.value })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Titular da Conta (IBAN)</label>
-                  <input 
-                    type="text" 
-                    value={settings.ibanName || ''}
-                    onChange={(e) => setSettings({ ...settings, ibanName: e.target.value })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Nome do Banco (IBAN)</label>
-                  <input 
-                    type="text" 
-                    value={settings.ibanBank || ''}
-                    onChange={(e) => setSettings({ ...settings, ibanBank: e.target.value })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
-                    placeholder="Ex: BFA - Banco Fomento Angola"
-                  />
-                </div>
-              </div>
+                    {settings.showIban && (
+                      <div className="space-y-4 bg-surface-container-low/40 p-4 rounded-2xl border border-outline-variant/10">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">IBAN de Depósito</label>
+                          <input 
+                            type="text" 
+                            value={settings.iban || ''}
+                            onChange={(e) => setSettings({ ...settings, iban: e.target.value })}
+                            className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
+                            placeholder="AO06.0000.0000..."
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Titular da Conta (IBAN)</label>
+                            <input 
+                              type="text" 
+                              value={settings.ibanName || ''}
+                              onChange={(e) => setSettings({ ...settings, ibanName: e.target.value })}
+                              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                              placeholder="Nome do Titular"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Nome do Banco (IBAN)</label>
+                            <input 
+                              type="text" 
+                              value={settings.ibanBank || ''}
+                              onChange={(e) => setSettings({ ...settings, ibanBank: e.target.value })}
+                              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
+                              placeholder="Ex: BFA - Banco Fomento Angola"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Entidade MCX (Código)</label>
-                  <input 
-                    type="text" 
-                    value={settings.multicaixaEntity || ''}
-                    onChange={(e) => setSettings({ ...settings, multicaixaEntity: e.target.value })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Referência MCX</label>
-                  <input 
-                    type="text" 
-                    value={settings.multicaixaReference || ''}
-                    onChange={(e) => setSettings({ ...settings, multicaixaReference: e.target.value })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Nome do Beneficiário (Cobrador MCX)</label>
-                <input 
-                  type="text" 
-                  value={settings.multicaixaName || ''}
-                  onChange={(e) => setSettings({ ...settings, multicaixaName: e.target.value })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
-                  placeholder="Nome da Empresa / Negócio"
-                />
-              </div>
+                {activePaymentTab === 'usdt' && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl border border-outline-variant/15">
+                      <div>
+                        <p className="font-bold text-on-surface text-xs">Ativar USDT</p>
+                        <p className="text-[10px] text-on-surface-variant">Habilitar pagamentos em USDT como opção de upgrade</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setSettings({ ...settings, showMulticaixa: !settings.showMulticaixa })}
+                        className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showMulticaixa ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showMulticaixa ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
+                      </button>
+                    </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-outline-variant/10 pt-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Chave KWIK</label>
-                  <input 
-                    type="text" 
-                    value={settings.kwikName || ''}
-                    onChange={(e) => setSettings({ ...settings, kwikName: e.target.value })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
-                    placeholder="Ex: Nº de Telemóvel ou Chave KWIK"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Titular da Conta (KWIK)</label>
-                  <input 
-                    type="text" 
-                    value={settings.kwikKey || ''}
-                    onChange={(e) => setSettings({ ...settings, kwikKey: e.target.value })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
-                    placeholder="Ex: Nome Completo do Titular"
-                  />
-                </div>
+                    {settings.showMulticaixa && (
+                      <div className="space-y-4 bg-surface-container-low/40 p-4 rounded-2xl border border-outline-variant/10">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Link do QR Code da Carteira USDT (Imagem)</label>
+                          <div className="flex gap-4 items-center">
+                            <input 
+                              type="text" 
+                              value={settings.usdtQrCodeUrl || ''}
+                              onChange={(e) => setSettings({ ...settings, usdtQrCodeUrl: e.target.value })}
+                              className="flex-1 bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                              placeholder="Cole o link da imagem do QR Code aqui (ex: https://...)"
+                            />
+                            {settings.usdtQrCodeUrl && (
+                              <img src={settings.usdtQrCodeUrl} alt="QR Preview" className="h-12 w-12 object-contain bg-white rounded-xl p-1 shrink-0 animate-in fade-in" referrerPolicy="no-referrer" />
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Endereço USDT</label>
+                            <input 
+                              type="text" 
+                              value={settings.usdtAddress || ''}
+                              onChange={(e) => setSettings({ ...settings, usdtAddress: e.target.value })}
+                              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
+                              placeholder="Ex: T9yD14Nj9y7xXvGy..."
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Legenda / Rede (Ex: Rede TRC20)</label>
+                            <input 
+                              type="text" 
+                              value={settings.usdtLegend || ''}
+                              onChange={(e) => setSettings({ ...settings, usdtLegend: e.target.value })}
+                              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                              placeholder="Ex: Utilizar apenas a rede TRC20 para não haver engano"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activePaymentTab === 'express' && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl border border-outline-variant/15">
+                      <div>
+                        <p className="font-bold text-on-surface text-xs">Ativar Express</p>
+                        <p className="text-[10px] text-on-surface-variant">Habilitar recebimentos por Multicaixa Express</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setSettings({ ...settings, showExpress: settings.showExpress !== false ? false : true })}
+                        className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showExpress !== false ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showExpress !== false ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
+                      </button>
+                    </div>
+
+                    {settings.showExpress !== false && (
+                      <div className="space-y-4 bg-surface-container-low/40 p-4 rounded-2xl border border-outline-variant/10">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Telemóvel MCX Express (Destinatário)</label>
+                          <input 
+                            type="text" 
+                            value={settings.expressNumber || ''}
+                            onChange={(e) => setSettings({ ...settings, expressNumber: e.target.value })}
+                            className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                            placeholder="Ex: 921167980"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Logo Multicaixa Express (URL)</label>
+                          <div className="flex gap-4 items-center">
+                            <input 
+                              type="text" 
+                              value={settings.multicaixaLogoUrl || ''}
+                              onChange={(e) => setSettings({ ...settings, multicaixaLogoUrl: e.target.value })}
+                              className="flex-1 bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                              placeholder="https://..."
+                            />
+                            {settings.multicaixaLogoUrl && (
+                              <img src={settings.multicaixaLogoUrl} alt="Logo Preview" className="h-10 w-10 object-contain bg-white rounded-xl p-1 shrink-0 animate-in fade-in" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activePaymentTab === 'kwik' && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl border border-outline-variant/15">
+                      <div>
+                        <p className="font-bold text-on-surface text-xs">Ativar KWIK</p>
+                        <p className="text-[10px] text-on-surface-variant">Habilitar recebimentos por KWIK instantâneo</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setSettings({ ...settings, showKwik: settings.showKwik !== false ? false : true })}
+                        className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.showKwik !== false ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.showKwik !== false ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
+                      </button>
+                    </div>
+
+                    {settings.showKwik !== false && (
+                      <div className="space-y-4 bg-surface-container-low/40 p-4 rounded-2xl border border-outline-variant/10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Chave KWIK</label>
+                            <input 
+                              type="text" 
+                              value={settings.kwikName || ''}
+                              onChange={(e) => setSettings({ ...settings, kwikName: e.target.value })}
+                              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white font-mono"
+                              placeholder="Ex: Nº de Telemóvel ou Chave KWIK"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Titular da Conta (KWIK)</label>
+                            <input 
+                              type="text" 
+                              value={settings.kwikKey || ''}
+                              onChange={(e) => setSettings({ ...settings, kwikKey: e.target.value })}
+                              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                              placeholder="Ex: Nome Completo do Titular"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-4 pt-6 border-t border-outline-variant/10">
@@ -2492,7 +2610,7 @@ export default function AdminPanel() {
                             </td>
                             <td className="p-4 font-bold uppercase font-mono">{p.planId?.replace('_', ' ')}</td>
                             <td className="p-4 font-bold uppercase tracking-wider text-[10px]">
-                              {p.paymentMethod === 'express' ? 'Express 📱' : p.paymentMethod === 'iban' ? 'IBAN 🏛️' : p.paymentMethod === 'kwik' ? 'KWIK 💸' : 'MCX Ref 💳'}
+                              {p.paymentMethod === 'express' ? 'Express 📱' : p.paymentMethod === 'iban' ? 'IBAN 🏛️' : p.paymentMethod === 'kwik' ? 'KWIK 💸' : 'USDT 🪙'}
                             </td>
                             <td className="p-4 text-[10px] text-on-surface-variant">{new Date(p.createdAt || Date.now()).toLocaleDateString()}</td>
                             <td className="p-4 text-right font-black text-emerald-400 font-mono">{p.amount?.toLocaleString()} Kz</td>

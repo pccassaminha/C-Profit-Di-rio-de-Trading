@@ -10,6 +10,7 @@ import {
 import { auth, db } from '../firebase';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
+import CountryDropdown from './CountryDropdown';
 import { 
   TrendingUp, 
   Wallet, 
@@ -104,10 +105,10 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
 
   const BASE_PLANS = [
     { id: 'trial_30', name: 'Teste (30 Dias)', rawPrice: 500, defaultTag: 'Grátis c/ Convite', defaultPrice: '500 Kz', oldPrice: 500 },
-    { id: 'mensal_6', name: 'Plano Mensal', rawPrice: 5000, defaultTag: 'Básico', defaultPrice: '5.000 Kz', oldPrice: 7500 },
-    { id: 'trimestral_6', name: 'Trimestral', rawPrice: 15000, defaultTag: '-33% OFF', defaultPrice: '15.000 Kz', oldPrice: 22500 },
-    { id: 'semestral_8', name: 'Semestral', rawPrice: 30000, defaultTag: 'Best Choice', defaultPrice: '30.000 Kz', oldPrice: 45000 },
-    { id: 'anual_16', name: 'Anual', rawPrice: 60000, defaultTag: 'Premium', defaultPrice: '60.000 Kz', oldPrice: 90000 }
+    { id: 'mensal_6', name: 'Plano Mensal', rawPrice: 8824, defaultTag: 'Básico', defaultPrice: '8.824 Kz', oldPrice: 13236 },
+    { id: 'trimestral_6', name: 'Trimestral', rawPrice: 26472, defaultTag: '-33% OFF', defaultPrice: '26.472 Kz', oldPrice: 39708 },
+    { id: 'semestral_8', name: 'Semestral', rawPrice: 52944, defaultTag: 'Best Choice', defaultPrice: '52.944 Kz', oldPrice: 79416 },
+    { id: 'anual_16', name: 'Anual', rawPrice: 105882, defaultTag: 'Premium', defaultPrice: '105.882 Kz', oldPrice: 158823 }
   ];
 
   const REGISTRATION_PLANS = BASE_PLANS.map(plan => {
@@ -314,8 +315,17 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
       if (!couponSnap.empty) {
         const couponDoc = couponSnap.docs[0].data();
         if (couponDoc.active) {
-          setAppliedCoupon({ id: couponSnap.docs[0].id, ...couponDoc });
-          setCouponFeedback({ type: 'success', message: `Cupom ${couponDoc.discountValue}${couponDoc.discountType === 'percentage' ? '%' : 'Kz'} aplicado!` });
+          const is83Coupon = uppercaseCode === 'CPROFIT83%OFF';
+          const finalDiscountValue = is83Coupon ? 83 : couponDoc.discountValue;
+          setAppliedCoupon({ 
+            id: couponSnap.docs[0].id, 
+            ...couponDoc,
+            discountValue: finalDiscountValue
+          });
+          setCouponFeedback({ 
+            type: 'success', 
+            message: `Cupom ${finalDiscountValue}${couponDoc.discountType === 'percentage' ? '%' : 'Kz'} aplicado!` 
+          });
           return;
         } else {
           setCouponFeedback({ type: 'error', message: 'Cupom de desconto inativo.' });
@@ -449,7 +459,13 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
           if (!couponSnap.empty) {
             const couponDoc = couponSnap.docs[0].data();
             if (couponDoc.active) {
-              validCoupon = { id: couponSnap.docs[0].id, ...couponDoc };
+              const is83Coupon = uppercaseCode === 'CPROFIT83%OFF';
+              const finalDiscountValue = is83Coupon ? 83 : couponDoc.discountValue;
+              validCoupon = { 
+                id: couponSnap.docs[0].id, 
+                ...couponDoc,
+                discountValue: finalDiscountValue
+              };
             } else {
               console.warn('Cupom de desconto inativo.');
             }
@@ -707,18 +723,10 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
                   >
                     <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50 block">Número de Telefone</label>
                     <div className="flex gap-2">
-                      <div className="relative shrink-0">
-                        <select 
-                          value={phoneDialCode}
-                          onChange={(e) => setPhoneDialCode(e.target.value)}
-                          className="bg-surface-container border border-outline-variant/10 rounded-2xl pl-4 pr-9 py-4 text-xs font-black text-on-surface outline-none focus:border-primary transition-all appearance-none cursor-pointer h-full"
-                        >
-                          {COUNTRIES.map(c => (
-                            <option key={c.code} value={c.dialCode}>{c.flag} {c.label}</option>
-                          ))}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[8px]">▼</div>
-                      </div>
+                      <CountryDropdown 
+                        value={phoneDialCode}
+                        onChange={setPhoneDialCode}
+                      />
 
                       <div className="relative flex-1">
                         <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-40" size={18} />

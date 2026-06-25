@@ -62,7 +62,10 @@
         "multicaixaReference": { "type": "string" },
         "showIban": { "type": "boolean" },
         "showMulticaixa": { "type": "boolean" },
-        "multicaixaLogoUrl": { "type": "string" }
+        "multicaixaLogoUrl": { "type": "string" },
+        "usdtQrCodeUrl": { "type": "string" },
+        "usdtAddress": { "type": "string" },
+        "usdtLegend": { "type": "string" }
       }
     },
     "CommunityPost": {

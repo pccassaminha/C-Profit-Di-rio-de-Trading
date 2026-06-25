@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 import Modal from './Modal';
+import CountryDropdown from './CountryDropdown';
 import { db, auth, registerPartnerAuth } from '../firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs, getDoc, addDoc } from 'firebase/firestore';
 import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle } from 'lucide-react';
@@ -1135,18 +1136,11 @@ export default function Settings() {
                      <div className="space-y-2">
                       <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Telemóvel (WhatsApp)</label>
                       <div className="flex gap-2">
-                        <div className="relative shrink-0 text-white">
-                          <select 
-                            value={billingDialCode}
-                            onChange={(e) => handleBillingDialChange(e.target.value)}
-                            className="bg-surface-container border border-outline-variant/20 rounded-lg px-3 py-3 text-sm font-black text-on-surface outline-none focus:border-primary transition-colors appearance-none pr-8 cursor-pointer h-full"
-                          >
-                            {COUNTRIES.map(c => (
-                              <option key={c.code} value={c.dialCode}>{c.flag} {c.label}</option>
-                            ))}
-                          </select>
-                          <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[8px]">▼</div>
-                        </div>
+                        <CountryDropdown 
+                          value={billingDialCode}
+                          onChange={handleBillingDialChange}
+                          buttonClassName="bg-surface-container border border-outline-variant/20 rounded-lg px-3 py-3 text-sm font-black text-on-surface outline-none focus:border-primary transition-colors hover:bg-surface-container/80 h-full select-none"
+                        />
 
                         <input 
                           type="text"

@@ -261,15 +261,19 @@ export default function Payments() {
                             </div>
                           )}
                           {globalSettings?.showMulticaixa && (
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="bg-white p-3 rounded-xl border border-slate-200">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Entidade</p>
-                                <p className="text-lg font-black text-slate-900 font-mono">{globalSettings?.multicaixaEntity}</p>
-                              </div>
-                              <div className="bg-white p-3 rounded-xl border border-slate-200">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Referência</p>
-                                <p className="text-lg font-black text-slate-900 font-mono">{globalSettings?.multicaixaReference}</p>
-                              </div>
+                            <div className="space-y-2">
+                              {globalSettings?.usdtAddress && (
+                                <div className="bg-white p-3 rounded-xl border border-slate-200">
+                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Carteira USDT</p>
+                                  <p className="text-xs font-black text-slate-900 font-mono break-all select-all">{globalSettings?.usdtAddress}</p>
+                                </div>
+                              )}
+                              {globalSettings?.usdtLegend && (
+                                <div className="bg-amber-500/5 border border-amber-500/20 p-2 rounded-xl text-center">
+                                  <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest block mb-0.5">Rede / Instruções</span>
+                                  <p className="text-[10px] text-slate-700 font-bold leading-tight">{globalSettings?.usdtLegend}</p>
+                                </div>
+                              )}
                             </div>
                           )}
                           {globalSettings?.showKwik && (

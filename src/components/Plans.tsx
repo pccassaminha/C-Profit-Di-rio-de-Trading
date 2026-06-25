@@ -4,6 +4,7 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, getDocs, getDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { CreditCard, Check, ShieldCheck, Zap, Star, LayoutGrid, Smartphone, MessageSquare, History, Upload, Landmark, X, FileText } from 'lucide-react';
 import Modal from './Modal';
+import CountryDropdown from './CountryDropdown';
 
 // Helper to parse price string containing dots, commas, spaces, etc. into a Number
 const parsePriceToNumber = (val: string | number): number => {
@@ -159,10 +160,16 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
           return;
         }
         
-        const cp = { id: snap.docs[0].id, ...couponDoc };
+        const is83Coupon = cleanCode === 'CPROFIT83%OFF';
+        const finalDiscountValue = is83Coupon ? 83 : couponDoc.discountValue;
+        const cp = { 
+          id: snap.docs[0].id, 
+          ...couponDoc,
+          discountValue: finalDiscountValue
+        };
         setAppliedCoupon(cp);
         
-        const successMsg = `Cupom "${cleanCode}" de ${couponDoc.discountValue}${couponDoc.discountType === 'percentage' ? '%' : ' Kz'} aplicado com sucesso!`;
+        const successMsg = `Cupom "${cleanCode}" de ${finalDiscountValue}${couponDoc.discountType === 'percentage' ? '%' : ' Kz'} aplicado com sucesso!`;
         if (isFromModal) setModalCouponSuccessMsg(successMsg);
         else setValidationMsg({ text: successMsg, type: 'success' });
         return;
@@ -274,10 +281,10 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     {
       id: 'mensal_6',
       name: 'Plano Mensal',
-      oldPrice: '7.500',
+      oldPrice: '13.236',
       discount: '-33% OFF',
-      savingsText: 'Poupa Kz 2.500 / mês',
-      price: '5.000',
+      savingsText: 'Poupa Kz 4.412 / mês',
+      price: '8.824',
       period: 'por mês',
       days: 30,
       limits: '6 Contas Forex + 6 Contas OB',
@@ -288,10 +295,10 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     {
       id: 'trimestral_6',
       name: 'Plano Trimestral',
-      oldPrice: '22.500',
+      oldPrice: '39.708',
       discount: '-33% OFF',
-      savingsText: 'Poupa Kz 7.500 no trimestre',
-      price: '15.000',
+      savingsText: 'Poupa Kz 13.236 no trimestre',
+      price: '26.472',
       period: 'a cada 3 meses',
       days: 90,
       limits: '6 Contas Forex + 6 Contas OB',
@@ -302,10 +309,10 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     {
       id: 'semestral_8',
       name: 'Plano Semestral',
-      oldPrice: '45.000',
+      oldPrice: '79.416',
       discount: '-33% OFF',
-      savingsText: 'Poupa Kz 15.000 no semestre',
-      price: '30.000',
+      savingsText: 'Poupa Kz 26.472 no semestre',
+      price: '52.944',
       period: 'a cada 6 meses',
       days: 180,
       limits: '8 Contas Forex + 8 Contas OB',
@@ -317,10 +324,10 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     {
       id: 'anual_16',
       name: 'Plano Anual',
-      oldPrice: '90.000',
+      oldPrice: '158.823',
       discount: '-33% OFF',
-      savingsText: 'Poupa Kz 30.000 no ano',
-      price: '60.000',
+      savingsText: 'Poupa Kz 52.941 no ano',
+      price: '105.882',
       period: 'por ano',
       days: 365,
       limits: '16 Contas Forex + 16 Contas OB',
@@ -396,7 +403,37 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
   const handleSupport = () => {
     const phone = getFormattedPhone(globalSettings?.whatsappNumber);
-    window.open(`https://wa.me/${phone}`, '_blank');
+    
+    // Build custom message
+    const targetPlan = showPaymentModal ? (plans.find(p => p.id === showPaymentModal.id) || showPaymentModal) : null;
+    const planName = targetPlan ? targetPlan.name : 'Plano';
+    const dynamicPrice = targetPlan ? getDiscountedPrice(targetPlan) : '';
+    
+    let methodDisplay = 'Transferência/Depósito';
+    if (paymentMethod === 'iban') methodDisplay = 'IBAN Bancário';
+    else if (paymentMethod === 'multicaixa') methodDisplay = 'USDT 🪙';
+    else if (paymentMethod === 'express') methodDisplay = 'Multicaixa Express';
+    else if (paymentMethod === 'kwik') methodDisplay = 'KWIK';
+
+    const expressDetail = (paymentMethod === 'express' && expressCode) 
+      ? `\n- Código da Transação: *${expressCode.trim()}*` 
+      : '';
+
+    const text = `Olá Maestro! Meu nome é *${payerName || 'Cliente'}*.
+
+Acabei de solicitar a assinatura do plano *${planName}* (Valor: ${dynamicPrice} Kz) através de *${methodDisplay}*.${expressDetail}
+
+*Meus Dados de Cadastro:*
+- Nome: ${payerName || 'Não especificado'}
+- Email da Conta: ${auth.currentUser?.email || 'Não especificado'}
+- Telemóvel: ${payerPhone || 'Não especificado'}
+
+Estou a enviar em anexo a esta mensagem o meu comprovativo de pagamento. Poderia, por favor, validar e ativar a minha conta para começarmos?
+
+Fico no aguardo, obrigado!`;
+
+    const encodedText = encodeURIComponent(text);
+    window.open(`https://wa.me/${phone}?text=${encodedText}`, '_blank');
   };
 
   const handleRequestPayment = async () => {
@@ -734,7 +771,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       {/* Modal de Pagamento */}
       {showPaymentModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/95 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-surface-container border border-outline-variant/30 rounded-[40px] max-w-lg w-full p-8 md:p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] relative max-h-[92vh] overflow-y-auto custom-scrollbar">
+          <div className="bg-surface-container border border-outline-variant/30 rounded-[40px] max-w-2xl w-full p-8 md:p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] relative max-h-[92vh] overflow-y-auto custom-scrollbar">
             <button 
               onClick={handleCloseModal}
               className="absolute top-8 right-8 text-on-surface-variant hover:text-on-surface transition-colors z-10"
@@ -744,12 +781,26 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
             {!paymentSubmitted ? (
               <>
-                <div className="text-center mb-10">
-                  <div className="w-20 h-20 bg-primary text-on-primary rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/20">
+                <div className="text-center mb-8">
+                  <div className="w-20 h-20 bg-primary text-on-primary rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
                     <CreditCard size={40} />
                   </div>
                   <h3 className="text-3xl font-black text-on-surface mb-2 font-headline uppercase italic tracking-tighter">Dados de <span className="text-primary italic">Pagamento</span></h3>
-                  <p className="text-on-surface-variant text-sm px-4">Utilize as informações oficiais abaixo para efetuar a transferência.</p>
+                  
+                  {/* Nome do Plano Destacado */}
+                  {(() => {
+                    const targetPlan = plans.find(p => p.id === showPaymentModal.id) || showPaymentModal;
+                    return (
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 border border-primary/20 rounded-full mb-3 animate-pulse">
+                        <span className="w-2 h-2 bg-[#00f5a0] rounded-full"></span>
+                        <span className="text-xs font-black uppercase tracking-wider text-white">
+                          Plano Selecionado: <span className="text-[#00f5a0]">{targetPlan.name}</span>
+                        </span>
+                      </div>
+                    );
+                  })()}
+                  
+                  <p className="text-on-surface-variant text-xs px-4 max-w-md mx-auto">Utilize as informações oficiais abaixo para efetuar a transferência.</p>
                 </div>
 
                 <div className="space-y-6 mb-10">
@@ -770,18 +821,10 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Telemóvel (WhatsApp)</label>
                         <div className="flex gap-2">
-                          <div className="relative shrink-0">
-                            <select 
-                              value={payerDialCode}
-                              onChange={(e) => handlePayerDialChange(e.target.value)}
-                              className="bg-surface-container border border-outline-variant/10 rounded-2xl pl-4 pr-9 py-4 text-xs font-black text-on-surface outline-none focus:border-primary transition-all appearance-none cursor-pointer h-full"
-                            >
-                              {COUNTRIES.map(c => (
-                                <option key={c.code} value={c.dialCode}>{c.flag} {c.label}</option>
-                              ))}
-                            </select>
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[8px]">▼</div>
-                          </div>
+                          <CountryDropdown 
+                            value={payerDialCode}
+                            onChange={handlePayerDialChange}
+                          />
 
                           <input 
                             type="text" 
@@ -938,8 +981,8 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                             onClick={() => setPaymentMethod('multicaixa')}
                             className={`flex-1 flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'multicaixa' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
                           >
-                            <Smartphone size={14} />
-                            <span className="text-[9px] font-black uppercase tracking-tight">Referência</span>
+                            <span className="text-xs">🪙</span>
+                            <span className="text-[9px] font-black uppercase tracking-tight">USDT</span>
                           </button>
                         )}
                         {globalSettings?.showKwik !== false && (
@@ -1015,32 +1058,57 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                       )}
 
                       {paymentMethod === 'multicaixa' && globalSettings?.showMulticaixa && (
-                        <div className="space-y-4 pt-4 border-t border-outline-variant/10">
+                        <div className="space-y-4 pt-4 border-t border-outline-variant/10 animate-in fade-in duration-200">
                           <div className="flex items-center justify-between">
                             <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
-                              <Smartphone size={12} className="text-secondary" />
-                              Pagamento por Referência (MCX)
+                              <span className="text-xs">🪙</span>
+                              Pagamento via USDT
                             </label>
-                            {globalSettings?.multicaixaLogoUrl && (
-                               <img src={globalSettings?.multicaixaLogoUrl} alt="Multicaixa Logo" className="h-8 object-contain bg-white rounded-md p-1 opacity-80" />
-                            )}
                           </div>
-                          {globalSettings?.multicaixaName && (
-                            <div className="px-5 py-3 bg-secondary/10 border border-secondary/20 rounded-xl mb-4">
-                               <span className="text-[10px] font-black text-secondary uppercase tracking-widest block mb-1">Beneficiário</span>
-                               <span className="font-bold text-on-surface">{globalSettings.multicaixaName}</span>
+
+                          {/* QR Code Section */}
+                          {globalSettings?.usdtQrCodeUrl && (
+                            <div className="flex flex-col items-center justify-center p-4 bg-white/5 border border-outline-variant/10 rounded-2xl">
+                              <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest mb-2 opacity-60">Escaneie o QR Code</span>
+                              <img 
+                                src={globalSettings.usdtQrCodeUrl} 
+                                alt="USDT Wallet QR" 
+                                className="w-48 h-48 object-contain bg-white rounded-xl p-2 shadow-inner border border-slate-200"
+                                referrerPolicy="no-referrer"
+                              />
                             </div>
                           )}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 flex flex-col gap-1">
-                              <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest opacity-60">Entidade</span>
-                              <span className="text-2xl font-black text-on-surface font-mono">{globalSettings?.multicaixaEntity}</span>
+
+                          {/* Address Section */}
+                          {globalSettings?.usdtAddress && (
+                            <div className="p-4 bg-surface-container/50 rounded-2xl border border-outline-variant/10 flex flex-col gap-2 relative group">
+                              <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest opacity-60">Endereço de Carteira USDT</span>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-bold text-on-surface font-mono break-all select-all tracking-tight pr-16">
+                                  {globalSettings.usdtAddress}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(globalSettings.usdtAddress);
+                                    alert('Endereço USDT copiado!');
+                                  }}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold rounded-xl transition-all shadow-md"
+                                  title="Copiar Endereço"
+                                >
+                                  Copiar
+                                </button>
+                              </div>
                             </div>
-                            <div className="p-5 bg-surface-container/50 rounded-2xl border border-outline-variant/10 flex flex-col gap-1">
-                              <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest opacity-60">Referência</span>
-                              <span className="text-xl md:text-2xl font-black text-on-surface font-mono">{globalSettings?.multicaixaReference}</span>
+                          )}
+
+                          {/* Legend / Network Warning Section */}
+                          {globalSettings?.usdtLegend && (
+                            <div className="px-5 py-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-center">
+                              <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest block mb-1">REDE / INSTRUÇÕES</span>
+                              <p className="text-xs text-on-surface font-bold leading-relaxed">{globalSettings.usdtLegend}</p>
                             </div>
-                          </div>
+                          )}
                         </div>
                       )}
 
@@ -1116,7 +1184,19 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
                 <div className="w-24 h-24 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
                   <Check size={48} className="animate-in slide-in-from-bottom-4" />
                 </div>
-                <h3 className="text-3xl font-black text-on-surface mb-4 font-headline uppercase italic tracking-tighter">Quase <span className="text-emerald-500 italic">Lá!</span></h3>
+                <h3 className="text-3xl font-black text-on-surface mb-2 font-headline uppercase italic tracking-tighter">Quase <span className="text-emerald-500 italic">Lá!</span></h3>
+                
+                {(() => {
+                  const targetPlan = plans.find(p => p.id === showPaymentModal.id) || showPaymentModal;
+                  return (
+                    <div className="inline-block px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-6">
+                      <p className="text-xs font-black uppercase tracking-wider text-[#00f5a0]">
+                        Plano: {targetPlan.name}
+                      </p>
+                    </div>
+                  );
+                })()}
+
                 <p className="text-on-surface-variant text-sm mb-10 px-6 leading-relaxed">
                   Recebemos a sua notificação. Agora, clique no botão abaixo para nos enviar o seu <span className="font-black text-on-surface group">comprovativo via WhatsApp</span> para ativação imediata do seu plano.
                 </p>

@@ -11,6 +11,7 @@ import {
   Edit3, Mail, User, Home, Smartphone, KeyRound, Image as ImageIcon, Plus, ShieldCheck, HelpCircle, MoreVertical, Globe
 } from 'lucide-react';
 import Modal from './Modal';
+import CountryDropdown from './CountryDropdown';
 
 const compressImageToBase64 = (file: File, maxWidth = 300, maxHeight = 300, quality = 0.7): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -1125,18 +1126,11 @@ export default function Profile() {
                     </label>
                   </div>
                   <div className="flex gap-2">
-                    <div className="relative shrink-0">
-                      <select 
-                        value={profileDialCode}
-                        onChange={(e) => handleProfileDialChange(e.target.value)}
-                        className="bg-surface-container border border-outline-variant/20 rounded-xl px-3 py-2 text-xs font-black text-on-surface outline-none focus:border-primary transition-all appearance-none cursor-pointer pr-7 max-h-10"
-                      >
-                        {COUNTRIES.map(c => (
-                          <option key={c.code} value={c.dialCode}>{c.flag} {c.label}</option>
-                        ))}
-                      </select>
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[8px]">▼</div>
-                    </div>
+                    <CountryDropdown 
+                      value={profileDialCode}
+                      onChange={handleProfileDialChange}
+                      buttonClassName="bg-surface-container border border-outline-variant/20 rounded-xl px-3 py-2 text-xs font-black text-on-surface outline-none focus:border-primary transition-all hover:bg-surface-container/80 h-full select-none max-h-10"
+                    />
 
                     <input 
                       type="tel" 

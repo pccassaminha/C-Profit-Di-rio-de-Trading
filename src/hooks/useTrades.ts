@@ -38,7 +38,10 @@ export const useTrades = (manualTrades: any[] = []) => {
       showKwik: true,
       kwikKey: '',
       kwikName: '',
-      multicaixaLogoUrl: 'https://i.ibb.co/vz6W1fN/mcx-logo.png'
+      multicaixaLogoUrl: 'https://i.ibb.co/vz6W1fN/mcx-logo.png',
+      usdtQrCodeUrl: '',
+      usdtAddress: '',
+      usdtLegend: ''
     };
 
     // Subscrição em tempo real aos dados do utilizador ('usuarios')
