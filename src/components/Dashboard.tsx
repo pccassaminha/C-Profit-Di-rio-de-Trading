@@ -1281,11 +1281,11 @@ export default function Dashboard() {
             <select 
               value={tradeTypeFilter}
               onChange={(e) => setTradeTypeFilter(e.target.value as any)}
-              className="w-full bg-surface-container-low border border-outline-variant/20 text-on-surface pl-6 pr-12 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold outline-none appearance-none cursor-pointer"
+              className="w-full bg-[#0f1b30] border border-outline-variant/20 text-[#f0f4ff] pl-6 pr-12 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold outline-none appearance-none cursor-pointer"
             >
-              {showForexFilter && showObFilter && <option value="all">Soma (Todas)</option>}
-              {showForexFilter && <option value="forex">Forex & Índices</option>}
-              {showObFilter && <option value="ob">Opções Binárias</option>}
+              {showForexFilter && showObFilter && <option className="bg-[#0f1b30] text-[#f0f4ff]" value="all">Soma (Todas)</option>}
+              {showForexFilter && <option className="bg-[#0f1b30] text-[#f0f4ff]" value="forex">Forex & Índices</option>}
+              {showObFilter && <option className="bg-[#0f1b30] text-[#f0f4ff]" value="ob">Opções Binárias</option>}
             </select>
             <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface text-lg pointer-events-none">expand_more</span>
           </div>
@@ -1293,9 +1293,9 @@ export default function Dashboard() {
             <select 
               value={selectedAccount}
               onChange={(e) => setSelectedAccount(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant/20 text-on-surface pl-6 pr-12 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold outline-none appearance-none cursor-pointer"
+              className="w-full bg-[#0f1b30] border border-outline-variant/20 text-[#f0f4ff] pl-6 pr-12 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold outline-none appearance-none cursor-pointer"
             >
-              <option value="all">Todas as Contas (Soma)</option>
+              <option className="bg-[#0f1b30] text-[#f0f4ff]" value="all">Todas as Contas (Soma)</option>
               {accounts.filter(acc => {
                 if (acc.status === 'inactive') return false;
                 const tt = acc.tradeType || 'forex';
@@ -1304,7 +1304,7 @@ export default function Dashboard() {
                 if (tradeTypeFilter !== 'all' && tt !== tradeTypeFilter) return false;
                 return true;
               }).map(acc => (
-                <option key={acc.id} value={acc.id}>
+                <option className="bg-[#0f1b30] text-[#f0f4ff]" key={acc.id} value={acc.id}>
                   Conta {acc.accountNumber} - {acc.accountType}
                 </option>
               ))}
