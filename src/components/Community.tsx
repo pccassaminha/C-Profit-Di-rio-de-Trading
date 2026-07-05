@@ -123,6 +123,8 @@ export default function Community() {
     );
     const unsubIncoming = onSnapshot(qIncoming, snap => {
       setIncomingRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.warn('[Community] Failed to listen to incoming requests:', err);
     });
 
     const qOutgoing = query(
@@ -131,6 +133,8 @@ export default function Community() {
     );
     const unsubOutgoing = onSnapshot(qOutgoing, snap => {
       setOutgoingRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.warn('[Community] Failed to listen to outgoing requests:', err);
     });
 
     return () => {
@@ -163,6 +167,8 @@ export default function Community() {
           }
         }
       }
+    }, (err) => {
+      console.warn('[Community] Failed to listen to accepted requests sync:', err);
     });
     return () => unsub();
   }, [friendsList]);
@@ -171,12 +177,18 @@ export default function Community() {
     if (!auth.currentUser) return;
     const unsub = onSnapshot(query(collection(db, 'users', auth.currentUser.uid, 'blocks')), snap => {
       setBlockedUsers(snap.docs.map(d => d.id));
+    }, (err) => {
+      console.warn('[Community] Failed to listen to blocks:', err);
     });
     const unsubFriends = onSnapshot(collection(db, 'users', auth.currentUser.uid, 'friends'), snap => {
       setFriendsList(snap.docs.map(d => d.id));
+    }, (err) => {
+      console.warn('[Community] Failed to listen to friends:', err);
     });
     const unsubDistancing = onSnapshot(collection(db, 'users', auth.currentUser.uid, 'distancing'), snap => {
       setDistancedList(snap.docs.map(d => d.id));
+    }, (err) => {
+      console.warn('[Community] Failed to listen to distancing:', err);
     });
     return () => {
       unsub();
@@ -186,13 +198,18 @@ export default function Community() {
   }, []);
 
   useEffect(() => {
+    if (!auth.currentUser) return;
     const unsubAll = onSnapshot(collection(db, 'usuarios'), (snap) => {
       setAllCommunityUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.warn('[Community] Failed to listen to usuarios:', err);
     });
     const unsubGlobalSettings = onSnapshot(doc(db, 'settings', 'global'), (snap) => {
       if (snap.exists()) {
         setGlobalSettings(snap.data());
       }
+    }, (err) => {
+      console.warn('[Community] Failed to listen to global settings:', err);
     });
     return () => {
       unsubAll();
@@ -320,10 +337,14 @@ export default function Community() {
       setProfileFollowersCount(snap.size);
       const isMeFollowing = snap.docs.some(d => d.id === auth.currentUser?.uid);
       setProfileIsFollowing(isMeFollowing);
+    }, (err) => {
+      console.warn('[Community] Failed to listen to followers:', err);
     });
 
     const unsubFollowing = onSnapshot(collection(db, 'usuarios', selectedProfileUser.id, 'following'), (snap) => {
       setProfileFollowingCount(snap.size);
+    }, (err) => {
+      console.warn('[Community] Failed to listen to following:', err);
     });
 
     return () => {
@@ -372,11 +393,15 @@ export default function Community() {
         userLiked: false // We'll check this per user if needed
       } as Post));
       setPosts(postsData);
+    }, (err) => {
+      console.warn('[Community] Failed to listen to posts:', err);
     });
 
     const bQ = query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'));
     const unsubB = onSnapshot(bQ, (snapshot) => {
       setBroadcasts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.warn('[Community] Failed to listen to broadcasts:', err);
     });
 
     return () => {
@@ -498,6 +523,8 @@ export default function Community() {
     const q = query(collection(db, 'community_posts', postId, 'comments'), orderBy('createdAt', 'asc'));
     onSnapshot(q, (snapshot) => {
       setComments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.warn('[Community] Failed to listen to comments in loadComments:', err);
     });
   };
 

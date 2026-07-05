@@ -80,8 +80,11 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
 
   // Listen for all user profiles from 'usuarios' collection
   useEffect(() => {
+    if (!auth.currentUser) return;
     const unsub = onSnapshot(collection(db, 'usuarios'), (snap) => {
       setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.warn('[GlobalChatWidget] Failed to listen to usuarios:', err);
     });
     return unsub;
   }, []);
@@ -160,6 +163,8 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     );
     const unsub = onSnapshot(q, (snap) => {
       setPendingInvites(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.warn('[GlobalChatWidget] Failed to listen to room invites:', err);
     });
     return unsub;
   }, []);
@@ -172,6 +177,8 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     const blocksQ = query(collection(db, 'users', uid, 'blocks'));
     const unsubBlocks = onSnapshot(blocksQ, snap => {
       setBlockedUsers(snap.docs.map(d => d.id));
+    }, (err) => {
+      console.warn('[GlobalChatWidget] Failed to listen to blocks:', err);
     });
 
     // Load chats where user is participant
@@ -270,6 +277,8 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     const unsub = onSnapshot(q, snap => {
       setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    }, (err) => {
+      console.warn('[GlobalChatWidget] Failed to listen to messages:', err);
     });
 
     if (auth.currentUser) {

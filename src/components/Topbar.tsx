@@ -40,8 +40,12 @@ export default function Topbar({
             if (altData.photoURL) setDbPhoto(altData.photoURL);
             if (altData.nome) setDbName(altData.nome);
           }
+        }, (err) => {
+          console.warn('[Topbar] Failed to listen to users document:', err);
         });
       }
+    }, (err) => {
+      console.warn('[Topbar] Failed to listen to usuarios document:', err);
     });
     
     return () => unsub();
@@ -141,6 +145,7 @@ export default function Topbar({
 
   // Subscribe to real-time broadcasts
   useEffect(() => {
+    if (!currentUser) return;
     const bQ = query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(bQ, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -153,7 +158,7 @@ export default function Topbar({
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]);
 
   // Subscribe to real-time chat unreads
   useEffect(() => {
@@ -178,6 +183,8 @@ export default function Topbar({
         }
       });
       setChatUnreads(unreads);
+    }, (error) => {
+      console.warn('[Topbar] Failed to listen to chat unreads:', error);
     });
     return () => unsub();
   }, [currentUser]);
