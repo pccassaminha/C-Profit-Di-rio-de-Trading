@@ -151,16 +151,22 @@ export default function Panorama() {
   };
 
   // Technical Analysis selector state
-  const [technicalSymbol, setTechnicalSymbol] = useState<'FX:EURUSD' | 'OANDA:XAUUSD' | 'BINANCE:BTCUSD'>('FX:EURUSD');
+  const [technicalSymbol, setTechnicalSymbol] = useState<string>('FX:EURUSD');
   
   // Unified heatmap selector state
-  const [activeHeatmap, setActiveHeatmap] = useState<'nasdaq' | 'djca' | 'forex' | 'crypto'>('forex');
+  const [activeHeatmap, setActiveHeatmap] = useState<'sp500' | 'nasdaq' | 'djca' | 'forex' | 'crypto'>('sp500');
 
   // Technical symbols constant
   const technicalSymbols = [
-    { id: 'FX:EURUSD', label: 'EUR/USD (Euro)' },
-    { id: 'OANDA:XAUUSD', label: 'Ouro (XAU/USD)' },
-    { id: 'BINANCE:BTCUSD', label: 'Bitcoin (BTC/USD)' },
+    { id: 'FX:EURUSD', label: 'EUR/USD' },
+    { id: 'FX:USDJPY', label: 'USD/JPY' },
+    { id: 'FX:GBPUSD', label: 'GBP/USD' },
+    { id: 'FX:USDCHF', label: 'USD/CHF' },
+    { id: 'FX:AUDUSD', label: 'AUD/USD' },
+    { id: 'FX:USDCAD', label: 'USD/CAD' },
+    { id: 'FX:NZDUSD', label: 'NZD/USD' },
+    { id: 'OANDA:XAUUSD', label: 'XAU/USD' },
+    { id: 'BINANCE:BTCUSD', label: 'BTC/USD' },
   ] as const;
 
   // Widget config definitions
@@ -192,6 +198,24 @@ export default function Panorama() {
     colorTheme: "dark",
     hasTopBar: false,
     isDataSetEnabled: false,
+    isZoomEnabled: true,
+    hasSymbolTooltip: true,
+    isMonoSize: false,
+    width: "100%",
+    height: "100%"
+  };
+
+  const sp500HeatmapConfig = {
+    dataSource: "SPX500",
+    blockSize: "market_cap_basic",
+    blockColor: "change",
+    grouping: "sector",
+    locale: "br",
+    symbolUrl: "",
+    colorTheme: "dark",
+    exchanges: [],
+    hasTopBar: true,
+    isDataSetEnabled: true,
     isZoomEnabled: true,
     hasSymbolTooltip: true,
     isMonoSize: false,
@@ -300,8 +324,13 @@ export default function Panorama() {
     colorTheme: 'dark'
   });
 
-  const getHeatmapProps = (type: 'nasdaq' | 'djca' | 'forex' | 'crypto') => {
+  const getHeatmapProps = (type: 'sp500' | 'nasdaq' | 'djca' | 'forex' | 'crypto') => {
     switch (type) {
+      case 'sp500':
+        return {
+          widgetType: 'stock-heatmap' as const,
+          config: sp500HeatmapConfig
+        };
       case 'nasdaq':
         return {
           widgetType: 'stock-heatmap' as const,
@@ -510,6 +539,16 @@ export default function Panorama() {
               {/* Switcher Toggles */}
               <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
                 <button
+                  onClick={() => setActiveHeatmap('sp500')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
+                    activeHeatmap === 'sp500'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  S&P 500
+                </button>
+                <button
                   onClick={() => setActiveHeatmap('forex')}
                   className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
                     activeHeatmap === 'forex'
@@ -674,6 +713,16 @@ export default function Panorama() {
                   
                   {/* Heatmap Type Toggle */}
                   <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
+                    <button
+                      onClick={() => setActiveHeatmap('sp500')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        activeHeatmap === 'sp500'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      S&P 500
+                    </button>
                     <button
                       onClick={() => setActiveHeatmap('forex')}
                       className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
