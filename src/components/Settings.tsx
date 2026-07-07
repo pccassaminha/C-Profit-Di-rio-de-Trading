@@ -54,6 +54,7 @@ export default function Settings() {
   const { currency, setCurrency } = useCurrency();
   const [isLoaded, setIsLoaded] = useState(false);
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
+  const [enableSmartSessions, setEnableSmartSessions] = useState(() => localStorage.getItem('app_enableSmartSessions') === 'true');
   const [sessionType, setSessionType] = useState<'simple' | 'subdivided'>('subdivided');
   const [defaultTradeType, setDefaultTradeType] = useState<'ask' | 'forex' | 'ob'>('ask');
   const [defaultCommunityFeed, setDefaultCommunityFeed] = useState<'forex' | 'ob'>('forex');
@@ -1526,8 +1527,9 @@ export default function Settings() {
               >
                 <div className="px-6 pb-6 pt-0 border-t border-outline-variant/10 mt-6">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                      <div className="flex items-center gap-3">
-                        <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Tipo de Sessão (Forex)</label>
+                      <div className="flex flex-col md:flex-row gap-6 items-start md:items-center w-full justify-between">
+                        <div className="flex items-center gap-3">
+                          <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Tipo de Sessão (Forex)</label>
                         <div className="relative">
                           <select 
                             value={sessionType}
@@ -1540,7 +1542,22 @@ export default function Settings() {
                           <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-sm">expand_more</span>
                         </div>
                       </div>
+                      <div className="flex items-center gap-3">
+                        <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Auto-Detectar Importados</label>
+                        <button 
+                          onClick={() => setEnableSmartSessions(!enableSmartSessions)}
+                          className={`text-[10px] uppercase tracking-wider font-bold px-3 py-2 rounded border transition-colors ${
+                            enableSmartSessions 
+                              ? 'bg-primary/20 text-primary border-primary/30' 
+                              : 'bg-surface-container text-on-surface-variant border-outline-variant/30 hover:bg-surface-container-high'
+                          }`}
+                          title="Alternar detecção automática de sessões para trades importados"
+                        >
+                          Auto: {enableSmartSessions ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
                     </div>
+                  </div>
                     
                     <div className="space-y-4">
                       {sessions.map(session => {

@@ -90,6 +90,7 @@ export default function Dashboard() {
   const [selectedAccountLogin, setSelectedAccountLogin] = useState(() => {
     return localStorage.getItem('dashboard_selectedAccountLogin') || 'all';
   });
+  const enableSmartSessions = localStorage.getItem('app_enableSmartSessions') === 'true';
   const [tradeTypeFilter, setTradeTypeFilter] = useState<'all' | 'forex' | 'ob'>(() => {
     return (localStorage.getItem('dashboard_tradeTypeFilter') as any) || 'all';
   });
@@ -825,10 +826,13 @@ export default function Dashboard() {
         }
 
         if (trade.session) {
-          if (!analysisSessionsMap[trade.session]) analysisSessionsMap[trade.session] = { pnl: 0, wins: 0, total: 0 };
-          analysisSessionsMap[trade.session].total += 1;
-          analysisSessionsMap[trade.session].pnl += trade.pnl;
-          if (trade.pnl > 0) analysisSessionsMap[trade.session].wins += 1;
+          const isImported = trade.source && (trade.source.includes('HTML') || trade.source.includes('CSV'));
+          if (enableSmartSessions || !isImported) {
+            if (!analysisSessionsMap[trade.session]) analysisSessionsMap[trade.session] = { pnl: 0, wins: 0, total: 0 };
+            analysisSessionsMap[trade.session].total += 1;
+            analysisSessionsMap[trade.session].pnl += trade.pnl;
+            if (trade.pnl > 0) analysisSessionsMap[trade.session].wins += 1;
+          }
         }
 
         if (trade.setups && Array.isArray(trade.setups)) {
@@ -877,10 +881,13 @@ export default function Dashboard() {
       }
 
       if (trade.session) {
-        if (!sessionsMap[trade.session]) sessionsMap[trade.session] = { pnl: 0, wins: 0, total: 0 };
-        sessionsMap[trade.session].total += 1;
-        sessionsMap[trade.session].pnl += trade.pnl;
-        if (trade.pnl > 0) sessionsMap[trade.session].wins += 1;
+        const isImported = trade.source && (trade.source.includes('HTML') || trade.source.includes('CSV'));
+        if (enableSmartSessions || !isImported) {
+          if (!sessionsMap[trade.session]) sessionsMap[trade.session] = { pnl: 0, wins: 0, total: 0 };
+          sessionsMap[trade.session].total += 1;
+          sessionsMap[trade.session].pnl += trade.pnl;
+          if (trade.pnl > 0) sessionsMap[trade.session].wins += 1;
+        }
       }
     });
 
@@ -1049,7 +1056,7 @@ export default function Dashboard() {
       pairsMap, // NEW
       setupsMap // NEW
     };
-  }, [selectedAccount, calendarDate, accounts, trades, analysisDateRange, tradeTypeFilter, objectives, withdrawals]);
+  }, [selectedAccount, calendarDate, accounts, trades, analysisDateRange, tradeTypeFilter, objectives, withdrawals, enableSmartSessions]);
 
   // --- LÓGICA DO CALENDÁRIO ---
   const calendarCells = useMemo(() => {
