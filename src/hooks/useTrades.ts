@@ -96,10 +96,10 @@ export const useTrades = (manualTrades: any[] = []) => {
           } else {
             setUserPlan(defaultPlan);
           }
-        });
+        }, (error) => { console.warn("Error listening to old user:", error); });
         return unsubOldUser;
       }
-    });
+    }, (error) => { console.warn("Error listening to user doc:", error); });
 
     // Subscrição em tempo real às configurações globais
     const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (settingsDoc) => {
@@ -108,6 +108,8 @@ export const useTrades = (manualTrades: any[] = []) => {
       } else {
         setGlobalSettings(defaultSettings);
       }
+    }, (error) => {
+      console.warn("Error listening to global settings:", error);
     });
 
     return () => {

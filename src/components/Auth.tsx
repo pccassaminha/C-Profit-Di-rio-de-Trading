@@ -270,8 +270,13 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
         onSuccess(false); // existing user
       }
     } catch (err: any) {
-      setError(getFriendlyErrorMessage(err));
-      console.error(err);
+            if (err?.code === 'auth/popup-closed-by-user') {
+        setError(null);
+      } else {
+        setError(getFriendlyErrorMessage(err));
+        console.warn("Auth info:", err.code || err);
+      }
+
     } finally {
       setLoading(false);
     }
@@ -289,8 +294,13 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
       await sendPasswordResetEmail(auth, email);
       setResetSent(true);
     } catch (err: any) {
-      setError(getFriendlyErrorMessage(err));
-      console.error(err);
+            if (err?.code === 'auth/popup-closed-by-user') {
+        setError(null);
+      } else {
+        setError(getFriendlyErrorMessage(err));
+        console.warn("Auth info:", err.code || err);
+      }
+
     } finally {
       setLoading(false);
     }
@@ -361,7 +371,13 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
 
       setCouponFeedback({ type: 'error', message: 'Cupom ou código inválido.' });
     } catch (err) {
-      console.error(err);
+      
+      if (err?.code === 'auth/popup-closed-by-user') {
+        setError(null);
+      } else {
+        console.warn("Auth info:", err.code || err);
+      }
+
       setCouponFeedback({ type: 'error', message: 'Erro ao validar.' });
     } finally {
       setIsApplyingCoupon(false);
@@ -384,21 +400,23 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
       let solvedReferredUid: string | null = null;
 
       if (isLogin) {
-        let partnerDetected = false;
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+        } catch (loginErr: any) {
+          throw loginErr;
+        }
+
         try {
           const qPartner = query(
             collection(db, 'usuarios'),
-            where('partnerEmail', '==', email.trim().toLowerCase()),
-            where('partnerPassword', '==', password.trim())
+            where('partnerEmail', '==', email.trim().toLowerCase())
           );
           const partnerSnap = await getDocs(qPartner);
-
           if (!partnerSnap.empty) {
-            partnerDetected = true;
             const parentDoc = partnerSnap.docs[0];
             const parentUid = parentDoc.id;
             const parentData = parentDoc.data();
-
+            
             // Store partner mode variables in localStorage
             localStorage.setItem('partnerModeActive', 'true');
             localStorage.setItem('partnerMainUserUid', parentUid);
@@ -415,24 +433,7 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
             localStorage.removeItem('partnerMainUserPhotoURL');
           }
         } catch (partnerErr: any) {
-          if (partnerErr.code !== 'permission-denied') {
-            console.warn("Partner log lookup failed under submissive flow:", partnerErr);
-          }
-        }
-
-        try {
-          await signInWithEmailAndPassword(auth, email, password);
-        } catch (loginErr: any) {
-          if (partnerDetected && (loginErr.code === 'auth/user-not-found' || loginErr.code === 'auth/invalid-credential')) {
-            try {
-              const { createUserWithEmailAndPassword: createAuthUser } = await import('firebase/auth');
-              await createAuthUser(auth, email, password);
-            } catch (createErr) {
-              throw loginErr;
-            }
-          } else {
-            throw loginErr;
-          }
+          console.warn("Partner log lookup failed after login:", partnerErr);
         }
         
         onSuccess(false); // existing user
@@ -568,8 +569,13 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
         onSuccess(true); // new user
       }
     } catch (err: any) {
-      setError(getFriendlyErrorMessage(err));
-      console.error(err);
+            if (err?.code === 'auth/popup-closed-by-user') {
+        setError(null);
+      } else {
+        setError(getFriendlyErrorMessage(err));
+        console.warn("Auth info:", err.code || err);
+      }
+
     } finally {
       setLoading(false);
     }

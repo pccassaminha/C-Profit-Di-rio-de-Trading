@@ -2,7 +2,16 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import firebaseConfig from '../firebase-applet-config.json';
+const firebaseConfig = {
+  apiKey: "AIzaSyDBEOdBHS3mxxE1Vhw2pSh0BjGaK6M8GBw",
+  authDomain: "c-trade-diario.firebaseapp.com",
+  databaseURL: "https://c-trade-diario-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "c-trade-diario",
+  storageBucket: "c-trade-diario.firebasestorage.app",
+  messagingSenderId: "699030568101",
+  appId: "1:699030568101:web:8e4871564f410eb466a14c",
+  measurementId: "G-L1YGRSF0GE"
+};
 
 export const app = initializeApp(firebaseConfig);
 
@@ -13,13 +22,13 @@ try {
       tabManager: persistentMultipleTabManager()
     }),
     experimentalForceLongPolling: true
-  }, firebaseConfig.firestoreDatabaseId);
+  }, undefined);
 } catch (cacheErr) {
   console.warn("[Firebase] Failed to initialize persistent local cache, falling back to in-memory local cache:", cacheErr);
   firestoreDb = initializeFirestore(app, {
     localCache: memoryLocalCache(),
     experimentalForceLongPolling: true
-  }, firebaseConfig.firestoreDatabaseId);
+  }, undefined);
 }
 
 export const db = firestoreDb;
