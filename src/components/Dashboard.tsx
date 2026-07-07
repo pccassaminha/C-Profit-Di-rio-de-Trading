@@ -217,12 +217,8 @@ export default function Dashboard() {
             if (altData.photoURL) setDbPhoto(altData.photoURL);
             if (altData.nome) setDbName(altData.nome);
           }
-        }, (err) => {
-          console.warn('[Dashboard] Failed to listen to users document:', err);
         });
       }
-    }, (err) => {
-      console.warn('[Dashboard] Failed to listen to usuarios document:', err);
     });
     
     return () => unsub();
@@ -354,8 +350,6 @@ export default function Dashboard() {
     const unsubOld = onSnapshot(qOld, (snapshot) => {
       const accountsOld = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       updateAccounts(accountsOld, 'old');
-    }, (error) => {
-      console.warn("onSnapshot qOld connection offline/unavailable:", error);
     });
     unsubscribes.push(unsubOld);
 
@@ -364,8 +358,6 @@ export default function Dashboard() {
     const unsubNew = onSnapshot(qNew, (snapshot) => {
       const accountsNew = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       updateAccounts(accountsNew, 'new');
-    }, (error) => {
-      console.warn("onSnapshot qNew connection offline/unavailable:", error);
     });
     unsubscribes.push(unsubNew);
 
@@ -373,8 +365,6 @@ export default function Dashboard() {
     const qWithdrawals = query(collection(db, 'withdrawals'), where('userId', '==', auth.currentUser.uid));
     const unsubWithdrawals = onSnapshot(qWithdrawals, (snapshot) => {
       setWithdrawals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.warn("onSnapshot qWithdrawals connection offline/unavailable:", error);
     });
     unsubscribes.push(unsubWithdrawals);
 

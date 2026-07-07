@@ -302,16 +302,12 @@ export default function AdminPanel() {
     // Listen to users
     const unsubUsers = onSnapshot(collection(db, 'usuarios'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      console.warn('[AdminPanel] Failed to listen to usuarios:', err);
     });
 
     // Listen to payments
     const qPayments = query(collection(db, 'payments'), orderBy('createdAt', 'desc'));
     const unsubPayments = onSnapshot(qPayments, (snapshot) => {
       setPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => {
-      console.warn('[AdminPanel] Failed to listen to payments:', err);
     });
 
     // Listen to coupons
@@ -319,8 +315,6 @@ export default function AdminPanel() {
     const unsubCoupons = onSnapshot(qCoupons, (snapshot) => {
       const fetchedCoupons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCoupons(fetchedCoupons);
-    }, (err) => {
-      console.warn('[AdminPanel] Failed to listen to coupons:', err);
     });
 
     // Auto-create default coupon once on mount/admin load if not exists
