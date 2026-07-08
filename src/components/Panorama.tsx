@@ -154,7 +154,7 @@ export default function Panorama() {
   const [technicalSymbol, setTechnicalSymbol] = useState<string>('FX:EURUSD');
   
   // Unified heatmap selector state
-  const [activeHeatmap, setActiveHeatmap] = useState<'sp500' | 'nasdaq' | 'djca' | 'forex' | 'crypto'>('sp500');
+  const [activeHeatmap, setActiveHeatmap] = useState<'sp500' | 'nasdaq' | 'djca' | 'nikkei' | 'forex' | 'crypto'>('forex');
 
   // Technical symbols constant
   const technicalSymbols = [
@@ -259,6 +259,24 @@ export default function Panorama() {
     height: "100%"
   };
 
+  const nikkeiHeatmapConfig = {
+    dataSource: "NKY",
+    blockSize: "market_cap_basic",
+    blockColor: "change",
+    grouping: "sector",
+    locale: "br",
+    symbolUrl: "",
+    colorTheme: "dark",
+    exchanges: [],
+    hasTopBar: true,
+    isDataSetEnabled: true,
+    isZoomEnabled: true,
+    hasSymbolTooltip: true,
+    isMonoSize: false,
+    width: "100%",
+    height: "100%"
+  };
+
   // Upgraded custom-configured quotesConfig containing precisely requested symbols groups
   const quotesConfig = {
     width: '100%',
@@ -324,7 +342,7 @@ export default function Panorama() {
     colorTheme: 'dark'
   });
 
-  const getHeatmapProps = (type: 'sp500' | 'nasdaq' | 'djca' | 'forex' | 'crypto') => {
+  const getHeatmapProps = (type: 'sp500' | 'nasdaq' | 'djca' | 'nikkei' | 'forex' | 'crypto') => {
     switch (type) {
       case 'sp500':
         return {
@@ -340,6 +358,11 @@ export default function Panorama() {
         return {
           widgetType: 'stock-heatmap' as const,
           config: djcaHeatmapConfig
+        };
+      case 'nikkei':
+        return {
+          widgetType: 'stock-heatmap' as const,
+          config: nikkeiHeatmapConfig
         };
       case 'forex':
         return {
@@ -539,16 +562,6 @@ export default function Panorama() {
               {/* Switcher Toggles */}
               <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
                 <button
-                  onClick={() => setActiveHeatmap('sp500')}
-                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
-                    activeHeatmap === 'sp500'
-                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  S&P 500
-                </button>
-                <button
                   onClick={() => setActiveHeatmap('forex')}
                   className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
                     activeHeatmap === 'forex'
@@ -557,6 +570,16 @@ export default function Panorama() {
                   }`}
                 >
                   Forex
+                </button>
+                <button
+                  onClick={() => setActiveHeatmap('sp500')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
+                    activeHeatmap === 'sp500'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  S&P 500
                 </button>
                 <button
                   onClick={() => setActiveHeatmap('nasdaq')}
@@ -577,6 +600,16 @@ export default function Panorama() {
                   }`}
                 >
                   Dow Jones (DJCA)
+                </button>
+                <button
+                  onClick={() => setActiveHeatmap('nikkei')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
+                    activeHeatmap === 'nikkei'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Nikkei 225
                 </button>
                 <button
                   onClick={() => setActiveHeatmap('crypto')}
@@ -714,16 +747,6 @@ export default function Panorama() {
                   {/* Heatmap Type Toggle */}
                   <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start sm:self-auto">
                     <button
-                      onClick={() => setActiveHeatmap('sp500')}
-                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
-                        activeHeatmap === 'sp500'
-                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
-                          : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
-                    >
-                      S&P 500
-                    </button>
-                    <button
                       onClick={() => setActiveHeatmap('forex')}
                       className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
                         activeHeatmap === 'forex'
@@ -732,6 +755,16 @@ export default function Panorama() {
                       }`}
                     >
                       Forex / Moedas
+                    </button>
+                    <button
+                      onClick={() => setActiveHeatmap('sp500')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        activeHeatmap === 'sp500'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      S&P 500
                     </button>
                     <button
                       onClick={() => setActiveHeatmap('nasdaq')}
@@ -752,6 +785,16 @@ export default function Panorama() {
                       }`}
                     >
                       Dow Jones
+                    </button>
+                    <button
+                      onClick={() => setActiveHeatmap('nikkei')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        activeHeatmap === 'nikkei'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Nikkei 225
                     </button>
                     <button
                       onClick={() => setActiveHeatmap('crypto')}
