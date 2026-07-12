@@ -365,8 +365,7 @@ export default function Community() {
   useEffect(() => {
     const q = query(
       collection(db, 'community_posts'),
-      where('type', '==', activeFeed),
-      orderBy('createdAt', 'desc')
+      where('type', '==', activeFeed)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -375,6 +374,11 @@ export default function Community() {
         ...doc.data(),
         userLiked: false // We'll check this per user if needed
       } as Post));
+      postsData.sort((a, b) => {
+        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
       setPosts(postsData);
     });
 

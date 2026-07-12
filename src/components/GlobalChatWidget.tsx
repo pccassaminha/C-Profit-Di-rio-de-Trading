@@ -97,7 +97,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     const unsubFriends = onSnapshot(collection(db, 'users', uid, 'friends'), (snap) => {
       setFriendsList(snap.docs.map(d => d.id));
     }, (err) => {
-      console.error('Error loading friends list in chat:', err);
+      console.error('Error loading friends list in chat for uid ' + uid + ':', err);
     });
     return unsubFriends;
   }, []);
