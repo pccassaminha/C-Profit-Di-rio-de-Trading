@@ -3,6 +3,8 @@ import { DayPicker } from 'react-day-picker';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+import { Calendar, ChevronUp, ChevronDown } from 'lucide-react';
+
 interface DatePickerProps {
   date: Date | undefined;
   onDateChange: (date: Date | undefined) => void;
@@ -35,12 +37,10 @@ export function DatePicker({ date, onDateChange, className = '' }: DatePickerPro
         className="w-full flex items-center justify-between bg-surface-container-highest border border-outline-variant/30 text-on-surface px-4 py-3 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer"
       >
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-[20px] text-on-surface-variant">calendar_month</span>
+          <Calendar className="text-[20px] text-on-surface-variant" />
           <span>{displayValue}</span>
         </div>
-        <span className="material-symbols-outlined text-[20px] text-on-surface-variant">
-          {isOpen ? 'expand_less' : 'expand_more'}
-        </span>
+        {isOpen ? <ChevronUp className="text-[20px] text-on-surface-variant" /> : <ChevronDown className="text-[20px] text-on-surface-variant" />}
       </button>
 
       {isOpen && (

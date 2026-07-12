@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DateRangePicker } from './DateRangePicker';
 import { DateRange } from 'react-day-picker';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Pie, Cell, BarChart, Bar, PieChart, LineChart } from 'recharts';
 import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
@@ -9,7 +9,9 @@ import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Download, MoreVertical, AlertTriangle, Users, MessageSquare, Check, ChevronRight } from 'lucide-react';
+
+import { Download, MoreVertical, AlertTriangle, Users, MessageSquare, Check, ChevronRight, Banknote, ChevronDown, X, TrendingUp, Calendar, Wallet, Scale, ChevronLeft, User, Copy, BarChart2, Shrink, Expand, Lock, Rocket, Plus, Activity, Clock, RefreshCw, Brain, History, ExternalLink, TrendingDown, PieChart as LucidePieChart, LineChart as LucideLineChart } from 'lucide-react';
+
 
 // Help function to normalize symbols and avoid duplicate entries
 function normalizeSymbol(symbol: string): string {
@@ -1206,7 +1208,7 @@ export default function Dashboard() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 backdrop-blur-md bg-background/80">
           <div className="bg-surface-container border border-error/30 p-10 rounded-[32px] max-w-xl w-full text-center shadow-2xl shadow-error/20 animate-in zoom-in-95 duration-300">
             <div className="w-20 h-20 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="material-symbols-outlined text-5xl">lock</span>
+              <Lock className="text-5xl" />
             </div>
             <h2 className="text-3xl font-black text-on-surface mb-4 font-headline">Plano Expirado</h2>
             <p className="text-on-surface-variant mb-8 leading-relaxed">
@@ -1218,7 +1220,7 @@ export default function Dashboard() {
                 onClick={handleMulticaixa}
                 className="flex-1 bg-primary text-on-primary py-4 rounded-2xl font-black hover:scale-105 transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3"
               >
-                <span className="material-symbols-outlined">payments</span>
+                <Banknote className="" />
                 Renovar Subscription
               </button>
             </div>
@@ -1231,7 +1233,7 @@ export default function Dashboard() {
         <div className="bg-error/10 border border-error/50 p-6 rounded-[24px] mb-6 flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top duration-500">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-error/20 rounded-full flex items-center justify-center text-error">
-              <span className="material-symbols-outlined">warning</span>
+              <AlertTriangle className="" />
             </div>
             <div>
               <p className="text-error font-black text-lg">Limite de Contas Atingido!</p>
@@ -1246,7 +1248,7 @@ export default function Dashboard() {
             className="w-full md:w-auto bg-error-container text-on-error-container px-8 py-3 rounded-xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2"
           >
             <span>Fazer Upgrade</span>
-            <span className="material-symbols-outlined text-sm">rocket_launch</span>
+            <Rocket className="text-sm" />
           </button>
         </div>
       )}
@@ -1294,7 +1296,7 @@ export default function Dashboard() {
               {showForexFilter && <option className="bg-[#0f1b30] text-[#f0f4ff]" value="forex">Forex & Índices</option>}
               {showObFilter && <option className="bg-[#0f1b30] text-[#f0f4ff]" value="ob">Opções Binárias</option>}
             </select>
-            <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface text-lg pointer-events-none">expand_more</span>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface text-lg pointer-events-none" />
           </div>
           <div className="relative flex-1 lg:flex-none min-w-[200px]">
             <select 
@@ -1316,14 +1318,14 @@ export default function Dashboard() {
                 </option>
               ))}
             </select>
-            <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface text-lg pointer-events-none">expand_more</span>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface text-lg pointer-events-none" />
           </div>
           <button 
             onClick={() => setIsAddAccountModalOpen(true)}
             className="w-10 h-10 md:w-12 md:h-12 bg-primary text-on-primary rounded-full flex items-center justify-center hover:brightness-110 transition-all shrink-0 shadow-lg shadow-primary/20"
             title="Adicionar Nova Conta"
           >
-            <span className="material-symbols-outlined">add</span>
+            <Plus className="" />
           </button>
 
 
@@ -1489,7 +1491,7 @@ export default function Dashboard() {
                 className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full w-10 h-10 flex items-center justify-center transition-colors"
                 title="Ocultar aviso"
               >
-                <span className="material-symbols-outlined text-xl">close</span>
+                <X className="text-xl" />
               </button>
               <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto text-3xl">
                 🎯
@@ -1514,14 +1516,12 @@ export default function Dashboard() {
             {/* Quadrant 1: Resultado do Mês Anterior */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 flex flex-col justify-between">
               <h4 className="text-on-surface font-bold text-base md:text-lg mb-2 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-xl">analytics</span>
+                <Activity className="text-primary text-xl" />
                 Resultado de {capitalize(prevMonthName)}
               </h4>
               <div className="flex-1 flex flex-col items-center justify-center py-4">
                 <p className={`font-black text-2xl md:text-3xl ${data.prevMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center justify-center gap-1.5`}>
-                  <span className="material-symbols-outlined text-xl md:text-2xl">
-                    {data.prevMonthPnl >= 0 ? 'trending_up' : 'trending_down'}
-                  </span>
+                  {data.prevMonthPnl >= 0 ? <TrendingUp className="text-xl md:text-2xl" /> : <trending_down className="text-xl md:text-2xl" />}
                   {data.prevMonthPnl >= 0 ? '+' : ''}{formatCurrency(data.prevMonthPnl)}
                 </p>
               </div>
@@ -1533,14 +1533,12 @@ export default function Dashboard() {
             {/* Quadrant 2: Resultado do Mês Corrente */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 flex flex-col justify-between">
               <h4 className="text-on-surface font-bold text-base md:text-lg mb-2 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary text-xl">insights</span>
+                <LucideLineChart className="text-secondary text-xl" />
                 Resultado de {capitalize(currentMonthName)}
               </h4>
               <div className="flex-1 flex flex-col items-center justify-center py-4">
                 <p className={`font-black text-2xl md:text-3xl ${data.currentMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center justify-center gap-1.5`}>
-                  <span className="material-symbols-outlined text-xl md:text-2xl">
-                    {data.currentMonthPnl >= 0 ? 'trending_up' : 'trending_down'}
-                  </span>
+                  {data.currentMonthPnl >= 0 ? <TrendingUp className="text-xl md:text-2xl" /> : <trending_down className="text-xl md:text-2xl" />}
                   {data.currentMonthPnl >= 0 ? '+' : ''}{formatCurrency(data.currentMonthPnl)}
                 </p>
               </div>
@@ -1553,7 +1551,7 @@ export default function Dashboard() {
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 flex flex-col justify-between">
               <div>
                 <h4 className="text-on-surface font-bold text-base md:text-lg mb-4 font-headline flex items-center gap-2">
-                  <span className="material-symbols-outlined text-warning text-xl">schedule</span>
+                  <Clock className="text-warning text-xl" />
                   Sessões (Top 3)
                 </h4>
                 <p className="text-on-surface-variant text-xs md:text-sm mb-3">Sessões com Maior Retorno</p>
@@ -1585,7 +1583,7 @@ export default function Dashboard() {
           {/* Best Setups */}
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
             <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">monitoring</span>
+              <Activity className="text-primary" />
               Melhores Setups
             </h4>
             <div className="space-y-4">
@@ -1608,7 +1606,7 @@ export default function Dashboard() {
           {/* Best Pairs */}
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
             <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary">currency_exchange</span>
+              <RefreshCw className="text-secondary" />
               Top 3 Pares
             </h4>
             <div className="space-y-4">
@@ -1631,7 +1629,7 @@ export default function Dashboard() {
           {/* Predominant Psychology */}
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
             <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-              <span className="material-symbols-outlined text-tertiary">psychology</span>
+              <Brain className="text-tertiary" />
               Estados Psicológicos
             </h4>
             <div className="space-y-4">
@@ -1657,7 +1655,7 @@ export default function Dashboard() {
           {/* Best Days of Week */}
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
             <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">calendar_month</span>
+              <Calendar className="text-primary" />
               Melhor Dia da Semana
             </h4>
             <div className="space-y-4">
@@ -1681,7 +1679,7 @@ export default function Dashboard() {
           {tradeTypeFilter === 'ob' && (
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
               <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">schedule</span>
+                <Clock className="text-primary" />
                 Melhores Timeframes
               </h4>
               <div className="space-y-4">
@@ -1709,7 +1707,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
               <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">history</span>
+                <History className="text-primary" />
                 Lucro mês de {capitalize(prevMonthName)}
               </h4>
                 <div className="flex flex-col items-center justify-center h-full min-h-[150px]">
@@ -1718,7 +1716,7 @@ export default function Dashboard() {
               </div>
               <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
                 <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                  <span className="material-symbols-outlined text-secondary">account_balance_wallet</span>
+                  <Wallet className="text-secondary" />
                   Lucro mês de {capitalize(currentMonthName)}
                 </h4>
                 <div className="flex flex-col justify-center h-full min-h-[150px]">
@@ -1776,9 +1774,9 @@ export default function Dashboard() {
       {/* Calendar */}
       <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl overflow-hidden">
         <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
-          <button onClick={handlePrevMonth} className="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors text-2xl">chevron_left</button>
+          <button onClick={handlePrevMonth} className="text-on-surface-variant hover:text-on-surface transition-colors text-2xl"><ChevronLeft /></button>
           <span className="text-on-surface font-bold text-lg md:text-xl capitalize">{monthName}</span>
-          <button onClick={handleNextMonth} className="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors text-2xl">chevron_right</button>
+          <button onClick={handleNextMonth} className="text-on-surface-variant hover:text-on-surface transition-colors text-2xl"><ChevronRight /></button>
         </div>
         <div className="w-full overflow-x-auto">
           <div className="min-w-[900px] lg:min-w-full">
@@ -1818,7 +1816,7 @@ export default function Dashboard() {
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
               <div className="flex justify-between items-center mb-6 md:mb-8">
                 <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">monitoring</span>
+                  <Activity className="text-primary" />
                   {setupFilter === 'positive' ? 'Melhores Setups' : 'Setups com Perda'}
                 </h4>
                 <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
@@ -1880,9 +1878,7 @@ export default function Dashboard() {
                           onClick={() => openAnalysisModal('setups')} 
                           className="w-full py-2 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
                         >
-                          <span className="material-symbols-outlined text-[18px]">
-                            open_in_new
-                          </span>
+                          <ExternalLink className="text-[18px]" />
                           Ver Todos
                         </button>
                       )}
@@ -1900,7 +1896,7 @@ export default function Dashboard() {
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
               <div className="flex justify-between items-center mb-6 md:mb-8">
                 <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
-                  <span className="material-symbols-outlined text-secondary">currency_exchange</span>
+                  <RefreshCw className="text-secondary" />
                   {pairFilter === 'positive' ? 'Melhores Pares' : 'Pares com Perda'}
                 </h4>
                 <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
@@ -1962,9 +1958,7 @@ export default function Dashboard() {
                           onClick={() => openAnalysisModal('pairs')} 
                           className="w-full py-2 flex items-center justify-center gap-2 text-secondary font-bold text-sm bg-secondary/10 rounded-xl hover:bg-secondary/20 transition-colors"
                         >
-                          <span className="material-symbols-outlined text-[18px]">
-                            open_in_new
-                          </span>
+                          <ExternalLink className="text-[18px]" />
                           Ver Todos
                         </button>
                       )}
@@ -1982,7 +1976,7 @@ export default function Dashboard() {
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
               <div className="flex justify-between items-center mb-6 md:mb-8">
                 <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">calendar_month</span>
+                  <Calendar className="text-primary" />
                   {dayFilter === 'positive' ? 'Melhor Dia da Semana' : 'Dias com Perda'}
                 </h4>
                 <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
@@ -2044,9 +2038,7 @@ export default function Dashboard() {
                           onClick={() => openAnalysisModal('days')} 
                           className="w-full py-2 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
                         >
-                          <span className="material-symbols-outlined text-[18px]">
-                            open_in_new
-                          </span>
+                          <ExternalLink className="text-[18px]" />
                           Ver Todos
                         </button>
                       )}
@@ -2063,7 +2055,7 @@ export default function Dashboard() {
             {/* Predominant Psychology */}
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
               <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <span className="material-symbols-outlined text-tertiary">psychology</span>
+                <Brain className="text-tertiary" />
                 Psicológicos Predominantes
               </h4>
               <div className="space-y-4">
@@ -2111,9 +2103,7 @@ export default function Dashboard() {
                           onClick={() => openAnalysisModal('psychology')} 
                           className="w-full py-2 flex items-center justify-center gap-2 text-tertiary font-bold text-sm bg-tertiary/10 rounded-xl hover:bg-tertiary/20 transition-colors"
                         >
-                          <span className="material-symbols-outlined text-[18px]">
-                            open_in_new
-                          </span>
+                          <ExternalLink className="text-[18px]" />
                           Ver Todos
                         </button>
                       )}
@@ -2129,7 +2119,7 @@ export default function Dashboard() {
             <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8 lg:col-span-2">
               <div className="flex justify-between items-center mb-6 md:mb-8">
                 <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#ffb4ab]">schedule</span>
+                  <Clock className="text-[#ffb4ab]" />
                   {sessionFilter === 'positive' ? 'Melhores Sessões' : 'Sessões com Perda'}
                 </h4>
                 <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
@@ -2191,9 +2181,7 @@ export default function Dashboard() {
                           onClick={() => openAnalysisModal('sessions')} 
                           className="w-full py-2 flex items-center justify-center gap-2 text-[#ffb4ab] font-bold text-sm bg-[#ffb4ab]/10 rounded-xl hover:bg-[#ffb4ab]/20 transition-colors"
                         >
-                          <span className="material-symbols-outlined text-[18px]">
-                            open_in_new
-                          </span>
+                          <ExternalLink className="text-[18px]" />
                           Ver Todos
                         </button>
                       )}
@@ -2212,7 +2200,7 @@ export default function Dashboard() {
               <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
                 <div className="flex justify-between items-center mb-6 md:mb-8">
                   <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary">schedule</span>
+                    <Clock className="text-primary" />
                     {timeframeFilterState === 'positive' ? 'Melhores Timeframes' : 'Timeframes com Perda'}
                   </h4>
                   <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/10">
@@ -2274,9 +2262,7 @@ export default function Dashboard() {
                             onClick={() => openAnalysisModal('timeframes')} 
                             className="w-full py-2 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
                           >
-                            <span className="material-symbols-outlined text-[18px]">
-                              open_in_new
-                            </span>
+                            <ExternalLink className="text-[18px]" />
                             Ver Todos
                           </button>
                         )}
@@ -2296,7 +2282,7 @@ export default function Dashboard() {
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                   <h4 className="text-on-surface font-bold text-base md:text-lg font-headline flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary">analytics</span>
+                    <Activity className="text-primary" />
                     Volume Financeiro do Período & Trades
                   </h4>
                   {/* Metric Switcher */}
@@ -2334,7 +2320,7 @@ export default function Dashboard() {
                   {analysisMetric === 'losses' && (
                     <>
                       <div className="w-16 h-16 bg-error/10 text-error rounded-full flex items-center justify-center mb-3">
-                        <span className="material-symbols-outlined text-3xl font-bold">trending_down</span>
+                        <TrendingDown className="text-3xl font-bold" />
                       </div>
                       <span className="text-on-surface-variant text-xs uppercase tracking-widest font-bold mb-1">Volume Total de Perdas</span>
                       <p className="text-error font-black text-4xl mb-2">-{formatCurrency(data.filteredHistoryTrades.filter(t => t.pnl < 0).reduce((acc, t) => acc + Math.abs(t.pnl), 0))}</p>
@@ -2346,7 +2332,7 @@ export default function Dashboard() {
                   {analysisMetric === 'gains' && (
                     <>
                       <div className="w-16 h-16 bg-secondary/10 text-secondary rounded-full flex items-center justify-center mb-3">
-                        <span className="material-symbols-outlined text-3xl font-bold">trending_up</span>
+                        <TrendingUp className="text-3xl font-bold" />
                       </div>
                       <span className="text-on-surface-variant text-xs uppercase tracking-widest font-bold mb-1">Volume Total de Ganhos</span>
                       <p className="text-secondary font-black text-4xl mb-2">+{formatCurrency(data.filteredHistoryTrades.filter(t => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0))}</p>
@@ -2362,7 +2348,7 @@ export default function Dashboard() {
                       return (
                         <>
                           <div className={`w-16 h-16 ${isProfit ? 'bg-secondary/10 text-secondary' : 'bg-error/10 text-error'} rounded-full flex items-center justify-center mb-3`}>
-                            <span className="material-symbols-outlined text-3xl font-bold">balance</span>
+                            <Scale className="text-3xl font-bold" />
                           </div>
                           <span className="text-on-surface-variant text-xs uppercase tracking-widest font-bold mb-1">Resultado Líquido do Período</span>
                           <p className={`${isProfit ? 'text-secondary' : 'text-error'} font-black text-4xl mb-2`}>
@@ -2517,7 +2503,7 @@ export default function Dashboard() {
               return (
                 <div className="flex justify-center items-center gap-6 mt-8">
                   <button onClick={handlePrev} disabled={historyCurrentPage === 1} className="text-on-surface-variant hover:text-on-surface disabled:opacity-50 disabled:hover:text-on-surface-variant transition-opacity">
-                    <span className="material-symbols-outlined text-xl">chevron_left</span>
+                    <ChevronLeft className="text-xl" />
                   </button>
                   <div className="flex gap-2 sm:gap-3 overflow-x-auto max-w-[60vw] pb-2 custom-scrollbar">
                     {Array.from({ length: totalPages }).map((_, idx) => {
@@ -2551,7 +2537,7 @@ export default function Dashboard() {
                     })}
                   </div>
                   <button onClick={handleNext} disabled={historyCurrentPage === totalPages} className="text-on-surface-variant hover:text-on-surface disabled:opacity-50 disabled:hover:text-on-surface-variant transition-opacity">
-                    <span className="material-symbols-outlined text-xl">chevron_right</span>
+                    <ChevronRight className="text-xl" />
                   </button>
                 </div>
               );
@@ -2607,7 +2593,7 @@ export default function Dashboard() {
                   {dbPhoto || auth.currentUser?.photoURL ? (
                     <img src={dbPhoto || auth.currentUser?.photoURL || ''} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="material-symbols-outlined text-5xl text-on-surface-variant">person</span>
+                    <User className="text-5xl text-on-surface-variant" />
                   )}
                 </div>
                 <div>
@@ -2615,7 +2601,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-3 mt-2">
                     <span className="text-on-surface-variant text-base">{accounts.find(a => a.id === selectedAccount)?.accountNumber}</span>
                     <button className="text-on-surface-variant hover:text-on-surface transition-colors">
-                      <span className="material-symbols-outlined text-base">content_copy</span>
+                      <Copy className="text-base" />
                     </button>
                   </div>
                   <p className="text-on-surface-variant text-sm mt-1 uppercase tracking-wider">
@@ -2682,15 +2668,15 @@ export default function Dashboard() {
               <div className="flex items-center gap-2">
                 {isAnalysisModalExpanded && (
                   <div className="flex bg-surface-container-high rounded-full p-1 mr-2 border border-outline-variant/10 shrink-0">
-                    <button onClick={() => setAnalysisModalChartType('pie')} className={`px-3 py-1.5 text-xs font-bold rounded-full transition-colors flex items-center gap-1 ${analysisModalChartType === 'pie' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}><span className="material-symbols-outlined text-[16px]">pie_chart</span><span className="hidden sm:inline">Pizza</span></button>
-                    <button onClick={() => setAnalysisModalChartType('bar')} className={`px-3 py-1.5 text-xs font-bold rounded-full transition-colors flex items-center gap-1 ${analysisModalChartType === 'bar' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}><span className="material-symbols-outlined text-[16px]">bar_chart</span><span className="hidden sm:inline">Barras</span></button>
+                    <button onClick={() => setAnalysisModalChartType('pie')} className={`px-3 py-1.5 text-xs font-bold rounded-full transition-colors flex items-center gap-1 ${analysisModalChartType === 'pie' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}><LucidePieChart className="w-4 h-4" /><span className="hidden sm:inline">Pizza</span></button>
+                    <button onClick={() => setAnalysisModalChartType('bar')} className={`px-3 py-1.5 text-xs font-bold rounded-full transition-colors flex items-center gap-1 ${analysisModalChartType === 'bar' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}><BarChart2 className="text-[16px]" /><span className="hidden sm:inline">Barras</span></button>
                   </div>
                 )}
                 <button onClick={toggleAnalysisModalExpanded} className="text-on-surface-variant hover:text-on-surface transition-colors p-2 bg-surface-container-high rounded-full shrink-0">
-                  <span className="material-symbols-outlined text-[20px]">{isAnalysisModalExpanded ? 'close_fullscreen' : 'open_in_full'}</span>
+                  {isAnalysisModalExpanded ? <Shrink className="text-[20px]" /> : <Expand className="text-[20px]" />}
                 </button>
                 <button onClick={closeAnalysisModal} className="text-on-surface-variant hover:text-on-surface transition-colors p-2 bg-surface-container-high rounded-full shrink-0">
-                  <span className="material-symbols-outlined text-[20px]">close</span>
+                  <X className="text-[20px]" />
                 </button>
               </div>
             </div>
@@ -2857,7 +2843,7 @@ export default function Dashboard() {
               onClick={() => setIsAddAccountModalOpen(false)}
               className="absolute top-6 right-6 text-on-surface-variant hover:text-on-surface transition-colors"
             >
-              <span className="material-symbols-outlined">close</span>
+              <X className="" />
             </button>
             
             <h2 className="text-2xl font-bold text-on-surface font-headline mb-2">Adicionar Nova Conta</h2>

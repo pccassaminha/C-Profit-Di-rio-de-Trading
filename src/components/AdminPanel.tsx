@@ -3,7 +3,7 @@ import { db, auth, registerNewMaestroAuth } from '../firebase';
 import { collection, getDocs, doc, getDoc, updateDoc, onSnapshot, query, orderBy, setDoc, addDoc, deleteDoc, where } from 'firebase/firestore';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
-import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, AlertTriangle, Search, Calendar, SlidersHorizontal, ArrowUpDown, Megaphone, History, Plus, Trash2, Pencil, FileText } from 'lucide-react';
+import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, AlertTriangle, Search, Calendar, SlidersHorizontal, ArrowUpDown, Megaphone, History, Plus, Trash2, Pencil, FileText, ChevronDown, Banknote, BadgeDollarSign, Handshake, ClipboardList, Gift, Coins, Clock, Wallet, UserPlus } from 'lucide-react';
 
 const getFormattedPhone = (phone: string | undefined): string => {
   if (!phone) return '';
@@ -941,7 +941,7 @@ export default function AdminPanel() {
                   <option value="anual_16">Anual (16 Contas)</option>
                 </select>
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
-                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                   <ChevronDown className="text-sm" />
                 </div>
               </div>
 
@@ -962,7 +962,7 @@ export default function AdminPanel() {
                   <option value="custom">Filtrar por Período...</option>
                 </select>
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
-                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                   <ChevronDown className="text-sm" />
                 </div>
               </div>
 
@@ -980,7 +980,7 @@ export default function AdminPanel() {
                   <option value="oldest">Inscrição: Mais Antigo</option>
                 </select>
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
-                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                   <ChevronDown className="text-sm" />
                 </div>
               </div>
             </div>
@@ -1177,7 +1177,7 @@ export default function AdminPanel() {
                   <option value="rejected">Rejeitado</option>
                 </select>
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
-                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                   <ChevronDown className="text-sm" />
                 </div>
               </div>
 
@@ -1198,7 +1198,7 @@ export default function AdminPanel() {
                   <option value="mcx">USDT 🪙</option>
                 </select>
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
-                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                   <ChevronDown className="text-sm" />
                 </div>
               </div>
 
@@ -1219,7 +1219,7 @@ export default function AdminPanel() {
                   <option value="custom">Filtrar por Período...</option>
                 </select>
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
-                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                   <ChevronDown className="text-sm" />
                 </div>
               </div>
             </div>
@@ -1239,7 +1239,7 @@ export default function AdminPanel() {
                   <option value="oldest">Mais Antigos Primeiro</option>
                 </select>
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
-                   <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                   <ChevronDown className="text-sm" />
                 </div>
               </div>
 
@@ -1933,7 +1933,7 @@ export default function AdminPanel() {
             </button>
 
             <h3 className="text-xl font-bold text-[#00f5a0] mb-2 font-headline flex items-center gap-3">
-              <span className="material-symbols-outlined text-[24px]">groups</span>
+              <Users className="text-[24px]" />
               Configurar Comunidade Oficial
             </h3>
             <p className="text-xs text-on-surface-variant mb-6">Insira os detalhes do grupo ou canal oficial da sua plataforma para os utilizadores se juntarem.</p>
@@ -2225,7 +2225,7 @@ export default function AdminPanel() {
                       ))}
                     </select>
                     <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant/60">
-                       <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                       <ChevronDown className="text-sm" />
                     </div>
                   </div>
                 </div>
@@ -2401,7 +2401,7 @@ export default function AdminPanel() {
                       }}
                       className="w-full sm:w-auto bg-surface-container hover:bg-surface-container-high text-white px-4 py-3 sm:py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-outline-variant/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                    >
-                      <span className="material-symbols-outlined text-[14px]">groups</span> Configurar Comunidade
+                      <Users className="text-[14px]" /> Configurar Comunidade
                    </button>
                 </div>
             </div>
@@ -2591,7 +2591,7 @@ export default function AdminPanel() {
                 </p>
                 <p className="text-[11px] text-on-surface-variant/70 mt-1">Soma de todos os planos aprovados (Clique para ver)</p>
               </div>
-              <span className="material-symbols-outlined text-4xl text-emerald-500/30">payments</span>
+              <Banknote className="text-4xl text-emerald-500/30" />
             </button>
 
             <button 
@@ -2616,7 +2616,7 @@ export default function AdminPanel() {
                 </p>
                 <p className="text-[11px] text-on-surface-variant/70 mt-1">Descontos aplicados via cupões (Clique para ver)</p>
               </div>
-              <span className="material-symbols-outlined text-4xl text-amber-500/30">price_check</span>
+              <BadgeDollarSign className="text-4xl text-amber-500/30" />
             </button>
 
             <button 
@@ -2633,7 +2633,7 @@ export default function AdminPanel() {
                 </p>
                 <p className="text-[11px] text-on-surface-variant/70 mt-1">Traders com comissões/convites (Clique para ver)</p>
               </div>
-              <span className="material-symbols-outlined text-4xl text-primary/30">handshake</span>
+              <Handshake className="text-4xl text-primary/30" />
             </button>
           </div>
 
@@ -2798,7 +2798,7 @@ export default function AdminPanel() {
           {affiliateTab === 'config' && (
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl">
             <h3 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">rule</span> Ajuste das Diretrizes de Afiliados (Business)
+              <ClipboardList className="text-primary" /> Ajuste das Diretrizes de Afiliados (Business)
             </h3>
             <p className="text-xs text-on-surface-variant max-w-3xl leading-relaxed mb-6">
               Defina abaixo qual modalidade de recompensa ou comissão será oferecida por padrão a todos os traders que promoverem a plataforma. Pode alternar livremente; o sistema reconfigura a área de afiliados de forma síncrona.
@@ -2816,7 +2816,7 @@ export default function AdminPanel() {
                     : 'bg-surface-container-high/40 border-outline-variant/15 text-on-surface hover:bg-surface-container-high'
                 }`}
               >
-                <span className="material-symbols-outlined text-amber-500 text-3xl">gif_box</span>
+                <Gift className="text-amber-500 text-3xl" />
                 <div>
                   <p className="font-bold text-sm">Opção 1: Convidar 5 = 1 Mês Grátis (Modo Parceria)</p>
                   <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
@@ -2836,7 +2836,7 @@ export default function AdminPanel() {
                     : 'bg-surface-container-high/40 border-outline-variant/15 text-on-surface hover:bg-surface-container-high'
                 }`}
               >
-                <span className="material-symbols-outlined text-emerald-500 text-3xl">currency_lira</span>
+                <Coins className="text-emerald-500 text-3xl" />
                 <div>
                   <p className="font-bold text-sm font-headline uppercase tracking-tight text-white">Opção 2: 30% de Comissões em Dinheiro</p>
                   <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
@@ -2854,7 +2854,7 @@ export default function AdminPanel() {
             <div className="p-6 border-b border-outline-variant/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container">
               <div>
                 <h3 className="font-bold text-sm text-on-surface uppercase tracking-wider flex items-center gap-2">
-                  <span className="material-symbols-outlined text-amber-500">pending_actions</span> Comissões & Indicações por Confirmar
+                  <Clock className="text-amber-500" /> Comissões & Indicações por Confirmar
                 </h3>
                 <p className="text-xs text-on-surface-variant mt-0.5">Transações geradas por primeiros pagamentos de usuários convidados</p>
               </div>
@@ -2938,7 +2938,7 @@ export default function AdminPanel() {
             <div className="p-6 border-b border-outline-variant/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container">
               <div>
                 <h3 className="font-bold text-sm text-on-surface uppercase tracking-wider flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-500">account_balance_wallet</span> Solicitatções de Saques de Afiliados
+                  <Wallet className="text-emerald-500" /> Solicitatções de Saques de Afiliados
                 </h3>
                 <p className="text-xs text-on-surface-variant mt-0.5">Pedidos de transferência de fundos provenientes de comissões acumuladas</p>
               </div>
@@ -3027,7 +3027,7 @@ export default function AdminPanel() {
              <div className="p-6 border-b border-outline-variant/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container">
                <div>
                   <h3 className="font-bold text-sm text-on-surface uppercase tracking-wider flex items-center gap-2">
-                    <span className="material-symbols-outlined text-cyan-400">group_add</span> Registo de Testes Grátis (Geração de Leads)
+                    <UserPlus className="text-cyan-400" /> Registo de Testes Grátis (Geração de Leads)
                   </h3>
                   <p className="text-xs text-on-surface-variant mt-0.5">Membros convidados que efetuaram sucesso no registo. Estes aguardam converter para a sua subscrição.</p>
                </div>

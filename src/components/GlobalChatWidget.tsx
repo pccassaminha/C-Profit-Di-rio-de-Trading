@@ -2,7 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, auth, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
-import { Send, Users, UserPlus, Settings, Info, Lock, Key, Edit2, Trash2, X, ShieldCheck, MessageSquare, Maximize2, Minimize2, MoreHorizontal, Image, ExternalLink } from 'lucide-react';
+
+import { Send, Users, UserPlus, Settings, Info, Lock, Key, Edit2, Trash2, X, ShieldCheck, MessageSquare, Maximize2, Minimize2, MoreHorizontal, Image, ExternalLink, MessageCircle, ArrowLeft, CheckCheck } from 'lucide-react';
+
+
+
 
 interface Chat {
   id: string;
@@ -633,7 +637,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                 <div className="p-4 border-b border-outline-variant/10 bg-surface-container-lowest flex justify-between items-center shrink-0">
                   <div className="flex items-center gap-3">
                     <button onClick={() => setActiveChat(null)} className="p-1 -ml-1 hover:bg-surface-container rounded-lg md:hidden">
-                       <span className="material-symbols-outlined text-on-surface-variant">arrow_back</span>
+                       <ArrowLeft className="text-on-surface-variant" />
                     </button>
                     
                     {/* Chat Header Avatar/Details Dynamic rendering */}
@@ -751,7 +755,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                             <span className="text-[9px] font-medium">
                               {msg.createdAt ? new Date(msg.createdAt.toDate ? msg.createdAt.toDate() : msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                             </span>
-                            {isMine && <span className="material-symbols-outlined text-[12px]">done_all</span>}
+                            {isMine && <CheckCheck className="text-[12px]" />}
                           </div>
                         </div>
                       </div>
@@ -1012,9 +1016,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
                         <h4 className="font-bold text-xs text-on-surface text-left truncate group-hover:text-primary transition-colors">{name}</h4>
                         <p className="text-[10px] text-on-surface-variant text-left truncate">Enviar mensagem directa</p>
                       </div>
-                      <span className="material-symbols-outlined text-[18px] text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                        chat_bubble
-                      </span>
+                      <MessageCircle className="text-[18px] text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   );
                 });

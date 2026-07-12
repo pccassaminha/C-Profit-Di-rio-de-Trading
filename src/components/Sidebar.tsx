@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTrades } from '../hooks/useTrades';
+import { LayoutDashboard, FileText, Calendar, CreditCard, Wallet, Globe, Users, Handshake, Crown, Settings, HelpCircle, LogOut } from 'lucide-react';
 import { auth } from '../firebase';
 
 export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab: string, setActiveTab: (tab: string) => void, isOpen: boolean }) {
@@ -27,14 +28,14 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
   };
 
   const navItems = [
-    { id: 'dashboard', icon: 'dashboard', label: 'Performance' },
-    { id: 'journal', icon: 'receipt_long', label: 'Diário de Trades' },
-    { id: 'planner', icon: 'calendar_today', label: 'Planejamento' },
-    { id: 'payments', icon: 'payments', label: 'Pagamentos' },
-    { id: 'withdrawals', icon: 'account_balance_wallet', label: 'Levantamentos' },
-    { id: 'panorama', icon: 'explore', label: 'Panorama Global' },
-    { id: 'community', icon: 'groups', label: 'Comunidade' },
-    { id: 'affiliates_user', icon: 'handshake', label: 'Área de Afiliado' },
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Performance' },
+    { id: 'journal', icon: FileText, label: 'Diário de Trades' },
+    { id: 'planner', icon: Calendar, label: 'Planejamento' },
+    { id: 'payments', icon: CreditCard, label: 'Pagamentos' },
+    { id: 'withdrawals', icon: Wallet, label: 'Levantamentos' },
+    { id: 'panorama', icon: Globe, label: 'Panorama Global' },
+    { id: 'community', icon: Users, label: 'Comunidade' },
+    { id: 'affiliates_user', icon: Handshake, label: 'Área de Afiliado' },
   ];
 
   return (
@@ -66,7 +67,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
                 : 'text-on-surface-variant hover:text-primary hover:bg-surface-container border-l-4 border-transparent'
             }`}
           >
-            <span className="material-symbols-outlined" style={activeTab === item.id ? { fontVariationSettings: "'FILL' 1" } : {}}>{item.icon}</span>
+            <item.icon className="w-5 h-5 shrink-0" strokeWidth={activeTab === item.id ? 2.5 : 2} />
             {isOpen && <span className={`font-body whitespace-nowrap ${activeTab === item.id ? 'font-bold' : 'font-medium'}`}>{item.label}</span>}
           </button>
         ))}
@@ -78,7 +79,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
             title={!isOpen ? "Planos" : undefined}
             className={`flex items-center transition-colors text-left ${isOpen ? 'gap-3 text-sm w-full' : 'justify-center'} ${activeTab === 'plans' ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
           >
-            <span className="material-symbols-outlined text-[20px]">workspace_premium</span> 
+            <Crown className="w-5 h-5 shrink-0" /> 
             {isOpen && <span className="whitespace-nowrap">Planos de Assinatura</span>}
           </button>
           <button 
@@ -86,7 +87,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
             title={!isOpen ? "Configurações" : undefined}
             className={`flex items-center transition-colors text-left ${isOpen ? 'gap-3 text-sm w-full' : 'justify-center'} ${activeTab === 'settings' ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
           >
-            <span className="material-symbols-outlined text-[20px]">settings</span> 
+            <Settings className="w-5 h-5 shrink-0" /> 
             {isOpen && <span className="whitespace-nowrap">Configurações</span>}
           </button>
           <button 
@@ -94,7 +95,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
             title={!isOpen ? "Suporte" : undefined}
             className={`flex items-center transition-colors text-left ${isOpen ? 'gap-3 text-sm w-full' : 'justify-center'} ${activeTab === 'support' ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
           >
-            <span className="material-symbols-outlined text-[20px]">help</span> 
+            <HelpCircle className="w-5 h-5 shrink-0" /> 
             {isOpen && <span className="whitespace-nowrap">Suporte</span>}
           </button>
           <button 
@@ -102,7 +103,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
             title={!isOpen ? "Sair da Conta" : undefined}
             className={`flex items-center transition-colors text-left mt-2 py-2 border-t border-outline-variant/10 ${isOpen ? 'gap-3 text-sm w-full' : 'justify-center'} text-error/60 hover:text-error`}
           >
-            <span className="material-symbols-outlined text-[20px]">logout</span> 
+            <LogOut className="w-5 h-5 shrink-0" /> 
             {isOpen && <span className="whitespace-nowrap font-bold uppercase tracking-widest text-[10px]">Encerrar Sessão</span>}
           </button>
         </div>

@@ -212,3 +212,8 @@ body {
   word-wrap: normal;
 }
 
+
+/* Horizontal Scrollbar */
+::-webkit-scrollbar:horizontal {
+  height: 4px;
+}

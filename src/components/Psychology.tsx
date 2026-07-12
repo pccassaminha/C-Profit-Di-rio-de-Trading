@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 
+import { Link, Save, Send, Brain, Edit2, Trash2, BrainCircuit } from 'lucide-react';
+
 export default function Psychology() {
   const [notes, setNotes] = useState<any[]>([]);
   const [newNote, setNewNote] = useState({ content: '', link: '' });
@@ -97,7 +99,7 @@ export default function Psychology() {
         
         <div className="border-t border-outline-variant/20 pt-4 mt-2 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
           <div className="flex-1 w-full flex items-center gap-2 bg-surface-container px-4 py-2 rounded-xl border border-outline-variant/30 focus-within:border-primary transition-colors">
-            <span className="material-symbols-outlined text-on-surface-variant text-sm">link</span>
+            <Link className="text-on-surface-variant text-sm" />
             <input
               type="url"
               value={newNote.link}
@@ -120,7 +122,7 @@ export default function Psychology() {
               disabled={isSaving || !newNote.content.trim()}
               className="flex-1 md:flex-none px-6 py-2 rounded-xl bg-primary text-on-primary font-bold hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
             >
-              <span className="material-symbols-outlined text-sm">{editingNote ? 'save' : 'send'}</span>
+              {editingNote ? <Save className="text-sm" /> : <Send className="text-sm" />}
               {editingNote ? 'Atualizar' : 'Publicar'}
             </button>
           </div>
@@ -134,7 +136,7 @@ export default function Psychology() {
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary font-bold">
-                  <span className="material-symbols-outlined">psychology</span>
+                  <Brain className="" />
                 </div>
                 <div>
                   <p className="font-bold text-on-surface text-sm">Nota Psicológica</p>
@@ -146,10 +148,10 @@ export default function Psychology() {
               </div>
               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => handleEdit(note)} className="w-8 h-8 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors">
-                  <span className="material-symbols-outlined text-sm">edit</span>
+                  <Edit2 className="text-sm" />
                 </button>
                 <button onClick={() => handleDelete(note.id)} className="w-8 h-8 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-error transition-colors">
-                  <span className="material-symbols-outlined text-sm">delete</span>
+                  <Trash2 className="text-sm" />
                 </button>
               </div>
             </div>
@@ -165,14 +167,14 @@ export default function Psychology() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-3 bg-surface-container rounded-xl text-primary hover:underline hover:bg-surface-container-highest transition-colors w-full md:w-auto overflow-hidden"
               >
-                <span className="material-symbols-outlined text-sm shrink-0">link</span>
+                <Link className="text-sm shrink-0" />
                 <span className="truncate text-sm font-medium">{note.link}</span>
               </a>
             )}
           </div>
         )) : (
           <div className="text-center py-12 bg-surface-container-low border border-outline-variant/20 rounded-2xl">
-            <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-4">psychology_alt</span>
+            <BrainCircuit className="text-4xl text-on-surface-variant mb-4" />
             <h3 className="text-lg font-bold text-on-surface mb-2">Seu Diário Mental está Vazio</h3>
             <p className="text-on-surface-variant text-sm">Comece a registrar seus pensamentos e reflexões acima.</p>
           </div>

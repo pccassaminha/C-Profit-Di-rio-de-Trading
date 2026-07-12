@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { DayPicker, DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+import { Calendar, ChevronUp, ChevronDown } from 'lucide-react';
 import 'react-day-picker/style.css';
 
 interface DateRangePickerProps {
@@ -43,11 +45,9 @@ export function DateRangePicker({ dateRange, onDateRangeChange, className = '' }
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 bg-surface-container-low border border-outline-variant/20 text-on-surface px-4 py-2.5 rounded-lg text-sm font-bold outline-none cursor-pointer hover:bg-surface-container transition-colors"
       >
-        <span className="material-symbols-outlined text-[20px]">calendar_month</span>
+        <Calendar className="text-[20px]" />
         {displayValue}
-        <span className="material-symbols-outlined text-[20px] ml-2">
-          {isOpen ? 'expand_less' : 'expand_more'}
-        </span>
+        {isOpen ? <ChevronUp className="text-[20px] ml-2" /> : <ChevronDown className="text-[20px] ml-2" />}
       </button>
 
       {isOpen && (

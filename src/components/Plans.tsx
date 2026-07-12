@@ -6,6 +6,8 @@ import { CreditCard, Check, ShieldCheck, Zap, Star, LayoutGrid, Smartphone, Mess
 import Modal from './Modal';
 import CountryDropdown from './CountryDropdown';
 
+import { Lock, PartyPopper, Ticket, PiggyBank, AlertTriangle } from 'lucide-react';
+
 // Helper to parse price string containing dots, commas, spaces, etc. into a Number
 const parsePriceToNumber = (val: string | number): number => {
   if (typeof val === 'number') return val;
@@ -594,7 +596,7 @@ Fico no aguardo, obrigado!`;
       {forcedExpired && (
         <div className="bg-error/10 border border-error/50 p-6 rounded-3xl flex items-center gap-6 animate-in slide-in-from-top duration-500">
           <div className="w-14 h-14 bg-error/20 rounded-2xl flex items-center justify-center text-error shadow-lg shadow-error/10">
-            <span className="material-symbols-outlined text-3xl">lock</span>
+            <Lock className="text-3xl" />
           </div>
           <div>
             <h2 className="text-error font-black text-xl uppercase tracking-tighter">
@@ -622,7 +624,7 @@ Fico no aguardo, obrigado!`;
         <div className="bg-gradient-to-r from-[#00f5a0]/10 to-primary/10 border-2 border-[#00f5a0]/30 p-6 rounded-[24px] flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl animate-in slide-in-from-bottom duration-500">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-[#00f5a0]/20 rounded-2xl flex items-center justify-center text-[#00f5a0] shadow-[0_0_20px_rgba(0,245,160,0.15)] shrink-0 animate-pulse">
-              <span className="material-symbols-outlined text-3xl">celebration</span>
+              <PartyPopper className="text-3xl" />
             </div>
             <div>
               <h3 className="text-[#00f5a0] font-black text-lg uppercase tracking-wider">
@@ -654,7 +656,7 @@ Fico no aguardo, obrigado!`;
         
         <div className="space-y-3 flex-1">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-2xl animate-bounce">local_activity</span>
+            <Ticket className="text-primary text-2xl animate-bounce" />
             <h3 className="text-lg font-black text-on-surface uppercase tracking-tight">Tem um Cupom de Desconto?</h3>
           </div>
           
@@ -716,7 +718,7 @@ Fico no aguardo, obrigado!`;
                 {/* Visual blocking overlay for used trial */}
                 {isTrialBlocked && (
                   <div className="absolute inset-0 bg-[#080e1a]/85 rounded-[24px] z-[60] flex flex-col items-center justify-center p-6 text-center select-none backdrop-blur-[2px] transition-all">
-                    <span className="material-symbols-outlined text-rose-500 text-3xl mb-3 animate-pulse">lock</span>
+                    <Lock className="text-rose-500 text-3xl mb-3 animate-pulse" />
                     <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Teste Já Utilizado</h4>
                     <p className="text-[10px] text-on-surface-variant font-medium leading-relaxed max-w-[200px]">
                       O plano de 30 dias por 500 Kz é de uso único. Selecione uma opção a partir de 5.000 Kz.
@@ -940,7 +942,7 @@ Fico no aguardo, obrigado!`;
                               <div className="border-t border-dashed border-[#00f5a0]/20 my-1"></div>
                               <div className="flex justify-between items-center text-sm font-black text-white">
                                 <span className="uppercase tracking-wider flex items-center gap-1.5 text-[11px] text-[#00f5a0]">
-                                  <span className="material-symbols-outlined text-sm">savings</span>
+                                  <PiggyBank className="text-sm" />
                                   Poupança Total:
                                 </span>
                                 <span className="text-[#00f5a0] font-mono tracking-tight font-black text-base bg-[#00f5a0]/15 px-3 py-1 rounded-xl">
@@ -959,14 +961,14 @@ Fico no aguardo, obrigado!`;
                                   onClick={() => setShowModalCouponInput(true)}
                                   className="text-[11px] font-black text-primary hover:underline flex items-center gap-1.5 transition-all text-left uppercase tracking-widest"
                                 >
-                                  <span className="material-symbols-outlined text-sm">local_activity</span>
+                                  <Ticket className="text-sm" />
                                   Tens um cupão ?
                                 </button>
                               ) : (
                                 <div className="space-y-2.5 animate-in slide-in-from-top-1 duration-200">
                                   <div className="flex items-center justify-between">
                                     <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-1">
-                                      <span className="material-symbols-outlined text-xs">local_activity</span>
+                                      <Ticket className="text-xs" />
                                       Código do Cupão
                                     </span>
                                     <button 
@@ -1317,7 +1319,7 @@ Fico no aguardo, obrigado!`;
                   {payments.some(p => p.status === 'pending') ? (
                     <div className="flex flex-col gap-2 p-5 bg-error/10 border border-error/20 rounded-2xl">
                       <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-error text-xl">warning</span>
+                        <AlertTriangle className="text-error text-xl" />
                         <p className="text-xs font-black text-error uppercase tracking-wider">
                           Solicitação Pendente Detectada
                         </p>

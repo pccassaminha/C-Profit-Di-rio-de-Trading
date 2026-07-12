@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { LayoutDashboard, FileText, Calendar, CreditCard, Wallet, Globe, Users, Handshake, Crown, Settings, HelpCircle, LogOut, Menu, X, Grid } from 'lucide-react';
 
 interface MobileBottomNavProps {
   activeTab: string;
@@ -45,21 +46,21 @@ export default function MobileBottomNav({ activeTab, setActiveTab }: MobileBotto
 
   // Main active bottom items
   const mainItems = [
-    { id: 'dashboard', icon: 'dashboard', label: 'Desempenho' },
-    { id: 'journal', icon: 'receipt_long', label: 'Diário' },
-    { id: 'planner', icon: 'calendar_today', label: 'Planejamento' },
-    { id: 'community', icon: 'groups', label: 'Comunidade' },
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Desempenho' },
+    { id: 'journal', icon: FileText, label: 'Diário' },
+    { id: 'planner', icon: Calendar, label: 'Planejamento' },
+    { id: 'community', icon: Users, label: 'Comunidade' },
   ];
 
   // Secondary items shown inside the "More" drawer
   const secondaryItems = [
-    { id: 'panorama', icon: 'explore', label: 'Panorama Global', desc: 'Análise, calendários e feeds técnicos' },
-    { id: 'withdrawals', icon: 'account_balance_wallet', label: 'Levantamentos', desc: 'Gerencie saques e aportes' },
-    { id: 'affiliates_user', icon: 'handshake', label: 'Painel do Afiliado', desc: 'Gere receita indicando traders' },
-    { id: 'payments', icon: 'payments', label: 'Faturas e Registros', desc: 'Histórico de transações' },
-    { id: 'plans', icon: 'workspace_premium', label: 'Assinaturas', desc: 'Atualize seu plano de trading' },
-    { id: 'settings', icon: 'settings', label: 'Configurações', desc: 'Ajuste objetivos e corretoras' },
-    { id: 'support', icon: 'help', label: 'Suporte', desc: 'Fale com nossa equipe técnica' },
+    { id: 'panorama', icon: Globe, label: 'Panorama Global', desc: 'Análise, calendários e feeds técnicos' },
+    { id: 'withdrawals', icon: Wallet, label: 'Levantamentos', desc: 'Gerencie saques e aportes' },
+    { id: 'affiliates_user', icon: Handshake, label: 'Painel do Afiliado', desc: 'Gere receita indicando traders' },
+    { id: 'payments', icon: CreditCard, label: 'Faturas e Registros', desc: 'Histórico de transações' },
+    { id: 'plans', icon: Crown, label: 'Assinaturas', desc: 'Atualize seu plano de trading' },
+    { id: 'settings', icon: Settings, label: 'Configurações', desc: 'Ajuste objetivos e corretoras' },
+    { id: 'support', icon: HelpCircle, label: 'Suporte', desc: 'Fale com nossa equipe técnica' },
   ];
 
   const displayUserName = userName || currentUser?.displayName || 'Traders';
@@ -83,12 +84,7 @@ export default function MobileBottomNav({ activeTab, setActiveTab }: MobileBotto
                 isActive ? 'text-primary scale-105' : 'text-on-surface-variant'
               }`}
             >
-              <span 
-                className="material-symbols-outlined text-[20px] transition-all"
-                style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}
-              >
-                {item.icon}
-              </span>
+              <item.icon className="w-5 h-5 shrink-0 transition-all" strokeWidth={isActive ? 2.5 : 2} />
               <span className={`text-[10px] tracking-wide font-medium font-body transition-colors ${isActive ? 'font-bold text-primary' : 'text-on-surface-variant'}`}>
                 {item.label}
               </span>
@@ -106,12 +102,7 @@ export default function MobileBottomNav({ activeTab, setActiveTab }: MobileBotto
             isMoreOpen ? 'text-primary scale-105' : 'text-on-surface-variant'
           }`}
         >
-          <span 
-            className="material-symbols-outlined text-[20px]"
-            style={isMoreOpen ? { fontVariationSettings: "'FILL' 1" } : {}}
-          >
-            grid_view
-          </span>
+          <Grid className="w-5 h-5 shrink-0 transition-all" strokeWidth={isMoreOpen ? 2.5 : 2} />
           <span className={`text-[10px] tracking-wide font-medium font-body ${isMoreOpen ? 'font-bold text-primary' : 'text-on-surface-variant'}`}>
             Mais
           </span>
@@ -172,9 +163,7 @@ export default function MobileBottomNav({ activeTab, setActiveTab }: MobileBotto
                 }`}
               >
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-primary/20' : 'bg-surface-container'}`}>
-                  <span className="material-symbols-outlined text-[18px]">
-                    {item.icon}
-                  </span>
+                  <item.icon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-[11px] font-extrabold tracking-wide uppercase block text-on-surface">
@@ -193,7 +182,7 @@ export default function MobileBottomNav({ activeTab, setActiveTab }: MobileBotto
             className="w-full flex items-center gap-3.5 p-3.5 rounded-2xl bg-error/5 border border-error/20 text-error hover:bg-error/10 transition-colors text-left font-bold mt-4"
           >
             <div className="w-8 h-8 rounded-xl bg-error/15 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[18px]">logout</span>
+              <LogOut className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
             </div>
             <div>
               <span className="text-[11px] font-black tracking-widest uppercase block">

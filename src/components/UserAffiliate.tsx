@@ -1,20 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { 
-  Copy, 
-  Check, 
-  Users, 
-  DollarSign, 
-  Gift, 
-  ArrowRight, 
-  TrendingUp, 
-  Wallet, 
-  Clock, 
-  AlertCircle,
-  HelpCircle,
-  Award
-} from 'lucide-react';
+import { Copy, Check, Users, DollarSign, Gift, ArrowRight, TrendingUp, Wallet, Clock, AlertCircle, HelpCircle, Award, LayoutDashboard, Network, CheckCircle } from 'lucide-react';
 
 interface ReferralRecord {
   id: string;
@@ -307,13 +294,13 @@ export default function UserAffiliate() {
         {/* Affiliate Sub-Tabs */}
         <div className="flex flex-wrap gap-2 p-2 bg-surface-container rounded-2xl border border-outline-variant/20 sticky top-[72px] z-20 backdrop-blur-md shadow-sm">
           <button onClick={() => setActiveTab('overview')} className={`px-4 py-2 flex items-center gap-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'overview' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>
-            <span className="material-symbols-outlined text-[18px]">dashboard</span> Início do Programa
+            <LayoutDashboard className="text-[18px]" /> Início do Programa
           </button>
           <button onClick={() => { setActiveTab('network'); setNetworkSearch(''); }} className={`px-4 py-2 flex items-center gap-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'network' ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>
-            <span className="material-symbols-outlined text-[18px]">lan</span> Minha Rede de Indicados
+            <Network className="text-[18px]" /> Minha Rede de Indicados
           </button>
           <button onClick={() => setActiveTab('payouts')} className={`px-4 py-2 flex items-center gap-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'payouts' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}>
-            <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span> Receitas & Saques
+            <Wallet className="text-[18px]" /> Receitas & Saques
           </button>
         </div>
 
@@ -567,7 +554,7 @@ export default function UserAffiliate() {
             {/* Referral table list */}
             <div className="p-5 border-b border-outline-variant/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container/20">
               <h4 className="text-sm font-black uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
-                <span className="material-symbols-outlined text-cyan-500">lan</span> Minhas Recomendações
+                <Network className="text-cyan-500" /> Minhas Recomendações
               </h4>
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <input 
@@ -640,7 +627,7 @@ export default function UserAffiliate() {
 
               {payoutSuccess ? (
                 <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-center space-y-2">
-                  <span className="material-symbols-outlined text-emerald-500 text-3xl">check_circle</span>
+                  <CheckCircle className="text-emerald-500 text-3xl" />
                   <p className="text-xs font-bold text-on-surface">Pedido Enviado com Sucesso!</p>
                   <p className="text-[11px] text-on-surface-variant leading-relaxed">
                     A sua solicitação foi encaminhada para os Maestros. O pagamento será feito por transferência bancária.

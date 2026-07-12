@@ -3,7 +3,11 @@ import { db, auth, storage } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, increment, deleteDoc, getDoc, getDocs, setDoc, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
-import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft } from 'lucide-react';
+
+import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft, Megaphone, Edit2, Ban, ArrowRight, Compass } from 'lucide-react';
+
+
+
 
 interface Post {
   id: string;
@@ -1054,7 +1058,7 @@ export default function Community() {
             <div key={b.id} className="bg-primary/10 border border-primary/30 rounded-3xl p-6 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-2 h-full bg-primary" />
               <div className="flex items-center gap-3 mb-2">
-                <span className="material-symbols-outlined text-primary">campaign</span>
+                <Megaphone className="text-primary" />
                 <span className="text-[10px] uppercase tracking-widest font-black text-primary">Comunicado Oficial - {b.author || 'Admin'}</span>
                 <span className="text-[10px] text-on-surface-variant ml-auto opacity-70">
                   {new Date(b.createdAt).toLocaleDateString()}
@@ -1104,7 +1108,7 @@ export default function Community() {
                         }}
                         className="w-full text-left px-4 py-3 text-sm text-on-surface hover:bg-surface-container transition-colors flex items-center gap-3"
                       >
-                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                        <Edit2 className="text-[18px]" />
                         Editar
                       </button>
                      )}
@@ -1122,7 +1126,7 @@ export default function Community() {
                           onClick={() => handleBlockUser(post.userId)}
                           className="w-full text-left px-4 py-3 text-sm text-error hover:bg-error/10 transition-colors flex items-center gap-3 border-t border-outline-variant/10"
                         >
-                          <span className="material-symbols-outlined text-[18px]">block</span>
+                          <Ban className="text-[18px]" />
                           Bloquear
                         </button>
                       </>
@@ -1392,11 +1396,11 @@ export default function Community() {
               
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-[#00f5a0]/10 flex items-center justify-center text-[#00f5a0] border border-[#00f5a0]/20 shrink-0 group-hover:scale-110 transition-transform duration-300 font-normal">
-                  {platform === 'Telegram' && <span className="material-symbols-outlined text-[24px]">send</span>}
-                  {platform === 'WhatsApp' && <span className="material-symbols-outlined text-[24px]">chat</span>}
-                  {platform === 'Discord' && <span className="material-symbols-outlined text-[24px]">forum</span>}
+                  {platform === 'Telegram' && <Send className="text-[24px]" />}
+                  {platform === 'WhatsApp' && <MessageSquare className="text-[24px]" />}
+                  {platform === 'Discord' && <MessageCircle className="text-[24px]" />}
                   {platform !== 'Telegram' && platform !== 'WhatsApp' && platform !== 'Discord' && (
-                    <span className="material-symbols-outlined text-[24px]">globe</span>
+                    <Globe className="text-[24px]" />
                   )}
                 </div>
                 
@@ -1419,7 +1423,7 @@ export default function Community() {
                   className="flex-1 py-3 px-5 bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-xs tracking-wider shadow-lg shadow-[#00f5a0]/15 hover:scale-[1.01] active:scale-95 transition-all cursor-pointer"
                 >
                   <span>Entrar no {platform}</span>
-                  <span className="material-symbols-outlined text-[16px] font-black">arrow_forward</span>
+                  <ArrowRight className="text-[16px] font-black" />
                 </a>
               </div>
             </div>
@@ -1429,7 +1433,7 @@ export default function Community() {
         {/* FRIEND REQUESTS CARD & WIDGET (PENDING ACTIONS) */}
         <div className="bg-surface-container-low border border-outline-variant/10 rounded-[32px] p-6 shadow-xl space-y-4">
            <div className="flex items-center gap-2 pb-2 border-b border-outline-variant/10">
-             <span className="material-symbols-outlined text-primary">group_add</span>
+             <UserPlus className="text-primary" />
              <h3 className="font-extrabold text-xs text-on-surface-variant uppercase tracking-widest pl-1">Solicitações Pendentes</h3>
              {incomingRequests.length > 0 && (
                <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full font-black">
@@ -1481,7 +1485,7 @@ export default function Community() {
         {/* TRADERS DA COMUNIDADE QUE TALVEZ CONHECES */}
         <div className="bg-surface-container-low border border-outline-variant/10 rounded-[32px] p-6 shadow-xl space-y-4">
            <div className="flex items-center gap-2 pb-2 border-b border-outline-variant/10">
-             <span className="material-symbols-outlined text-secondary">explore</span>
+             <Compass className="text-secondary" />
              <h3 className="font-extrabold text-xs text-on-surface-variant uppercase tracking-widest pl-1">Traders que talvez conheças</h3>
            </div>
            {getRecommendedTraders().length === 0 ? (
@@ -2218,7 +2222,7 @@ export default function Community() {
                                     </p>
                                     {isFriend ? (
                                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#00f5a0]/10 text-[#00f5a0] text-[10px] font-bold">
-                                        <span className="material-symbols-outlined text-[12px]">done</span>
+                                        <Check className="text-[12px]" />
                                         Você e {selectedProfileUser.name.split(' ')[0]} são amigos
                                       </span>
                                     ) : (
@@ -2835,7 +2839,7 @@ export default function Community() {
                                   {isFriend ? (
                                     <div className="pt-2">
                                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#00f5a0]/10 text-[#00f5a0] text-xs font-bold shadow-sm">
-                                        <span className="material-symbols-outlined text-[14px]">done</span>
+                                        <Check className="text-[14px]" />
                                         Você e {selectedProfileUser.name} são amigos
                                       </span>
                                     </div>

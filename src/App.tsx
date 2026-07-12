@@ -27,6 +27,8 @@ import Termos from './components/Termos';
 import Privacidade from './components/Privacidade';
 import Ajuda from './components/Ajuda';
 
+import { Handshake, LogOut, Ticket, X, Copy } from 'lucide-react';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [journalView, setJournalView] = useState<'list' | 'form' | 'detail'>(() => {
@@ -212,7 +214,7 @@ export default function App() {
         {localStorage.getItem('partnerModeActive') === 'true' && (
           <div className="bg-[#00f5a0]/15 border-b border-[#00f5a0]/30 px-6 py-2.5 flex items-center justify-between text-[#00f5a0] text-xs font-semibold select-none animate-in fade-in slide-in-from-top duration-300">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[16px]">handshake</span>
+              <Handshake className="text-[16px]" />
               <span>Sessão de Parceiro de Portfólio Ativa: Você está acessando a conta e dados de <strong>{auth.currentUser?.displayName}</strong></span>
             </div>
             <button 
@@ -220,7 +222,7 @@ export default function App() {
               onClick={() => auth.signOut()}
               className="hover:underline flex items-center gap-1 font-bold"
             >
-              Excluir Sessão <span className="material-symbols-outlined text-xs">logout</span>
+              Excluir Sessão <LogOut className="text-xs" />
             </button>
           </div>
         )}
@@ -238,7 +240,7 @@ export default function App() {
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-[#00f5a0]/15 rounded-xl flex items-center justify-center text-[#00f5a0] shrink-0">
-                 <span className="material-symbols-outlined text-xl">local_activity</span>
+                 <Ticket className="text-xl" />
               </div>
               <p className="font-extrabold text-xs uppercase tracking-wider text-[#00f5a0]">🎁 Cupom de 83% Ativado!</p>
             </div>
@@ -247,7 +249,7 @@ export default function App() {
               className="text-white/40 hover:text-white transition-colors p-1"
               title="Fechar"
             >
-              <span className="material-symbols-outlined text-sm">close</span>
+              <X className="text-sm" />
             </button>
           </div>
           
@@ -262,7 +264,7 @@ export default function App() {
                 onClick={handleCopyCoupon}
                 className="bg-[#00f5a0] hover:bg-[#00f5a0]/80 text-black px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shrink-0"
               >
-                <span className="material-symbols-outlined text-[10px]">content_copy</span>
+                <Copy className="text-[10px]" />
                 {copiedCoupon ? 'Copiado!' : 'Copiar'}
               </button>
             </div>

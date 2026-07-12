@@ -7,6 +7,8 @@ import { DateRangePicker } from './DateRangePicker';
 import { DatePicker } from './DatePicker';
 import { DateRange } from 'react-day-picker';
 
+import { Plus, X } from 'lucide-react';
+
 export default function Withdrawals() {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -150,7 +152,7 @@ export default function Withdrawals() {
             onClick={() => setIsModalOpen(true)}
             className="px-6 py-2.5 rounded-lg bg-primary text-on-primary font-bold shadow-xl shadow-primary/10 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <Plus className="text-sm" />
             Registrar
           </button>
         </div>
@@ -233,7 +235,7 @@ export default function Withdrawals() {
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-on-surface font-headline">Registrar Levantamento</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-on-surface-variant hover:text-on-surface">
-                <span className="material-symbols-outlined">close</span>
+                <X className="" />
               </button>
             </div>
             

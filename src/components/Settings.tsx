@@ -4,8 +4,12 @@ import Modal from './Modal';
 import CountryDropdown from './CountryDropdown';
 import { db, auth, registerPartnerAuth } from '../firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs, getDoc, addDoc } from 'firebase/firestore';
-import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle } from 'lucide-react';
+
 import { motion, AnimatePresence } from 'motion/react';
+
+import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle, Plus, Edit2, Trash2, Wallet, FileText, Flag, X, Save, RefreshCw, Eye, EyeOff, Eraser, Undo } from 'lucide-react';
+
+
 
 const COUNTRIES = [
   { code: 'AO', label: 'AO +244', dialCode: '+244', flag: '🇦🇴' },
@@ -1162,7 +1166,7 @@ export default function Settings() {
                       disabled={isSaving}
                       className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
                     >
-                      <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
+                      {isSaving ? <RefreshCw className="w-5 h-5 animate-spin shrink-0 mr-2" /> : <Save className="w-5 h-5 shrink-0 mr-2" />}
                       {isSaving ? 'A guardar...' : 'Salvar Dados'}
                     </button>
                   </div>
@@ -1211,7 +1215,7 @@ export default function Settings() {
                             <option value="GBP">Libra Esterlina (GBP)</option>
                             <option value="AOA">Kwanza Angolano (Kz)</option>
                           </select>
-                          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
                         </div>
                       </div>
 
@@ -1227,7 +1231,7 @@ export default function Settings() {
                             <option value="MM/DD/YYYY">MM/DD/YYYY (Ex: 12/31/2026)</option>
                             <option value="YYYY-MM-DD">YYYY-MM-DD (Ex: 2026-12-31)</option>
                           </select>
-                          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
                         </div>
                       </div>
                     </div>
@@ -1237,7 +1241,7 @@ export default function Settings() {
                       disabled={isSaving}
                       className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
                     >
-                      <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
+                      {isSaving ? <RefreshCw className="w-5 h-5 animate-spin shrink-0 mr-2" /> : <Save className="w-5 h-5 shrink-0 mr-2" />}
                       {isSaving ? 'A guardar...' : 'Salvar Preferências'}
                     </button>
                   </div>
@@ -1283,7 +1287,7 @@ export default function Settings() {
                             <option value="forex">Forex & Índices</option>
                             <option value="ob">Opções Binárias (OB)</option>
                           </select>
-                          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
                         </div>
                       </div>
 
@@ -1318,7 +1322,7 @@ export default function Settings() {
                             <option value="forex">Forex / Índices</option>
                             <option value="ob">Opções Binárias (OB)</option>
                           </select>
-                          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
                         </div>
                       </div>
                       
@@ -1334,7 +1338,7 @@ export default function Settings() {
                             <option value="forex">Apenas Forex / Índices</option>
                             <option value="ob">Apenas Opções Binárias</option>
                           </select>
-                          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
                         </div>
                       </div>
                     </div>
@@ -1344,7 +1348,7 @@ export default function Settings() {
                       disabled={isSaving}
                       className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
                     >
-                      <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
+                      {isSaving ? <RefreshCw className="w-5 h-5 animate-spin shrink-0 mr-2" /> : <Save className="w-5 h-5 shrink-0 mr-2" />}
                       {isSaving ? 'A guardar...' : 'Salvar Preferências'}
                     </button>
                   </div>
@@ -1395,7 +1399,7 @@ export default function Settings() {
                       }}
                       className="bg-primary text-on-primary px-4 py-2 rounded-lg text-sm font-bold hover:brightness-110 transition-all flex items-center gap-2"
                     >
-                      <span className="material-symbols-outlined text-sm">add</span>
+                      <Plus className="text-sm" />
                       Novo Objetivo
                     </button>
                   </div>
@@ -1427,9 +1431,7 @@ export default function Settings() {
                                     className={`transition-colors ${obj.hidden ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
                                     title={obj.hidden ? "Mostrar no Dashboard" : "Ocultar no Dashboard"}
                                   >
-                                    <span className="material-symbols-outlined text-sm">
-                                      {obj.hidden ? 'visibility_off' : 'visibility'}
-                                    </span>
+                                    {obj.hidden ? <visibility_off className="text-sm" /> : <visibility className="text-sm" />}
                                   </button>
                                   <button 
                                     onClick={() => {
@@ -1438,7 +1440,7 @@ export default function Settings() {
                                     }}
                                     className="text-on-surface-variant hover:text-primary transition-colors"
                                   >
-                                    <span className="material-symbols-outlined text-sm">edit</span>
+                                    <Edit2 className="text-sm" />
                                   </button>
                                   <button 
                                     onClick={async () => {
@@ -1455,7 +1457,7 @@ export default function Settings() {
                                     }}
                                     className="text-on-surface-variant hover:text-error transition-colors"
                                   >
-                                    <span className="material-symbols-outlined text-sm">delete</span>
+                                    <Trash2 className="text-sm" />
                                   </button>
                                 </div>
                               </div>
@@ -1539,7 +1541,7 @@ export default function Settings() {
                             <option value="simple">Sessão Simples</option>
                             <option value="subdivided">Sessão Subdividida</option>
                           </select>
-                          <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-sm">expand_more</span>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-sm" />
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -1644,7 +1646,7 @@ export default function Settings() {
                       disabled={isSaving}
                       className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
                     >
-                      <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
+                      {isSaving ? <RefreshCw className="w-5 h-5 animate-spin shrink-0 mr-2" /> : <Save className="w-5 h-5 shrink-0 mr-2" />}
                       {isSaving ? 'A guardar...' : 'Salvar Sessões'}
                     </button>
                   </div>
@@ -1760,7 +1762,7 @@ export default function Settings() {
                     disabled={isSaving}
                     className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
                   >
-                    <span className="material-symbols-outlined text-sm">{isSaving ? 'sync' : 'save'}</span>
+                    {isSaving ? <RefreshCw className="w-5 h-5 animate-spin shrink-0 mr-2" /> : <Save className="w-5 h-5 shrink-0 mr-2" />}
                     {isSaving ? 'A guardar...' : 'Salvar Conexão'}
                   </button>
                 </div>
@@ -1861,7 +1863,7 @@ export default function Settings() {
                       }}
                       className="p-2 rounded-lg bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 transition-colors flex items-center justify-center relative group/btn-clean"
                     >
-                      <span className="material-symbols-outlined text-sm">mop</span>
+                      <Eraser className="w-[18px] h-[18px] shrink-0" />
                       <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-surface-container-highest text-on-surface text-xs rounded shadow-xl opacity-0 hover:opacity-100 focus:opacity-100 group-hover/btn-clean:opacity-100 transition-opacity pointer-events-none z-10 border border-outline-variant/20">
                         Zerar Trades desta conta
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-surface-container-highest"></div>
@@ -1874,7 +1876,7 @@ export default function Settings() {
                       }}
                       className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors flex items-center justify-center relative group/btn-delete"
                     >
-                      <span className="material-symbols-outlined text-sm">delete</span>
+                      <Trash2 className="text-sm" />
                       <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-surface-container-highest text-on-surface text-xs rounded shadow-xl opacity-0 hover:opacity-100 focus:opacity-100 group-hover/btn-delete:opacity-100 transition-opacity pointer-events-none z-10 border border-outline-variant/20">
                         Excluir Conta
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-surface-container-highest"></div>
@@ -1940,7 +1942,7 @@ export default function Settings() {
                           onClick={handleUndoLastImport}
                           className="w-fit bg-error/10 text-error px-4 py-2 rounded-lg text-xs font-bold hover:bg-error/20 transition-all flex items-center gap-2"
                         >
-                          <span className="material-symbols-outlined text-sm">undo</span>
+                          <Undo className="w-[18px] h-[18px] shrink-0" />
                           Desfazer Importação
                         </button>
                       </div>
@@ -1971,7 +1973,7 @@ export default function Settings() {
                         onClick={handleResetAccounts}
                         className="bg-error/10 text-error font-bold px-6 py-3 rounded-lg hover:bg-error/20 transition-all flex border border-error/20 items-center justify-center gap-2 w-full h-full"
                       >
-                        <span className="material-symbols-outlined text-sm">account_balance_wallet</span>
+                        <Wallet className="text-sm" />
                         Zerar Contas
                       </button>
                       <div className="absolute bottom-full right-0 md:left-1/2 md:-translate-x-1/2 mb-2 w-64 p-3 bg-surface-container-highest text-on-surface text-xs rounded-lg shadow-xl opacity-0 hover:opacity-100 focus:opacity-100 group-hover/btn-accounts:opacity-100 transition-opacity pointer-events-none z-10 border border-outline-variant/20">
@@ -1985,7 +1987,7 @@ export default function Settings() {
                         onClick={handleResetTrades}
                         className="bg-error/10 text-error font-bold px-6 py-3 rounded-lg hover:bg-error/20 transition-all flex border border-error/20 items-center justify-center gap-2 w-full h-full"
                       >
-                        <span className="material-symbols-outlined text-sm">receipt_long</span>
+                        <FileText className="text-sm" />
                         Zerar Diário
                       </button>
                       <div className="absolute bottom-full right-0 md:left-1/2 md:-translate-x-1/2 mb-2 w-64 p-3 bg-surface-container-highest text-on-surface text-xs rounded-lg shadow-xl opacity-0 hover:opacity-100 focus:opacity-100 group-hover/btn-trades:opacity-100 transition-opacity pointer-events-none z-10 border border-outline-variant/20">
@@ -1999,7 +2001,7 @@ export default function Settings() {
                         onClick={handleResetObjectives}
                         className="bg-error/10 text-error font-bold px-6 py-3 rounded-lg hover:bg-error/20 transition-all flex border border-error/20 items-center justify-center gap-2 w-full h-full"
                       >
-                        <span className="material-symbols-outlined text-sm">flag</span>
+                        <Flag className="text-sm" />
                         Zerar Planos
                       </button>
                       <div className="absolute bottom-full right-0 md:left-1/2 md:-translate-x-1/2 mb-2 w-64 p-3 bg-surface-container-highest text-on-surface text-xs rounded-lg shadow-xl opacity-0 hover:opacity-100 focus:opacity-100 group-hover/btn-plans:opacity-100 transition-opacity pointer-events-none z-10 border border-outline-variant/20">
@@ -2013,7 +2015,7 @@ export default function Settings() {
                         onClick={handleResetSystem}
                         className="bg-error text-on-error font-bold px-6 py-3 rounded-lg hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-error/20 w-full h-full"
                       >
-                        <span className="material-symbols-outlined text-sm">delete_forever</span>
+                        <Trash2 className="text-sm" />
                         Reiniciar Sistema
                       </button>
                       <div className="absolute bottom-full right-0 md:left-1/2 md:-translate-x-1/2 mb-2 w-64 p-3 bg-surface-container-highest text-on-surface text-xs rounded-lg shadow-xl opacity-0 hover:opacity-100 focus:opacity-100 group-hover/btn-system:opacity-100 transition-opacity pointer-events-none z-10 border border-outline-variant/20">
@@ -2040,7 +2042,7 @@ export default function Settings() {
               onClick={() => setIsObjectiveModalOpen(false)}
               className="absolute top-6 right-6 text-on-surface-variant hover:text-on-surface transition-colors"
             >
-              <span className="material-symbols-outlined">close</span>
+              <X className="" />
             </button>
             
             <h2 className="text-2xl font-bold text-on-surface font-headline mb-6">
@@ -2126,7 +2128,7 @@ export default function Settings() {
                       <option value="Semana">Por Semana</option>
                       <option value="Geral">Geral</option>
                     </select>
-                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant" />
                   </div>
                 </div>
               </div>

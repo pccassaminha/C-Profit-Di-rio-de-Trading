@@ -5,11 +5,7 @@ import {
   doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, deleteDoc, getDocs, collectionGroup
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { 
-  Eye, EyeOff, MessageSquare, ThumbsUp, Trash2, Camera, MapPin, 
-  Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, 
-  Edit3, Mail, User, Home, Smartphone, KeyRound, Image as ImageIcon, Plus, ShieldCheck, HelpCircle, MoreVertical, Globe
-} from 'lucide-react';
+import { Eye, EyeOff, MessageSquare, ThumbsUp, Trash2, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Mail, User, Home, Smartphone, KeyRound, Image as ImageIcon, Plus, ShieldCheck, HelpCircle, MoreVertical, Globe } from 'lucide-react';
 import Modal from './Modal';
 import CountryDropdown from './CountryDropdown';
 
@@ -1334,7 +1330,7 @@ export default function Profile() {
                       className="w-full bg-surface-container hover:bg-surface-container-high transition-colors border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs focus:outline-none text-left flex justify-between items-center text-on-surface"
                     >
                       <span>Enviar link de alteração de palavra-passe para o meu e-mail</span>
-                      <span className="material-symbols-outlined text-[16px] text-on-surface-variant">mail</span>
+                      <Mail className="text-[16px] text-on-surface-variant" />
                     </button>
                   </div>
                 </div>

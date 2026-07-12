@@ -154,17 +154,26 @@ export default function Panorama() {
   const [technicalSymbol, setTechnicalSymbol] = useState<string>('FX:EURUSD');
   
   // Unified heatmap selector state
-  const [activeHeatmap, setActiveHeatmap] = useState<'sp500' | 'nasdaq' | 'djca' | 'nikkei' | 'forex' | 'crypto'>('forex');
+  const [activeHeatmap, setActiveHeatmap] = useState<'sp500' | 'nasdaq' | 'djca' | 'nikkei' | 'dax' | 'forex' | 'crypto'>('forex');
 
   // Technical symbols constant
-  const technicalSymbols = [
+    const technicalSymbols = [
+    // Majors
     { id: 'FX:EURUSD', label: 'EUR/USD' },
-    { id: 'FX:USDJPY', label: 'USD/JPY' },
     { id: 'FX:GBPUSD', label: 'GBP/USD' },
+    { id: 'FX:USDJPY', label: 'USD/JPY' },
     { id: 'FX:USDCHF', label: 'USD/CHF' },
-    { id: 'FX:AUDUSD', label: 'AUD/USD' },
     { id: 'FX:USDCAD', label: 'USD/CAD' },
+    { id: 'FX:AUDUSD', label: 'AUD/USD' },
     { id: 'FX:NZDUSD', label: 'NZD/USD' },
+    // Crosses
+    { id: 'FX:EURJPY', label: 'EUR/JPY' },
+    { id: 'FX:GBPJPY', label: 'GBP/JPY' },
+    { id: 'FX:EURGBP', label: 'EUR/GBP' },
+    { id: 'FX:AUDJPY', label: 'AUD/JPY' },
+    { id: 'FX:EURAUD', label: 'EUR/AUD' },
+    { id: 'FX:GBPAUD', label: 'GBP/AUD' },
+    // Commodities/Crypto
     { id: 'OANDA:XAUUSD', label: 'XAU/USD' },
     { id: 'BINANCE:BTCUSD', label: 'BTC/USD' },
   ] as const;
@@ -277,6 +286,24 @@ export default function Panorama() {
     height: "100%"
   };
 
+  const daxHeatmapConfig = {
+    dataSource: "DAX",
+    blockSize: "market_cap_basic",
+    blockColor: "change",
+    grouping: "sector",
+    locale: "br",
+    symbolUrl: "",
+    colorTheme: "dark",
+    exchanges: [],
+    hasTopBar: true,
+    isDataSetEnabled: true,
+    isZoomEnabled: true,
+    hasSymbolTooltip: true,
+    isMonoSize: false,
+    width: "100%",
+    height: "100%"
+  };
+
   // Upgraded custom-configured quotesConfig containing precisely requested symbols groups
   const quotesConfig = {
     width: '100%',
@@ -342,7 +369,7 @@ export default function Panorama() {
     colorTheme: 'dark'
   });
 
-  const getHeatmapProps = (type: 'sp500' | 'nasdaq' | 'djca' | 'nikkei' | 'forex' | 'crypto') => {
+  const getHeatmapProps = (type: 'sp500' | 'nasdaq' | 'djca' | 'nikkei' | 'dax' | 'forex' | 'crypto') => {
     switch (type) {
       case 'sp500':
         return {
@@ -363,6 +390,11 @@ export default function Panorama() {
         return {
           widgetType: 'stock-heatmap' as const,
           config: nikkeiHeatmapConfig
+        };
+      case 'dax':
+        return {
+          widgetType: 'stock-heatmap' as const,
+          config: daxHeatmapConfig
         };
       case 'forex':
         return {
@@ -521,12 +553,12 @@ export default function Panorama() {
               </div>
 
               {/* Symbol selector */}
-              <div className="grid grid-cols-2 sm:flex sm:flex-wrap bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 w-full">
+              <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 w-full overflow-x-auto custom-scrollbar pb-2">
                 {technicalSymbols.map((s) => (
                   <button
                     key={s.id}
                     onClick={() => setTechnicalSymbol(s.id)}
-                    className={`flex-1 min-w-[70px] px-2 py-1.5 rounded-lg font-bold uppercase text-[9px] tracking-wider transition-all cursor-pointer text-center ${
+                    className={`shrink-0 min-w-[70px] px-3 py-1.5 rounded-lg font-bold uppercase text-[9px] tracking-wider transition-all cursor-pointer text-center ${
                       technicalSymbol === s.id
                         ? 'bg-primary/20 text-primary border border-primary/20'
                         : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
@@ -610,6 +642,16 @@ export default function Panorama() {
                   }`}
                 >
                   Nikkei 225
+                </button>
+                <button
+                  onClick={() => setActiveHeatmap('dax')}
+                  className={`px-3 py-1.5 rounded-lg font-black uppercase text-[9px] tracking-wider transition-all cursor-pointer ${
+                    activeHeatmap === 'dax'
+                      ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  DAX Index
                 </button>
                 <button
                   onClick={() => setActiveHeatmap('crypto')}
@@ -797,6 +839,16 @@ export default function Panorama() {
                       Nikkei 225
                     </button>
                     <button
+                      onClick={() => setActiveHeatmap('dax')}
+                      className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
+                        activeHeatmap === 'dax'
+                          ? 'bg-primary/10 text-primary border border-primary/25 shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      DAX Index
+                    </button>
+                    <button
                       onClick={() => setActiveHeatmap('crypto')}
                       className={`px-3 py-1.5 rounded-lg font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer ${
                         activeHeatmap === 'crypto'
@@ -826,7 +878,7 @@ export default function Panorama() {
                   </div>
 
                   {/* Symbol Selector */}
-                  <div className="flex flex-wrap bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 self-start lg:self-auto">
+                  <div className="flex bg-surface-container-low border border-outline-variant/10 rounded-xl p-1 gap-1 select-none shrink-0 w-full lg:max-w-[70%] overflow-x-auto custom-scrollbar pb-2 self-start lg:self-auto">
                     {technicalSymbols.map((s) => (
                       <button
                         key={s.id}

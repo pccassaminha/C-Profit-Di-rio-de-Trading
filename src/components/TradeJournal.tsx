@@ -9,6 +9,8 @@ import Modal from './Modal';
 import { DatePicker } from './DatePicker';
 import { importTradeFile, detectSession } from '../utils/tradeParsers';
 
+import { Calendar, Trash2, ChevronRight, BarChart2, Timer, ArrowLeft, Edit2, ExternalLink, Link, ArrowRightLeft, UploadCloud, Activity, TrendingUp, TrendingDown, Plus, Save, CheckCircle } from 'lucide-react';
+
 export default function TradeJournal({ currentView = 'list', onViewChange }: { currentView?: 'list' | 'form' | 'detail', onViewChange?: (view: 'list' | 'form' | 'detail') => void }) {
   const { formatCurrency } = useCurrency();
   const [view, setView] = useState<'list' | 'form' | 'detail'>(currentView);
@@ -886,7 +888,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center">
-                          <span className="material-symbols-outlined text-primary">calendar_today</span>
+                          <Calendar className="text-primary" />
                         </div>
                         <div>
                           <h3 className="text-lg md:text-xl font-bold text-on-surface font-headline">Diário de trade do dia {date}</h3>
@@ -953,9 +955,9 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                                 className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-colors ml-2"
                                 title="Apagar trade"
                               >
-                                <span className="material-symbols-outlined">delete</span>
+                                <Trash2 className="" />
                               </button>
-                              <span className="material-symbols-outlined text-on-surface-variant text-sm ml-2">arrow_forward_ios</span>
+                              <ChevronRight className="text-on-surface-variant text-sm ml-2" />
                             </div>
                           </div>
                         ))}
@@ -982,14 +984,14 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                   onClick={() => handleOpenTradeForm('forex')}
                   className="flex flex-col items-center justify-center gap-4 p-6 rounded-xl border-2 border-outline-variant/20 hover:border-primary hover:bg-primary/5 transition-all group"
                 >
-                  <span className="material-symbols-outlined text-4xl text-on-surface-variant group-hover:text-primary transition-colors">candlestick_chart</span>
+                  <BarChart2 className="text-4xl text-on-surface-variant group-hover:text-primary transition-colors" />
                   <span className="font-bold text-on-surface">Forex / Índices</span>
                 </button>
                 <button
                   onClick={() => handleOpenTradeForm('ob')}
                   className="flex flex-col items-center justify-center gap-4 p-6 rounded-xl border-2 border-outline-variant/20 hover:border-primary hover:bg-primary/5 transition-all group"
                 >
-                  <span className="material-symbols-outlined text-4xl text-on-surface-variant group-hover:text-primary transition-colors">timer</span>
+                  <Timer className="text-4xl text-on-surface-variant group-hover:text-primary transition-colors" />
                   <span className="font-bold text-on-surface">Opções Binárias</span>
                 </button>
               </div>
@@ -1019,7 +1021,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
             }}
             className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors font-bold"
           >
-            <span className="material-symbols-outlined">arrow_back</span>
+            <ArrowLeft className="" />
             Voltar para a Lista
           </button>
           <div className="flex gap-3">
@@ -1027,7 +1029,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
               onClick={() => handleDeleteTrade(selectedTrade.id)}
               className="px-6 py-2 bg-error/10 text-error rounded-lg font-bold hover:bg-error/20 transition-colors flex items-center gap-2"
             >
-              <span className="material-symbols-outlined">delete</span>
+              <Trash2 className="" />
               Apagar
             </button>
             <button 
@@ -1062,7 +1064,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
               }}
               className="px-4 py-1.5 rounded-full font-bold text-sm bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-2"
             >
-              <span className="material-symbols-outlined text-sm">edit</span>
+              <Edit2 className="text-sm" />
               Editar
             </button>
             <span className={`px-4 py-1.5 rounded-full font-bold text-sm ${selectedTrade.pnl >= 0 ? 'bg-secondary/20 text-secondary' : 'bg-error/20 text-error'}`}>
@@ -1266,7 +1268,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                           />
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <span className="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2">
-                              <span className="material-symbols-outlined">open_in_new</span>
+                              <ExternalLink className="" />
                               Ampliar Imagem
                             </span>
                           </div>
@@ -1281,7 +1283,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg font-bold text-sm hover:brightness-110 transition-colors"
                       >
-                        <span className="material-symbols-outlined text-sm">link</span>
+                        <Link className="text-sm" />
                         Acessar Link do Estudo
                       </a>
                     );
@@ -1310,7 +1312,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
             onClick={() => handleViewChange('list')}
             className="px-6 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant font-medium hover:bg-surface-container transition-all flex items-center gap-2"
           >
-            <span className="material-symbols-outlined text-sm">arrow_back</span>
+            <ArrowLeft className="text-sm" />
             Voltar
           </button>
 
@@ -1345,7 +1347,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
               }}
               className="px-6 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant font-medium hover:bg-surface-container transition-all flex items-center gap-2"
             >
-              <span className="material-symbols-outlined text-sm">swap_horiz</span>
+              <ArrowRightLeft className="text-sm" />
               Mudar para {tradeType === 'ob' ? 'Forex' : 'OB'}
             </button>
           )}
@@ -1395,7 +1397,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 htmlFor="file-upload"
                 className={`px-6 py-2.5 rounded-lg border border-primary/50 text-primary font-bold hover:bg-primary/10 transition-all cursor-pointer flex items-center gap-2 ${isSaving ? 'opacity-50 pointer-events-none' : ''}`}
               >
-                <span className="material-symbols-outlined text-sm">upload_file</span>
+                <UploadCloud className="text-sm" />
                 Importar CSV/HTML
               </label>
             </>
@@ -1408,7 +1410,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
           <section className="bg-surface-container-low rounded-xl p-8 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
               <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-primary">analytics</span>
+                <Activity className="text-primary" />
                 <h3 className="text-lg font-bold font-headline uppercase tracking-wider text-on-surface-variant flex items-center gap-2">
                   Parâmetros Principais
                 </h3>
@@ -1543,7 +1545,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                   onClick={() => setTradeData({...tradeData, action: 'Buy'})}
                   className={`${tradeData.action === 'Buy' ? 'bg-secondary text-on-secondary shadow-lg shadow-secondary/20' : 'bg-surface-container-highest text-slate-400 hover:bg-surface-container hover:text-slate-300'} py-4 rounded-xl font-bold text-sm uppercase transition-all flex items-center justify-center gap-2`}
                 >
-                  <span className="material-symbols-outlined text-lg">trending_up</span>
+                  <TrendingUp className="text-lg" />
                   {tradeType === 'ob' ? 'Acima (Call)' : 'Long (Compra)'}
                 </button>
                 <button 
@@ -1551,7 +1553,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                   onClick={() => setTradeData({...tradeData, action: 'Sell'})}
                   className={`${tradeData.action === 'Sell' ? 'bg-error text-on-error shadow-lg shadow-error/20' : 'bg-surface-container-highest text-slate-400 hover:bg-surface-container hover:text-slate-300'} py-4 rounded-xl font-bold text-sm uppercase transition-all flex items-center justify-center gap-2`}
                 >
-                  <span className="material-symbols-outlined text-lg">trending_down</span>
+                  <TrendingDown className="text-lg" />
                   {tradeType === 'ob' ? 'Abaixo (Put)' : 'Short (Venda)'}
                 </button>
               </div>
@@ -1677,7 +1679,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 onClick={handleAddCustomSetup}
                 className="bg-primary/10 text-primary hover:bg-primary/20 px-3 py-2 rounded-lg transition-colors flex items-center justify-center"
               >
-                <span className="material-symbols-outlined text-sm">add</span>
+                <Plus className="text-sm" />
               </button>
               <button
                 type="button"
@@ -1685,7 +1687,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 className="bg-error/10 text-error hover:bg-error/20 px-3 py-2 rounded-lg transition-colors flex items-center justify-center"
                 title="Excluir o(s) setup(s) selecionado(s)"
               >
-                <span className="material-symbols-outlined text-sm">delete</span>
+                <Trash2 className="text-sm" />
               </button>
             </div>
           </section>
@@ -1785,7 +1787,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
               disabled={isSaving}
               className="w-full md:w-auto px-12 py-4 bg-surface-container-highest rounded-lg font-bold text-on-surface border border-outline-variant/20 hover:border-primary/50 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
             >
-              <span className="material-symbols-outlined">save_as</span>
+              <Save className="" />
               {isSaving ? 'Salvando...' : 'Guardar para Revisão'}
             </button>
           </div>
@@ -1806,7 +1808,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
               ) : (
                 <>
                   <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <span className="material-symbols-outlined text-3xl text-primary">check_circle</span>
+                    <CheckCircle className="text-3xl text-primary" />
                   </div>
                   <h3 className="text-xl font-bold text-on-surface mb-2">Arquivo Processado</h3>
                   <p className="text-on-surface-variant text-sm mb-8">

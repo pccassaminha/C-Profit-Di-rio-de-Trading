@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { auth, db } from '../firebase';
 import { useTrades } from '../hooks/useTrades';
+import { Menu, Bell, MessageSquare, UserPlus, MessageCircle, Megaphone, ChevronDown, User, Settings, HelpCircle, Shield, LogOut } from 'lucide-react';
 import { collection, query, onSnapshot, orderBy, where, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 export default function Topbar({ 
@@ -236,7 +237,7 @@ export default function Topbar({
           onClick={toggleSidebar}
           className="w-10 h-10 rounded-full border border-outline-variant/20 hidden md:flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors"
         >
-          <span className="material-symbols-outlined text-sm">menu</span>
+          <Menu className="w-4 h-4" />
         </button>
         <div className="flex md:hidden items-center gap-2 select-none">
           <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[24px] w-auto drop-shadow-md rounded" />
@@ -251,7 +252,7 @@ export default function Topbar({
             onClick={handleBellClick}
             className={`w-10 h-10 rounded-full border border-outline-variant/20 flex items-center justify-center transition-colors relative ${notificationsOpen ? 'bg-surface-container-high ring-2 ring-primary text-primary' : 'text-on-surface hover:bg-surface-container'}`}
           >
-            <span className="material-symbols-outlined text-xl">notifications</span>
+            <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-error text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow-md animate-bounce">
                 {unreadCount}
@@ -287,7 +288,7 @@ export default function Topbar({
                     className="p-3.5 rounded-xl border transition-colors bg-primary/5 border-primary/20 shadow-sm cursor-pointer hover:bg-primary/10"
                   >
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="material-symbols-outlined text-primary text-[18px]">chat</span>
+                      <MessageSquare className="w-[18px] h-[18px] text-primary" />
                       <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
                         Nova Mensagem
                       </span>
@@ -316,7 +317,7 @@ export default function Topbar({
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="material-symbols-outlined text-secondary text-[16px]">group_add</span>
+                        <UserPlus className="w-4 h-4 text-secondary" />
                         <span className="text-[10px] uppercase tracking-wider font-extrabold text-secondary">
                           Novo Pedido
                         </span>
@@ -333,7 +334,7 @@ export default function Topbar({
                     className="p-3.5 rounded-xl border transition-colors bg-primary/5 border-primary/25 shadow-sm space-y-2"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary text-[18px]">forum</span>
+                      <MessageCircle className="w-[18px] h-[18px] text-primary" />
                       <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
                         Convite de Sala
                       </span>
@@ -380,7 +381,7 @@ export default function Topbar({
                         }`}
                       >
                         <div className="flex items-center gap-2 mb-1.5">
-                          <span className="material-symbols-outlined text-primary text-[18px]">campaign</span>
+                          <Megaphone className="w-[18px] h-[18px] text-primary" />
                           <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
                             {b.author || 'Admin'}
                           </span>
@@ -413,7 +414,7 @@ export default function Topbar({
               )}
             </div>
             <span className="text-on-surface text-sm font-medium">{userName.split(' ')[0]}</span>
-            <span className="material-symbols-outlined text-[16px] text-on-surface-variant transition-transform duration-200" style={{ transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>expand_more</span>
+            <ChevronDown className={`w-4 h-4 text-on-surface-variant transition-transform duration-200 ${dropdownOpen ? "rotate-180" : "rotate-0"}`} />
           </div>
 
           {dropdownOpen && (
@@ -422,21 +423,21 @@ export default function Topbar({
                 onClick={() => handleNavigate('profile')}
                 className="w-full text-left px-4 py-3 text-sm text-on-surface hover:bg-surface-container hover:text-primary transition-colors flex items-center gap-3"
               >
-                <span className="material-symbols-outlined text-[18px]">person</span>
+                <User className="w-[18px] h-[18px]" />
                 Meu Perfil
               </button>
               <button 
                 onClick={() => handleNavigate('settings')}
                 className="w-full text-left px-4 py-3 text-sm text-on-surface hover:bg-surface-container hover:text-primary transition-colors flex items-center gap-3 border-t border-outline-variant/10"
               >
-                <span className="material-symbols-outlined text-[18px]">settings</span>
+                <Settings className="w-[18px] h-[18px]" />
                 Configurações
               </button>
               <button 
                 onClick={() => handleNavigate('support')}
                 className="w-full text-left px-4 py-3 text-sm text-on-surface hover:bg-surface-container hover:text-primary transition-colors flex items-center gap-3 border-t border-outline-variant/10"
               >
-                <span className="material-symbols-outlined text-[18px]">help</span>
+                <HelpCircle className="w-[18px] h-[18px]" />
                 Suporte
               </button>
               {isSuperAdmin && (
@@ -444,7 +445,7 @@ export default function Topbar({
                   onClick={() => handleNavigate('admin')}
                   className="w-full text-left px-4 py-3 text-sm text-primary hover:bg-surface-container transition-colors flex items-center gap-3 border-t border-outline-variant/10"
                 >
-                  <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+                  <Shield className="w-[18px] h-[18px]" />
                   Administração
                 </button>
               )}
@@ -452,7 +453,7 @@ export default function Topbar({
                 onClick={() => auth.signOut()}
                 className="w-full text-left px-4 py-3 text-sm text-error hover:bg-error/10 transition-colors flex items-center gap-3 border-t border-outline-variant/10 font-bold"
               >
-                <span className="material-symbols-outlined text-[18px]">logout</span>
+                <LogOut className="w-[18px] h-[18px]" />
                 Sair da Conta
               </button>
             </div>
