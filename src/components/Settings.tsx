@@ -7,7 +7,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDoc
 
 import { motion, AnimatePresence } from 'motion/react';
 
-import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle, Plus, Edit2, Trash2, Wallet, FileText, Flag, X, Save, RefreshCw, Eye, EyeOff, Eraser, Undo, MoreVertical } from 'lucide-react';
+import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle, Plus, Edit2, Trash2, Wallet, FileText, Flag, X, Save, RefreshCw, Eye, EyeOff, Eraser, Undo, MoreVertical, CandlestickChart } from 'lucide-react';
 
 
 
@@ -216,6 +216,7 @@ export default function Settings() {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     billing: true,
     regional: true,
+    tradePrefs: true,
     community: true,
     objectives: true,
     sessions: true,
@@ -1294,6 +1295,79 @@ export default function Settings() {
           </AnimatePresence>
         </div>
 
+        {/* Preferências de Trade */}
+        <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl overflow-hidden">
+          <button 
+            onClick={() => toggleSection('tradePrefs')}
+            className="w-full flex justify-between items-center p-6 hover:bg-surface-container-highest transition-colors text-left"
+          >
+            <h3 className="text-on-surface font-bold text-lg font-headline flex items-center gap-2">
+              <CandlestickChart className="text-primary" size={24} />
+              Preferências de Trade
+            </h3>
+            <span className={`material-symbols-outlined transition-transform duration-300 ${collapsedSections.tradePrefs ? '' : 'rotate-180'}`}>
+              expand_more
+            </span>
+          </button>
+          
+          <AnimatePresence>
+            {!collapsedSections.tradePrefs && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+              >
+                <div className="px-6 pb-6 pt-0 border-t border-outline-variant/10 mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Novo Trade (Padrão)</label>
+                      <div className="relative">
+                        <select 
+                          value={defaultTradeType}
+                          onChange={(e) => setDefaultTradeType(e.target.value as 'ask' | 'forex' | 'ob')}
+                          className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none appearance-none cursor-pointer focus:border-primary transition-colors"
+                        >
+                          <option value="ask">Perguntar Sempre</option>
+                          <option value="forex">Forex / Índices</option>
+                          <option value="ob">Opções Binárias (OB)</option>
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 flex flex-col justify-center">
+                      <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider mb-2">Visibilidade de Mercados</label>
+                      <div className="relative">
+                        <select 
+                          value={visibleMarkets}
+                          onChange={(e) => setVisibleMarkets(e.target.value as 'all' | 'forex' | 'ob')}
+                          className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none appearance-none cursor-pointer focus:border-primary transition-colors"
+                        >
+                          <option value="all">Mostrar Tudo (Forex + OB)</option>
+                          <option value="forex">Apenas Forex / Índices</option>
+                          <option value="ob">Apenas Opções Binárias</option>
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-6">
+                    <button 
+                      onClick={handleSaveCommunity}
+                      disabled={isSaving}
+                      className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
+                    >
+                      {isSaving ? <RefreshCw className="w-5 h-5 animate-spin shrink-0 mr-2" /> : <Save className="w-5 h-5 shrink-0 mr-2" />}
+                      {isSaving ? 'A guardar...' : 'Salvar Preferências'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Preferências da Comunidade */}
         <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl overflow-hidden">
           <button 
@@ -1351,38 +1425,6 @@ export default function Settings() {
                             {showCommunityFilter ? 'Mostrar no feed' : 'Ocultar (fixar feed padrão)'}
                           </div>
                         </label>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Novo Trade (Padrão)</label>
-                        <div className="relative">
-                          <select 
-                            value={defaultTradeType}
-                            onChange={(e) => setDefaultTradeType(e.target.value as 'ask' | 'forex' | 'ob')}
-                            className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none appearance-none cursor-pointer focus:border-primary transition-colors"
-                          >
-                            <option value="ask">Perguntar Sempre</option>
-                            <option value="forex">Forex / Índices</option>
-                            <option value="ob">Opções Binárias (OB)</option>
-                          </select>
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2 flex flex-col justify-center">
-                        <label className="text-on-surface-variant text-xs font-bold uppercase tracking-wider mb-2">Visibilidade de Mercados</label>
-                        <div className="relative">
-                          <select 
-                            value={visibleMarkets}
-                            onChange={(e) => setVisibleMarkets(e.target.value as 'all' | 'forex' | 'ob')}
-                            className="w-full bg-surface-container border border-outline-variant/20 text-on-surface px-4 py-3 rounded-lg text-sm outline-none appearance-none cursor-pointer focus:border-primary transition-colors"
-                          >
-                            <option value="all">Mostrar Tudo (Forex + OB)</option>
-                            <option value="forex">Apenas Forex / Índices</option>
-                            <option value="ob">Apenas Opções Binárias</option>
-                          </select>
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-                        </div>
                       </div>
                     </div>
                   <div className="flex justify-end mt-6">
