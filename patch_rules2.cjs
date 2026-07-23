@@ -1,19 +1,19 @@
 const fs = require('fs');
-let content = fs.readFileSync('firestore.rules', 'utf8');
+let rules = fs.readFileSync('firestore.rules', 'utf8');
 
-const collectionGroups = `
-    // Collection Group rules for Profile.tsx updates
-    match /{path=**}/comments/{commentId} {
-      allow read: if isAuthenticated();
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-    }
-    match /{path=**}/messages/{messageId} {
-      allow read: if isAuthenticated();
-      allow update: if isAuthenticated() && resource.data.senderId == request.auth.uid;
-    }
-  }
-}
-`;
+rules = rules.replace(
+/request\.auth\.token != null &&\s*request\.auth\.token\.email != null/g,
+"request.auth.token != null && request.auth.token.get('email', '') != ''"
+);
 
-content = content.replace(/  \}\n\}$/, collectionGroups);
-fs.writeFileSync('firestore.rules', content);
+rules = rules.replace(
+/request\.auth\.token\.email\.lower\(\)/g,
+"request.auth.token.get('email', '').lower()"
+);
+
+rules = rules.replace(
+/request\.auth\.token\.email/g,
+"request.auth.token.get('email', '')"
+);
+
+fs.writeFileSync('firestore.rules', rules);

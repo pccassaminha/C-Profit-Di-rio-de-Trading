@@ -95,8 +95,10 @@ export default function App() {
               if (s.sessions) localStorage.setItem('app_sessions', JSON.stringify(s.sessions));
             }
           }
-        } catch (error) {
-          console.error("Error loading settings from Firestore in App.tsx:", error);
+        } catch (error: any) {
+          if (error.code !== 'permission-denied') {
+            console.error("Error loading settings from Firestore in App.tsx:", error);
+          }
         }
       }
     });

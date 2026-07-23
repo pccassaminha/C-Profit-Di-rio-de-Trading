@@ -1,5 +1,4 @@
 const fs = require('fs');
-
 let rules = fs.readFileSync('firestore.rules.backup', 'utf8');
 
 rules = rules.replace(
@@ -7,7 +6,7 @@ rules = rules.replace(
 `function isStaticSuperAdmin() {
       return isAuthenticated() && (
         (request.auth.token != null && 
-         request.auth.token.email != null && 
+         request.auth.token.keys().hasAll(['email']) && 
          (request.auth.token.email.lower() == 'exportacoes.extras@gmail.com' || request.auth.token.email.lower() == 'omilionario.extra@gmail.com')) ||
         (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && 
          (get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('email', '') == 'exportacoes.extras@gmail.com' || 
@@ -42,7 +41,7 @@ rules = rules.replace(
 `function isPartner(userId) {
       return isAuthenticated() && 
         request.auth.token != null && 
-        request.auth.token.email != null && (
+        request.auth.token.keys().hasAll(['email']) && (
           (exists(/databases/$(database)/documents/usuarios/$(userId)) && 
            get(/databases/$(database)/documents/usuarios/$(userId)).data.get('partnerEmail', '') == request.auth.token.email) ||
           (exists(/databases/$(database)/documents/users/$(userId)) && 

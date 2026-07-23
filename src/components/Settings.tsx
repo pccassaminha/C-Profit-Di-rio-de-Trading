@@ -7,7 +7,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDoc
 
 import { motion, AnimatePresence } from 'motion/react';
 
-import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle, Plus, Edit2, Trash2, Wallet, FileText, Flag, X, Save, RefreshCw, Eye, EyeOff, Eraser, Undo } from 'lucide-react';
+import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle, Plus, Edit2, Trash2, Wallet, FileText, Flag, X, Save, RefreshCw, Eye, EyeOff, Eraser, Undo, MoreVertical } from 'lucide-react';
 
 
 
@@ -65,6 +65,7 @@ export default function Settings() {
   const [showCommunityFilter, setShowCommunityFilter] = useState(true);
   const [visibleMarkets, setVisibleMarkets] = useState<'all' | 'forex' | 'ob'>('all');
   const [tokenCopiedId, setTokenCopiedId] = useState<string | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const handleCopyAccountToken = (token: string, id: string) => {
     navigator.clipboard.writeText(token);
@@ -85,6 +86,48 @@ export default function Settings() {
     hidden: false
   });
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
+  const [isUpdatingAccount, setIsUpdatingAccount] = useState(false);
+
+  const handleUpdateAccount = async () => {
+    if (!editingAccount || !auth.currentUser) return;
+    setIsUpdatingAccount(true);
+    try {
+      try {
+        await updateDoc(doc(db, 'accounts', editingAccount.id), editingAccount);
+      } catch (e) {
+        console.warn("Could not update root accounts collection");
+      }
+      try {
+        await updateDoc(doc(db, 'usuarios', auth.currentUser.uid, 'accounts', editingAccount.id), editingAccount);
+      } catch (e) {
+        console.warn("Could not update subcollection accounts");
+      }
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: "Conta atualizada com sucesso!",
+        confirmText: "OK",
+        onConfirm: () => {
+          setEditingAccount(null);
+          closeModal();
+        }
+      });
+    } catch (error) {
+      console.error(error);
+      setModalConfig({
+        isOpen: true,
+        title: "Erro",
+        message: "Erro ao atualizar conta.",
+        isError: true,
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
+    } finally {
+      setIsUpdatingAccount(false);
+    }
+  };
+
   const [sessions, setSessions] = useState([
     { 
       id: 'asian', 
@@ -171,7 +214,7 @@ export default function Settings() {
   const [partnerSaved, setPartnerSaved] = useState(false);
   const [isSavingPartner, setIsSavingPartner] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
-    billing: false,
+    billing: true,
     regional: true,
     community: true,
     objectives: true,
@@ -1801,7 +1844,7 @@ export default function Settings() {
               <p className="text-on-surface-variant text-sm">Nenhuma conta registrada.</p>
             ) : (
               accounts.map(account => (
-                <div key={account.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-surface-container border border-outline-variant/10 rounded-lg">
+                <div key={account.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-surface-container border border-outline-variant/10 rounded-lg group relative">
                   <div className="flex flex-col gap-1 flex-1">
                     <p className="text-on-surface font-bold text-sm">{account.accountNumber} - {account.broker}</p>
                     <div className="flex items-center gap-2">
@@ -1845,10 +1888,21 @@ export default function Settings() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingAccount(account);
+                      }}
+                      className="px-4 py-2 rounded-lg text-sm font-bold bg-surface-container-highest text-on-surface-variant hover:text-primary transition-colors flex items-center gap-2"
+                      title="Editar Conta"
+                    >
+                      <Edit2 size={14} />
+                      <span className="hidden sm:inline">Editar</span>
+                    </button>
                     <button
                       onClick={() => toggleAccountStatus(account.id, account.status || 'active')}
-                      className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                      className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${
                         (account.status || 'active') === 'active' 
                           ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20' 
                           : 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20'
@@ -1856,32 +1910,56 @@ export default function Settings() {
                     >
                       {(account.status || 'active') === 'active' ? 'Ativa' : 'Desativada'}
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleResetAccountTrades(account.id);
-                      }}
-                      className="p-2 rounded-lg bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 transition-colors flex items-center justify-center relative group/btn-clean"
-                    >
-                      <Eraser className="w-[18px] h-[18px] shrink-0" />
-                      <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-surface-container-highest text-on-surface text-xs rounded shadow-xl opacity-0 hover:opacity-100 focus:opacity-100 group-hover/btn-clean:opacity-100 transition-opacity pointer-events-none z-10 border border-outline-variant/20">
-                        Zerar Trades desta conta
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-surface-container-highest"></div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteAccount(account.id);
-                      }}
-                      className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors flex items-center justify-center relative group/btn-delete"
-                    >
-                      <Trash2 className="text-sm" />
-                      <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-surface-container-highest text-on-surface text-xs rounded shadow-xl opacity-0 hover:opacity-100 focus:opacity-100 group-hover/btn-delete:opacity-100 transition-opacity pointer-events-none z-10 border border-outline-variant/20">
-                        Excluir Conta
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-surface-container-highest"></div>
-                      </div>
-                    </button>
+                    
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdownId(openDropdownId === account.id ? null : account.id);
+                        }}
+                        className="p-2 rounded-lg bg-surface-container-highest text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center"
+                      >
+                        <MoreVertical className="w-[18px] h-[18px] shrink-0" />
+                      </button>
+                      
+                      <AnimatePresence>
+                        {openDropdownId === account.id && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setOpenDropdownId(null)}></div>
+                            <motion.div 
+                              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                              className="absolute right-0 bottom-full mb-2 w-48 bg-surface-container-highest border border-outline-variant/20 rounded-xl shadow-xl overflow-hidden z-50 flex flex-col"
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDropdownId(null);
+                                  handleResetAccountTrades(account.id);
+                                }}
+                                className="w-full px-4 py-3 text-left text-orange-500 hover:bg-orange-500/10 transition-colors flex items-center gap-3 text-sm font-bold"
+                              >
+                                <Eraser size={16} />
+                                Zerar Trades
+                              </button>
+                              <div className="h-px w-full bg-outline-variant/10"></div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDropdownId(null);
+                                  handleDeleteAccount(account.id);
+                                }}
+                                className="w-full px-4 py-3 text-left text-error hover:bg-error/10 transition-colors flex items-center gap-3 text-sm font-bold"
+                              >
+                                <Trash2 size={16} />
+                                Excluir Conta
+                              </button>
+                            </motion.div>
+                          </>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </div>
               ))
@@ -2203,6 +2281,137 @@ export default function Settings() {
           </div>
         </div>
       )}
+
+      {/* Edit Account Modal */}
+      {editingAccount && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-10 w-full max-w-2xl shadow-2xl relative my-8">
+            <button 
+              onClick={() => setEditingAccount(null)}
+              className="absolute top-6 right-6 text-on-surface-variant hover:text-on-surface transition-colors"
+            >
+              <X className="" />
+            </button>
+            
+            <h2 className="text-2xl font-bold text-on-surface font-headline mb-2">Editar Conta</h2>
+            <p className="text-on-surface-variant text-sm mb-8">Atualize os detalhes da sua conta.</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Número da Conta *</label>
+                <input 
+                  type="text" 
+                  value={editingAccount.accountNumber}
+                  onChange={(e) => setEditingAccount({...editingAccount, accountNumber: e.target.value})}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
+                  placeholder="Ex: 506460" 
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Corretora (Broker)</label>
+                <input 
+                  type="text" 
+                  value={editingAccount.broker}
+                  onChange={(e) => setEditingAccount({...editingAccount, broker: e.target.value})}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
+                  placeholder="Ex: matchtrade" 
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Saldo Inicial</label>
+                <div className="flex gap-2">
+                  <select 
+                    value={editingAccount.currency}
+                    onChange={(e) => setEditingAccount({...editingAccount, currency: e.target.value})}
+                    className="w-1/3 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors appearance-none"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="AOA">AOA</option>
+                    <option value="BRL">BRL</option>
+                  </select>
+                  <input 
+                    type="number" 
+                    value={editingAccount.initialBalance}
+                    onChange={(e) => setEditingAccount({...editingAccount, initialBalance: e.target.value})}
+                    className="w-2/3 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
+                    placeholder="10000" 
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo de Conta</label>
+                <select 
+                  value={editingAccount.accountType}
+                  onChange={(e) => setEditingAccount({...editingAccount, accountType: e.target.value})}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors appearance-none"
+                >
+                  <option>5K Challenge</option>
+                  <option>10K Challenge</option>
+                  <option>25K Challenge</option>
+                  <option>50K Challenge</option>
+                  <option>100K Challenge</option>
+                  <option>200K Challenge</option>
+                  <option>Conta Real</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Fase</label>
+                <select 
+                  value={editingAccount.phase}
+                  onChange={(e) => setEditingAccount({...editingAccount, phase: e.target.value})}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors appearance-none"
+                >
+                  <option>Fase 1</option>
+                  <option>Fase 2</option>
+                  <option>Conta Live</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Mercado</label>
+                <select 
+                  value={editingAccount.tradeType || 'forex'}
+                  onChange={(e) => setEditingAccount({...editingAccount, tradeType: e.target.value})}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors appearance-none"
+                >
+                  <option value="forex">Forex / Índices</option>
+                  <option value="ob">Opções Binárias (OB)</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Data de Início *</label>
+                <div className="relative">
+                  <input 
+                    type="date" 
+                    value={editingAccount.startDate || ''}
+                    onChange={(e) => setEditingAccount({...editingAccount, startDate: e.target.value})}
+                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
+                    style={{ colorScheme: 'dark' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-10 flex justify-end gap-4">
+              <button 
+                onClick={() => setEditingAccount(null)}
+                className="px-6 py-3 rounded-xl text-on-surface-variant font-bold hover:bg-surface-container transition-colors"
+                disabled={isUpdatingAccount}
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleUpdateAccount}
+                disabled={isUpdatingAccount}
+                className="px-8 py-3 rounded-xl bg-primary text-on-primary font-bold hover:brightness-110 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+              >
+                {isUpdatingAccount ? 'Salvando...' : 'Salvar Alterações'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

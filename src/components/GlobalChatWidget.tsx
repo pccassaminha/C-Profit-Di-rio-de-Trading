@@ -86,7 +86,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'usuarios'), (snap) => {
       setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (err) => console.log('Usuarios listener error:', err.code));
     return unsub;
   }, []);
 
@@ -97,7 +97,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     const unsubFriends = onSnapshot(collection(db, 'users', uid, 'friends'), (snap) => {
       setFriendsList(snap.docs.map(d => d.id));
     }, (err) => {
-      console.error('Error loading friends list in chat for uid ' + uid + ':', err);
+      if (err.code !== 'permission-denied') console.error('Error loading friends list:', err);
     });
     return unsubFriends;
   }, []);
@@ -164,7 +164,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     );
     const unsub = onSnapshot(q, (snap) => {
       setPendingInvites(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (err) => console.log('Room invites listener error:', err.code));
     return unsub;
   }, []);
 
@@ -176,7 +176,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     const blocksQ = query(collection(db, 'users', uid, 'blocks'));
     const unsubBlocks = onSnapshot(blocksQ, snap => {
       setBlockedUsers(snap.docs.map(d => d.id));
-    });
+    }, (err) => console.log('Blocks listener error:', err.code));
 
     // Load chats where user is participant
     const q = query(
@@ -274,7 +274,7 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
     const unsub = onSnapshot(q, snap => {
       setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    });
+    }, (err) => console.log('Messages listener error:', err.code));
 
     if (auth.currentUser) {
       updateDoc(doc(db, 'chats', activeChat.id), {
