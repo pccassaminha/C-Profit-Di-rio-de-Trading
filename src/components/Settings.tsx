@@ -602,6 +602,23 @@ export default function Settings() {
     }, 400);
   };
 
+  const handleSaveTradePrefs = async () => {
+    setIsSaving(true);
+    localStorage.setItem('app_default_trade_type', defaultTradeType);
+    localStorage.setItem('app_visible_markets', visibleMarkets);
+    setTimeout(() => {
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: "Preferências de trade salvas com sucesso!",
+        confirmText: "OK",
+        isError: false,
+        onConfirm: closeModal
+      });
+      setIsSaving(false);
+    }, 400);
+  };
+
   const handleSaveSessions = async () => {
     setIsSaving(true);
     localStorage.setItem('app_session_type', sessionType);
@@ -1354,7 +1371,7 @@ export default function Settings() {
                   </div>
                   <div className="flex justify-end mt-6">
                     <button 
-                      onClick={handleSaveCommunity}
+                      onClick={handleSaveTradePrefs}
                       disabled={isSaving}
                       className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50 text-sm"
                     >
