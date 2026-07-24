@@ -1634,7 +1634,7 @@ export default function Settings() {
         </div>
 
         {/* Sessões de Trading */}
-        <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl overflow-hidden mt-4">
+        <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl mt-4">
           <button 
             onClick={() => toggleSection('sessions')}
             className="w-full flex justify-between items-center p-6 hover:bg-surface-container-highest transition-colors text-left"
@@ -1902,10 +1902,10 @@ export default function Settings() {
       </div>
 
         {/* Gerenciamento de Contas */}
-        <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl overflow-hidden mt-4">
+        <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl mt-4">
           <button 
             onClick={() => toggleSection('accounts')}
-            className="w-full flex justify-between items-center p-6 hover:bg-surface-container-highest transition-colors text-left"
+            className={`w-full flex justify-between items-center p-6 hover:bg-surface-container-highest transition-colors text-left ${collapsedSections.accounts ? 'rounded-xl' : 'rounded-t-xl'}`}
           >
             <h3 className="text-on-surface font-bold text-lg font-headline flex items-center gap-2">
               <Landmark className="text-primary" size={24} />
@@ -1930,7 +1930,7 @@ export default function Settings() {
               <p className="text-on-surface-variant text-sm">Nenhuma conta registrada.</p>
             ) : (
               accounts.map(account => (
-                <div key={account.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-surface-container border border-outline-variant/10 rounded-lg group relative">
+                <div key={account.id} className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-surface-container border border-outline-variant/10 rounded-lg group relative ${openDropdownId === account.id ? 'z-50' : 'z-10'}`}>
                   <div className="flex flex-col gap-1 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="text-on-surface font-bold text-sm">{account.accountNumber} - {account.broker}</p>
@@ -2013,7 +2013,7 @@ export default function Settings() {
                               initial={{ opacity: 0, scale: 0.95, y: 10 }}
                               animate={{ opacity: 1, scale: 1, y: 0 }}
                               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                              className="absolute right-0 bottom-full mb-2 w-48 bg-surface-container-highest border border-outline-variant/20 rounded-xl shadow-xl overflow-hidden z-50 flex flex-col"
+                              className="absolute right-0 top-full mt-2 w-48 bg-surface-container-highest border border-outline-variant/20 rounded-xl shadow-xl overflow-hidden z-50 flex flex-col"
                             >
                               <button
                                 onClick={(e) => {
