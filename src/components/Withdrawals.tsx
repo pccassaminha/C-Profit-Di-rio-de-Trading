@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
@@ -75,6 +75,22 @@ export default function Withdrawals() {
 
     return () => unsubscribes.forEach(unsub => unsub());
   }, [auth.currentUser]);
+
+  // Auto-cleanup orphaned withdrawals for deleted accounts
+  useEffect(() => {
+    if (!auth.currentUser || accounts.length === 0) return;
+    const orphaned = withdrawals.filter(w => w.accountId && !accounts.some(a => a.id === w.accountId));
+    if (orphaned.length > 0) {
+      orphaned.forEach(async (w) => {
+        try {
+          await deleteDoc(doc(db, 'withdrawals', w.id));
+        } catch (e) {
+          console.error("Error auto-deleting orphaned withdrawal:", e);
+        }
+      });
+      setWithdrawals(prev => prev.filter(w => !w.accountId || accounts.some(a => a.id === w.accountId)));
+    }
+  }, [accounts, withdrawals]);
 
   const handleSave = async () => {
     if (!auth.currentUser || !newWithdrawal.accountId || !newWithdrawal.amount) return;

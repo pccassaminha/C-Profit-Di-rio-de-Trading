@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { DateRangePicker } from './DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Pie, Cell, BarChart, Bar, PieChart, LineChart } from 'recharts';
-import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
@@ -445,6 +445,27 @@ export default function Dashboard() {
             });
           })
           .catch(err => console.error("Error auto-restoring 10k objective in Dashboard:", err));
+      }
+    }
+  }, [accounts, objectives]);
+
+  // Auto-cleanup orphaned objectives whose target account no longer exists
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    if (accounts.length > 0 || objectives.length > 0) {
+      const orphaned = objectives.filter(obj => obj.type === 'account' && !accounts.some(acc => acc.id === obj.targetId));
+      if (orphaned.length > 0) {
+        console.log("Dashboard auto-cleaning orphaned objectives:", orphaned);
+        orphaned.forEach(async (obj) => {
+          try {
+            await deleteDoc(doc(db, 'objectives', obj.id));
+          } catch (err) {
+            console.error("Error deleting orphaned objective in Dashboard:", err);
+          }
+        });
+        const cleaned = objectives.filter(obj => obj.type !== 'account' || accounts.some(acc => acc.id === obj.targetId));
+        setObjectives(cleaned);
+        localStorage.setItem('app_objectives', JSON.stringify(cleaned));
       }
     }
   }, [accounts, objectives]);

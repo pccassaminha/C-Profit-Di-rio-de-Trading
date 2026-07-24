@@ -459,6 +459,25 @@ export default function Settings() {
     }
   }, [accounts, objectives]);
 
+  // Auto-cleanup orphaned objectives whose target account no longer exists
+  useEffect(() => {
+    if (!auth.currentUser || !isLoaded) return;
+    const orphaned = objectives.filter(obj => obj.type === 'account' && !accounts.some(acc => acc.id === obj.targetId));
+    if (orphaned.length > 0) {
+      console.log("Auto-deleting orphaned account objectives:", orphaned);
+      orphaned.forEach(async (obj) => {
+        try {
+          await deleteDoc(doc(db, 'objectives', obj.id));
+        } catch (err) {
+          console.error("Error auto-deleting orphaned objective:", err);
+        }
+      });
+      const cleaned = objectives.filter(obj => obj.type !== 'account' || accounts.some(acc => acc.id === obj.targetId));
+      setObjectives(cleaned);
+      localStorage.setItem('app_objectives', JSON.stringify(cleaned));
+    }
+  }, [accounts, objectives, isLoaded]);
+
   // Auto-save settings when changes occur (only after initial profile and settings load is complete)
   useEffect(() => {
     if (!isLoaded || !auth.currentUser) return;
@@ -1124,44 +1143,72 @@ export default function Settings() {
   const handleDeleteAccount = (accountId: string) => {
     setModalConfig({
       isOpen: true,
-      title: "Confirmar Exclusão",
-      message: "Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.",
-      confirmText: "Excluir",
+      title: "Confirmar Exclusão de Conta",
+      message: "Tem certeza que deseja excluir esta conta? Todos os dados associados (histórico de trades, objetivos de conta e retiradas) serão excluídos permanentemente.",
+      confirmText: "Excluir Conta e Dados",
+      isError: true,
       onCancel: closeModal,
       onConfirm: async () => {
         try {
           const uid = auth.currentUser?.uid;
           if (!uid) return;
+          setIsSaving(true);
           
-          // Try both paths for deletion
-          try {
-            await deleteDoc(doc(db, 'accounts', accountId));
-          } catch (e) {
-            console.warn("Could not delete from root accounts, trying subcollection...");
-          }
-          
-          try {
-            await deleteDoc(doc(db, 'usuarios', uid, 'accounts', accountId));
-          } catch (e) {
-            console.warn("Could not delete from subcollection accounts.");
-          }
+          const deletePromises: Promise<any>[] = [];
+
+          // 1. Delete all trades associated with this accountId (both root and subcollection)
+          const qRootTrades = query(collection(db, 'trades'), where('userId', '==', uid), where('accountId', '==', accountId));
+          const snapshotRootTrades = await getDocs(qRootTrades);
+          snapshotRootTrades.forEach(d => deletePromises.push(deleteDoc(doc(db, 'trades', d.id))));
+
+          const qSubTrades = query(collection(db, 'usuarios', uid, 'trades'), where('accountId', '==', accountId));
+          const snapshotSubTrades = await getDocs(qSubTrades);
+          snapshotSubTrades.forEach(d => deletePromises.push(deleteDoc(doc(db, 'usuarios', uid, 'trades', d.id))));
+
+          // 2. Delete all objectives associated with this accountId
+          const qObjTarget = query(collection(db, 'objectives'), where('userId', '==', uid), where('targetId', '==', accountId));
+          const snapshotObjTarget = await getDocs(qObjTarget);
+          snapshotObjTarget.forEach(d => deletePromises.push(deleteDoc(doc(db, 'objectives', d.id))));
+
+          const qObjAcc = query(collection(db, 'objectives'), where('userId', '==', uid), where('accountId', '==', accountId));
+          const snapshotObjAcc = await getDocs(qObjAcc);
+          snapshotObjAcc.forEach(d => deletePromises.push(deleteDoc(doc(db, 'objectives', d.id))));
+
+          // 3. Delete all withdrawals associated with this accountId
+          const qWithdrawals = query(collection(db, 'withdrawals'), where('userId', '==', uid), where('accountId', '==', accountId));
+          const snapshotWithdrawals = await getDocs(qWithdrawals);
+          snapshotWithdrawals.forEach(d => deletePromises.push(deleteDoc(doc(db, 'withdrawals', d.id))));
+
+          // 4. Delete the account document from both paths
+          deletePromises.push(deleteDoc(doc(db, 'accounts', accountId)).catch(() => {}));
+          deletePromises.push(deleteDoc(doc(db, 'usuarios', uid, 'accounts', accountId)).catch(() => {}));
+
+          await Promise.all(deletePromises);
+
+          // Update local state and localStorage
+          setAccounts(prev => prev.filter(a => a.id !== accountId));
+          const updatedObjectives = objectives.filter(o => o.targetId !== accountId && (o as any).accountId !== accountId);
+          setObjectives(updatedObjectives);
+          localStorage.setItem('app_objectives', JSON.stringify(updatedObjectives));
 
           setModalConfig({
             isOpen: true,
             title: "Sucesso",
-            message: "Conta excluída com sucesso!",
+            message: "Conta e todos os seus registros (trades, objetivos e retiradas) foram excluídos com sucesso!",
             confirmText: "OK",
             onConfirm: closeModal
           });
         } catch (error) {
-          console.error("Error deleting account: ", error);
+          console.error("Error deleting account and associated data: ", error);
           setModalConfig({
             isOpen: true,
             title: "Erro",
-            message: "Erro ao excluir a conta.",
+            message: "Erro ao excluir a conta. Tente novamente.",
             isError: true,
             onConfirm: closeModal
           });
+        } finally {
+          setIsSaving(false);
         }
       }
     });
@@ -1534,11 +1581,14 @@ export default function Settings() {
                   </div>
 
                   <div className="mt-0">
-                    {objectives.length === 0 ? (
-                        <p className="text-on-surface-variant text-sm text-center py-8">Nenhum objetivo definido. Clique em "Novo Objetivo" para começar.</p>
-                      ) : (
+                    {(() => {
+                      const validObjectives = objectives.filter(obj => obj.type !== 'account' || accounts.some(a => a.id === obj.targetId));
+                      if (validObjectives.length === 0) {
+                        return <p className="text-on-surface-variant text-sm text-center py-8">Nenhum objetivo definido. Clique em "Novo Objetivo" para começar.</p>;
+                      }
+                      return (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {objectives.map((obj) => (
+                          {validObjectives.map((obj) => (
                             <div key={obj.id} className={`bg-surface-container border border-outline-variant/20 rounded-xl p-4 relative group transition-all ${obj.hidden ? 'opacity-60 border-dashed saturate-50' : ''}`}>
                               <div className="absolute top-4 right-4 flex gap-2">
                                 <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
@@ -1625,7 +1675,8 @@ export default function Settings() {
                             </div>
                           ))}
                         </div>
-                      )}
+                      );
+                    })()}
                   </div>
                 </div>
               </motion.div>
