@@ -315,7 +315,15 @@ export default function Community() {
         const timeB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()) : 0;
         return timeB - timeA;
       });
-      setSelectedUserPosts(postsData);
+      setSelectedUserPosts(currentPosts => {
+        return postsData.map(newPost => {
+          const old = currentPosts.find(p => p.id === newPost.id);
+          if (old && old.userLiked !== undefined) {
+            newPost.userLiked = old.userLiked;
+          }
+          return newPost;
+        });
+      });
       setIsLoadingSelectedProfile(false);
     }, (err) => {
       console.error('Error loading posts:', err);
@@ -392,7 +400,15 @@ export default function Community() {
         const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
         return timeB - timeA;
       });
-      setPosts(postsData);
+      setPosts(currentPosts => {
+        return postsData.map(newPost => {
+          const old = currentPosts.find(p => p.id === newPost.id);
+          if (old && old.userLiked !== undefined) {
+            newPost.userLiked = old.userLiked;
+          }
+          return newPost;
+        });
+      });
     });
 
     const bQ = query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'));
@@ -406,17 +422,28 @@ export default function Community() {
     };
   }, [activeFeed]);
 
+  const checkedLikesRef = useRef<Set<string>>(new Set());
+
   // Effect to check likes per post
   useEffect(() => {
-    if (!auth.currentUser || posts.length === 0) return;
+    if (!auth.currentUser) return;
 
-    posts.forEach(async (post) => {
-      const likeDoc = await getDoc(doc(db, 'community_posts', post.id, 'likes', auth.currentUser!.uid));
-      if (likeDoc.exists()) {
-        setPosts(current => current.map(p => p.id === post.id ? { ...p, userLiked: true } : p));
+    const allPosts = [...posts, ...selectedUserPosts];
+    allPosts.forEach(async (post) => {
+      if (checkedLikesRef.current.has(post.id)) return;
+      checkedLikesRef.current.add(post.id);
+
+      try {
+        const likeDoc = await getDoc(doc(db, 'community_posts', post.id, 'likes', auth.currentUser!.uid));
+        if (likeDoc.exists()) {
+          setPosts(current => current.map(p => p.id === post.id ? { ...p, userLiked: true } : p));
+          setSelectedUserPosts(current => current.map(p => p.id === post.id ? { ...p, userLiked: true } : p));
+        }
+      } catch (err) {
+        console.error(err);
       }
     });
-  }, [posts.length]);
+  }, [posts, selectedUserPosts]);
 
   const handleSavePost = async () => {
     if (!newPost.legend || !auth.currentUser) return;
@@ -523,7 +550,7 @@ export default function Community() {
       if (post.userLiked) {
         await deleteDoc(likeRef);
         await updateDoc(postRef, { likesCount: increment(-1) });
-        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: false, likesCount: p.likesCount - 1 } : p));
+        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: false, likesCount: Math.max(0, (p.likesCount || 0) - 1) } : p));
       } else {
         await setDoc(likeRef, { createdAt: serverTimestamp() });
         await updateDoc(postRef, { likesCount: increment(1) });
@@ -906,8 +933,8 @@ export default function Community() {
       if (isCurrentlyLiked) {
         await deleteDoc(likeRef);
         await updateDoc(postRef, { likesCount: increment(-1) });
-        setSelectedUserPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: false, likesCount: p.likesCount - 1 } : p));
-        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: false, likesCount: p.likesCount - 1 } : p));
+        setSelectedUserPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: false, likesCount: Math.max(0, (p.likesCount || 0) - 1) } : p));
+        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: false, likesCount: Math.max(0, (p.likesCount || 0) - 1) } : p));
       } else {
         await setDoc(likeRef, { createdAt: serverTimestamp() });
         await updateDoc(postRef, { likesCount: increment(1) });
