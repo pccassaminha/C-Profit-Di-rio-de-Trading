@@ -323,7 +323,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 30,
       limits: '2 Contas Forex + 2 Contas OB',
       totalLimit: 4,
-      features: ['Acesso ao Panorama Global', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade', 'Válido para novos registros'],
+      features: ['Acesso ao Panorama Global', 'Importação MT5, HTML e CSV', 'Diário de Trades Ilimitado', 'Acesso à Comunidade', 'Válido para novos registros'],
       current: userPlan?.plan_type === 'trial_30' || userPlan?.plan_type === 'trial_15'
     },
     {
@@ -337,7 +337,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 30,
       limits: '6 Contas Forex + 6 Contas OB',
       totalLimit: 12,
-      features: ['Acesso ao Panorama Global', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade'],
+      features: ['Acesso ao Panorama Global', 'Importação MT5, HTML e CSV', 'Diário de Trades Ilimitado', 'Acesso à Comunidade'],
       current: userPlan?.plan_type === 'mensal_6' || userPlan?.plan_type === 'mensal_2'
     },
     {
@@ -351,7 +351,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 90,
       limits: '6 Contas Forex + 6 Contas OB',
       totalLimit: 12,
-      features: ['Acesso ao Panorama Global', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade VIP'],
+      features: ['Tudo do Plano Mensal', 'Análise Psicológica Essencial', 'Resumo Macroeconômico', 'Acesso à Comunidade VIP'],
       current: userPlan?.plan_type === 'trimestral_6'
     },
     {
@@ -365,7 +365,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 180,
       limits: '8 Contas Forex + 8 Contas OB',
       totalLimit: 16,
-      features: ['Acesso ao Panorama Global', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Resumos Macroeconômicos', 'Acesso à Comunidade VIP', 'Suporte Prioritário via WhatsApp'],
+      features: ['Tudo do Plano Trimestral', 'Suporte Prioritário via WhatsApp'],
       featured: true,
       current: userPlan?.plan_type === 'semestral_8' || userPlan?.plan_type === 'semestral_6'
     },
@@ -380,7 +380,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 365,
       limits: '16 Contas Forex + 16 Contas OB',
       totalLimit: 32,
-      features: ['Acesso ao Panorama Global', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Resumos Macroeconômicos', 'Acesso à Comunidade VIP', 'Suporte Prioritário via WhatsApp', 'Personalização de Interface', 'Acesso Antecipado a Beta'],
+      features: ['Tudo do Plano Semestral', 'Mentorias Coletivas', 'Acesso Antecipado a Beta'],
       current: userPlan?.plan_type === 'anual_16'
     }
   ];
@@ -646,7 +646,7 @@ Fico no aguardo, obrigado!`;
           <h1 className="text-4xl font-black text-on-surface mb-4 font-headline text-center uppercase tracking-tighter">
             Níveis de <span className="text-primary italic">Assinatura</span>
           </h1>
-          <p className="text-on-surface-variant text-center max-w-2xl">Aumente sua capacidade analítica e tenha um terminal profissional de alta performance.</p>
+          <p className="text-on-surface-variant text-center max-w-5xl">Aumente sua capacidade analítica e tenha um terminal profissional de alta performance.</p>
         </div>
       )}
 
@@ -709,7 +709,7 @@ Fico no aguardo, obrigado!`;
             return (
               <div 
                 key={`${plan.id}-${idx}`}
-                className={`relative p-[32px_24px] rounded-[32px] border transition-all flex flex-col hover:-translate-y-[6px] hover:z-20 hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] w-[340px] shrink-0 ${
+                className={`relative p-[24px_16px] rounded-[24px] border transition-all flex flex-col hover:-translate-y-[6px] hover:z-20 hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] w-[280px] shrink-0 ${
                   plan.featured 
                     ? 'bg-surface-container-high border-primary/40 shadow-[0_0_30px_rgba(0,245,160,0.06)] z-10' 
                     : 'bg-surface-container border-outline hover:border-outline-variant shadow-lg z-0'
@@ -829,7 +829,7 @@ Fico no aguardo, obrigado!`;
         <h3 className="text-2xl font-black text-on-surface uppercase tracking-tighter mb-8 text-center">
           Dúvidas Frequentes
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-6">
           <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/5">
             <h4 className="font-bold text-on-surface mb-2 flex items-center gap-2">
               <span className="text-primary">•</span> Como funcionam as restrições de contas?
@@ -871,7 +871,7 @@ Fico no aguardo, obrigado!`;
       {/* Modal de Pagamento */}
       {showPaymentModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/95 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-surface-container border border-outline-variant/30 rounded-[40px] max-w-5xl w-full p-8 md:p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] relative max-h-[92vh] overflow-y-auto custom-scrollbar">
+          <div className="bg-surface-container border border-outline-variant/30 rounded-[40px] max-w-2xl w-full p-8 md:p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] relative max-h-[92vh] overflow-y-auto custom-scrollbar">
             <button 
               onClick={handleCloseModal}
               className="absolute top-8 right-8 text-on-surface-variant hover:text-on-surface transition-colors z-10"
@@ -903,12 +903,13 @@ Fico no aguardo, obrigado!`;
                   <p className="text-on-surface-variant text-xs px-4 max-w-md mx-auto">Utilize as informações oficiais abaixo para efetuar a transferência.</p>
                 </div>
 
+                
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-10 text-left items-start">
-                  
-                  {/* Left Column */}
+                  {/* Left Column: Form Details */}
                   <div className="lg:col-span-7 space-y-6">
                     <div className="bg-surface-container-high rounded-[32px] p-6 md:p-8 border border-outline-variant/20 relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-2xl pointer-events-none"></div>
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                      
                       <h4 className="text-[11px] font-black text-on-surface-variant uppercase tracking-widest border-b border-outline-variant/10 pb-3 mb-6 relative z-10">Dados do Pagador</h4>
                       <div className="relative z-10 space-y-4">
                         
@@ -940,12 +941,13 @@ Fico no aguardo, obrigado!`;
                           />
                         </div>
                       </div>
+                    </div>
+
                     
-                      </div>
                     </div>
 
                     <div className="bg-surface-container-high rounded-[32px] p-6 md:p-8 border border-outline-variant/20 relative overflow-hidden">
-                                          {/* Seleção do Método de Pagamento */}
+                      {/* Seleção do Método de Pagamento */}
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Selecione o Método</label>
                       <div className="flex flex-row gap-2 bg-surface-container-low rounded-2xl p-1 border border-outline-variant/10 w-full">
@@ -996,9 +998,279 @@ Fico no aguardo, obrigado!`;
                       </div>
                     </div>
 
+                    
+                      
+                      <div className="space-y-6 pt-6 mt-6 border-t border-outline-variant/10">
+                        
+          <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/5">
+            <h4 className="font-bold text-on-surface mb-2 flex items-center gap-2">
+              <span className="text-primary">•</span> Como funcionam as restrições de contas?
+            </h4>
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              As restrições (ex: 6 Contas Forex + 6 Contas OB) referem-se ao número máximo de contas de trading que você pode integrar simultaneamente no terminal. Você pode excluir uma conta antiga para adicionar uma nova a qualquer momento, desde que não ultrapasse o limite ativo do seu plano.
+            </p>
+          </div>
+          
+          <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/5">
+            <h4 className="font-bold text-on-surface mb-2 flex items-center gap-2">
+              <span className="text-primary">•</span> Posso fazer upgrade de plano?
+            </h4>
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              Sim! Ao realizar o upgrade para um plano superior (ex: Mensal para Semestral), os dias restantes do seu plano atual são mantidos, e as novas vantagens são ativadas imediatamente após a aprovação do comprovante.
+            </p>
+          </div>
+        </div>
+      </div>
 
-                      <div className="pt-6 mt-6 border-t border-outline-variant/10">
-                                            <div className="space-y-6">
+      {/* Link para Faturamentos */}
+      <div className="bg-surface-container-low border border-outline-variant/10 rounded-[32px] p-8 md:p-10 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center">
+            <History size={24} />
+          </div>
+          <div>
+            <h3 className="text-2xl font-black text-on-surface uppercase tracking-tighter">Histórico de Pagamentos</h3>
+            <p className="text-sm text-on-surface-variant tracking-wide">Visualize e baixe suas faturas e recibos anteriores.</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2 text-on-surface-variant text-sm font-bold opacity-60">
+          <FileText size={20} />
+          Acesse no menu lateral
+        </div>
+      </div>
+
+      {/* Modal de Pagamento */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/95 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-surface-container border border-outline-variant/30 rounded-[40px] max-w-2xl w-full p-8 md:p-10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] relative max-h-[92vh] overflow-y-auto custom-scrollbar">
+            <button 
+              onClick={handleCloseModal}
+              className="absolute top-8 right-8 text-on-surface-variant hover:text-on-surface transition-colors z-10"
+            >
+              <X size={28} />
+            </button>
+
+            {!paymentSubmitted ? (
+              <>
+                <div className="text-center mb-8">
+                  <div className="w-20 h-20 bg-primary text-on-primary rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
+                    <CreditCard size={40} />
+                  </div>
+                  <h3 className="text-3xl font-black text-on-surface mb-2 font-headline uppercase italic tracking-tighter">Dados de <span className="text-primary italic">Pagamento</span></h3>
+                  
+                  {/* Nome do Plano Destacado */}
+                  {(() => {
+                    const targetPlan = plans.find(p => p.id === showPaymentModal.id) || showPaymentModal;
+                    return (
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 border border-primary/20 rounded-full mb-3 animate-pulse">
+                        <span className="w-2 h-2 bg-[#00f5a0] rounded-full"></span>
+                        <span className="text-xs font-black uppercase tracking-wider text-white">
+                          Plano Selecionado: <span className="text-[#00f5a0]">{targetPlan.name}</span>
+                        </span>
+                      </div>
+                    );
+                  })()}
+                  
+                  <p className="text-on-surface-variant text-xs px-4 max-w-md mx-auto">Utilize as informações oficiais abaixo para efetuar a transferência.</p>
+                </div>
+
+                <div className="space-y-6 mb-10">
+                  <div className="bg-surface-container-high rounded-[32px] p-8 border border-outline-variant/20 space-y-8 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Nome Completo do Pagador</label>
+                        <input 
+                          type="text" 
+                          value={payerName}
+                          onChange={(e) => setPayerName(e.target.value)}
+                          placeholder="Ex: João Manuel dos Santos"
+                          className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Telemóvel (WhatsApp)</label>
+                        <div className="flex gap-2">
+                          <CountryDropdown 
+                            value={payerDialCode}
+                            onChange={handlePayerDialChange}
+                          />
+
+                          <input 
+                            type="text" 
+                            required
+                            value={payerPhoneLocal}
+                            onChange={(e) => handlePayerPhoneLocalChange(e.target.value)}
+                            placeholder="Ex: 923 000 000"
+                            className="flex-1 bg-surface-container border border-outline-variant/10 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const targetPlan = plans.find(p => p.id === showPaymentModal.id) || showPaymentModal;
+                      const dynamicPrice = getDiscountedPrice(targetPlan);
+                      const is83Off = (appliedCoupon || userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30');
+                      const originalOldPrice = targetPlan.oldPrice || targetPlan.price;
+                      const savingsAmount = parsePriceToNumber(originalOldPrice) - parsePriceToNumber(dynamicPrice);
+
+                      return (
+                        <>
+                          <div className="flex justify-between items-center pb-6 border-b border-outline-variant/20">
+                            <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.3em]">Total a Liquidar:</span>
+                            <span className="text-3xl font-black text-primary font-mono tracking-tighter">{dynamicPrice} Kz</span>
+                          </div>
+
+                          {/* Economia e Desconto Expressivo */}
+                          {showPaymentModal.id !== 'trial_30' && (
+                            <div className="bg-[#00f5a0]/10 border border-[#00f5a0]/30 rounded-2xl p-4 flex flex-col gap-2 text-left">
+                              <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
+                                <span>Preço Normal Original:</span>
+                                <span className="line-through font-mono text-white/50">{originalOldPrice} Kz</span>
+                              </div>
+                              <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
+                                <span>Desconto Activo:</span>
+                                <span className="text-[#00f5a0] font-black">
+                                  {is83Off ? '83% OFF' : '33% OFF'}
+                                </span>
+                              </div>
+                              <div className="border-t border-dashed border-[#00f5a0]/20 my-1"></div>
+                              <div className="flex justify-between items-center text-sm font-black text-white">
+                                <span className="uppercase tracking-wider flex items-center gap-1.5 text-[11px] text-[#00f5a0]">
+                                  <PiggyBank className="text-sm" />
+                                  Poupança Total:
+                                </span>
+                                <span className="text-[#00f5a0] font-mono tracking-tight font-black text-base bg-[#00f5a0]/15 px-3 py-1 rounded-xl">
+                                  Economiza {formatPrice(savingsAmount)} Kz
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Cupão de Desconto Interativo no Modal */}
+                          {showPaymentModal.id !== 'trial_30' && (
+                            <div className="border border-outline-variant/10 rounded-2xl p-3 bg-surface-container-low/50">
+                              {!showModalCouponInput ? (
+                                <button 
+                                  type="button"
+                                  onClick={() => setShowModalCouponInput(true)}
+                                  className="text-[11px] font-black text-primary hover:underline flex items-center gap-1.5 transition-all text-left uppercase tracking-widest"
+                                >
+                                  <Ticket className="text-sm" />
+                                  Tens um cupão ?
+                                </button>
+                              ) : (
+                                <div className="space-y-2.5 animate-in slide-in-from-top-1 duration-200">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-widest flex items-center gap-1">
+                                      <Ticket className="text-xs" />
+                                      Código do Cupão
+                                    </span>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => {
+                                        setShowModalCouponInput(false);
+                                        setModalCouponError(null);
+                                        setModalCouponSuccessMsg(null);
+                                      }}
+                                      className="text-[9px] font-black text-rose-400 uppercase tracking-widest hover:underline"
+                                    >
+                                      Ocultar
+                                    </button>
+                                  </div>
+                                  
+                                  <div className="flex gap-2">
+                                    <input 
+                                      type="text" 
+                                      value={modalCouponCode}
+                                      onChange={(e) => setModalCouponCode(e.target.value.toUpperCase())}
+                                      placeholder="Ex: CPROFIT83%OFF"
+                                      className="flex-1 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 text-xs font-bold text-on-surface uppercase outline-none focus:border-primary placeholder:text-on-surface-variant/30 font-mono text-white"
+                                    />
+                                    <button 
+                                      type="button"
+                                      onClick={async () => {
+                                        await handleApplyCouponCode(modalCouponCode, true);
+                                      }}
+                                      className="bg-primary text-on-primary text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-opacity-90 transition-all shrink-0"
+                                    >
+                                      Aplicar
+                                    </button>
+                                  </div>
+                                  
+                                  {modalCouponSuccessMsg && (
+                                    <p className="text-[10px] font-bold text-emerald-400 leading-normal">
+                                      {modalCouponSuccessMsg}
+                                    </p>
+                                  )}
+                                  {modalCouponError && (
+                                    <p className="text-[10px] font-bold text-rose-400 leading-normal">
+                                      {modalCouponError}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+
+                    {/* Seleção do Método de Pagamento */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Selecione o Método</label>
+                      <div className="flex flex-row gap-2 bg-surface-container-low rounded-2xl p-1 border border-outline-variant/10 w-full">
+                        {globalSettings?.showIban !== false && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('iban')}
+                            className={`flex-1 flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'iban' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                          >
+                            <Landmark size={14} />
+                            <span className="text-[9px] font-black uppercase tracking-tight">IBAN</span>
+                          </button>
+                        )}
+                        {globalSettings?.showExpress !== false && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('express')}
+                            className={`flex-1 flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'express' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                          >
+                            <img 
+                              src={globalSettings?.multicaixaLogoUrl || "https://i.ibb.co/vz6W1fN/mcx-logo.png"} 
+                              alt="Express" 
+                              className={`h-[12px] object-contain shrink-0 ${paymentMethod === 'express' ? 'invert brightness-0 bg-transparent' : 'bg-white p-0.5 rounded-sm'}`} 
+                            />
+                            <span className="text-[9px] font-black uppercase tracking-tight">Express</span>
+                          </button>
+                        )}
+                        {globalSettings?.showMulticaixa !== false && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('multicaixa')}
+                            className={`flex-1 flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'multicaixa' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                          >
+                            <span className="text-xs">🪙</span>
+                            <span className="text-[9px] font-black uppercase tracking-tight">USDT</span>
+                          </button>
+                        )}
+                        {globalSettings?.showKwik !== false && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('kwik')}
+                            className={`flex-1 flex flex-col sm:flex-row items-center justify-center py-2.5 px-2 rounded-xl text-center gap-1.5 transition-all font-bold ${paymentMethod === 'kwik' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'}`}
+                          >
+                            <span className="text-sm">💸</span>
+                            <span className="text-[9px] font-black uppercase tracking-tight">KWIK</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
                       {paymentMethod === 'kwik' && globalSettings?.showKwik !== false && (
                         <div className="space-y-4 animate-in fade-in duration-200">
                           <div className="space-y-2 group cursor-pointer" onClick={() => {
@@ -1239,19 +1511,70 @@ Fico no aguardo, obrigado!`;
                           Informações indisponíveis. Contacte o administrador via WhatsApp.
                         </div>
                       )}
-                    </div>
-                  
+                    
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Column */}
+                  {/* Right Column: Summary & Submit */}
                   <div className="lg:col-span-5 space-y-6 sticky top-6">
                     <div className="bg-surface-container-high rounded-[32px] p-6 md:p-8 border border-primary/30 relative overflow-hidden shadow-[0_0_30px_rgba(0,245,160,0.05)]">
                       <div className="absolute top-0 right-0 w-40 h-40 bg-primary/10 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none"></div>
-                      <h4 className="text-[11px] font-black text-primary uppercase tracking-widest border-b border-primary/20 pb-3 mb-6 relative z-10">Resumo da Compra</h4>
+                      
+                      <h4 className="text-xs font-black text-primary uppercase tracking-widest border-b border-primary/20 pb-3 mb-6 relative z-10">Resumo da Compra</h4>
+                      
                       <div className="space-y-6 relative z-10">
-                                            {(() => {
+                        {(() => {
+                    const targetPlan = plans.find(p => p.id === showPaymentModal.id) || showPaymentModal;
+                    return (
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 border border-primary/20 rounded-full mb-3 animate-pulse">
+                        <span className="w-2 h-2 bg-[#00f5a0] rounded-full"></span>
+                        <span className="text-xs font-black uppercase tracking-wider text-white">
+                          Plano Selecionado: <span className="text-[#00f5a0]">{targetPlan.name}</span>
+                        </span>
+                      </div>
+                    );
+                  })()}
+                  
+                  <p className="text-on-surface-variant text-xs px-4 max-w-md mx-auto">Utilize as informações oficiais abaixo para efetuar a transferência.</p>
+                </div>
+
+                <div className="space-y-6 mb-10">
+                  <div className="bg-surface-container-high rounded-[32px] p-8 border border-outline-variant/20 space-y-8 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Nome Completo do Pagador</label>
+                        <input 
+                          type="text" 
+                          value={payerName}
+                          onChange={(e) => setPayerName(e.target.value)}
+                          placeholder="Ex: João Manuel dos Santos"
+                          className="w-full bg-surface-container border border-outline-variant/10 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest pl-1">Telemóvel (WhatsApp)</label>
+                        <div className="flex gap-2">
+                          <CountryDropdown 
+                            value={payerDialCode}
+                            onChange={handlePayerDialChange}
+                          />
+
+                          <input 
+                            type="text" 
+                            required
+                            value={payerPhoneLocal}
+                            onChange={(e) => handlePayerPhoneLocalChange(e.target.value)}
+                            placeholder="Ex: 923 000 000"
+                            className="flex-1 bg-surface-container border border-outline-variant/10 rounded-2xl px-6 py-4 text-sm font-bold text-on-surface outline-none focus:border-primary transition-all font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {(() => {
                       const targetPlan = plans.find(p => p.id === showPaymentModal.id) || showPaymentModal;
                       const dynamicPrice = getDiscountedPrice(targetPlan);
                       const is83Off = (appliedCoupon || userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30');
@@ -1360,9 +1683,10 @@ Fico no aguardo, obrigado!`;
                       );
                     })()}
 
-
+                    
+                        
                         <div className="pt-2">
-                                            {payments.some(p => p.status === 'pending') ? (
+                          {payments.some(p => p.status === 'pending') ? (
                     <div className="flex flex-col gap-2 p-5 bg-error/10 border border-error/20 rounded-2xl">
                       <div className="flex items-center gap-3">
                         <AlertTriangle className="text-error text-xl" />
@@ -1382,18 +1706,17 @@ Fico no aguardo, obrigado!`;
                       </p>
                     </div>
                   )}
-                
-                        </div>
-                        
-                        <div className="pt-2">
-                          <button 
-                            onClick={handleRequestPayment}
-                            disabled={isSubmitting || payments.some(p => p.status === 'pending')}
-                            className="w-full bg-primary text-on-primary py-6 rounded-[24px] font-black hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-primary/30 uppercase tracking-[0.2em] disabled:opacity-40 disabled:hover:scale-100 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-sm"
-                          >
-                            {isSubmitting ? 'A processar...' : payments.some(p => p.status === 'pending') ? '⚠️ Aguardando Validação' : 'Confirmar Pagamento'}
-                          </button>
-                        </div>
+                </div>
+
+
+                        <button 
+                  onClick={handleRequestPayment}
+                  disabled={isSubmitting || payments.some(p => p.status === 'pending')}
+                  className="w-full bg-primary text-on-primary py-6 rounded-[24px] font-black hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-primary/30 uppercase tracking-[0.2em] disabled:opacity-40 disabled:hover:scale-100 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-sm"
+                >
+                  {isSubmitting ? 'A processar...' : payments.some(p => p.status === 'pending') ? '⚠️ Aguardando Validação' : 'Confirmar Pagamento'}
+                </button>
+
                       </div>
                     </div>
                   </div>

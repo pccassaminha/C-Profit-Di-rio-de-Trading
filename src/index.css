@@ -186,7 +186,7 @@ body {
 
 .plans-ticker-track {
   display: flex;
-  gap: 24px;
+  gap: 32px;
   width: max-content;
   animation: plansTicker 45s linear infinite;
 }
