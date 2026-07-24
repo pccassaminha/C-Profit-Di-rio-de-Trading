@@ -403,28 +403,31 @@ export default function Dashboard() {
     return () => unsubscribes.forEach(unsub => unsub());
   }, []);
 
-  // Self-heal and auto-restore objective for 10k account if missing
+  // Auto-restore / ensure objectives exist for ALL active accounts
   useEffect(() => {
-    if (!auth.currentUser || accounts.length === 0 || objectives.length === 0) return;
-    
-    // Find any account where initialBalance is 10000 (10k)
-    const account10k = accounts.find(acc => Number(acc.initialBalance) === 10000);
-    if (account10k) {
-      // Check if there is an objective for this account
-      const hasObj = objectives.some(obj => obj.type === 'account' && obj.targetId === account10k.id);
+    if (!auth.currentUser || accounts.length === 0) return;
+
+    accounts.forEach(acc => {
+      const hasObj = objectives.some(obj => obj.type === 'account' && obj.targetId === acc.id);
       if (!hasObj) {
-        console.log("Restoring missing objective for 10k account:", account10k.id);
+        console.log("Restoring/creating objective for existing account in Dashboard:", acc.id, acc.accountNumber);
+        
+        const initialBal = Number(acc.initialBalance) || 10000;
+        const profitTarget = Math.max(100, Math.round(initialBal * 0.1)).toString();
+        const maxLoss = Math.max(100, Math.round(initialBal * 0.1)).toString();
+        const dailyLoss = Math.max(50, Math.round(initialBal * 0.05)).toString();
+
         const restoredObj = {
           userId: auth.currentUser.uid,
           type: 'account' as const,
-          targetId: account10k.id,
-          profitTarget: '1000',
-          maxLoss: '1000',
-          dailyLoss: '500',
+          targetId: acc.id,
+          profitTarget,
+          maxLoss,
+          dailyLoss,
           maxLossPeriod: 'Mês' as const,
           hidden: false
         };
-        // Save to Firestore and local state to prevent disappearance
+
         addDoc(collection(db, 'objectives'), {
           userId: auth.currentUser?.uid,
           type: restoredObj.type,
@@ -432,42 +435,21 @@ export default function Dashboard() {
           profitTarget: restoredObj.profitTarget,
           maxLoss: restoredObj.maxLoss,
           dailyLoss: restoredObj.dailyLoss,
-          maxLossPeriod: restoredObj.maxLossPeriod || 'Mês',
+          maxLossPeriod: 'Mês',
           hidden: false
         })
           .then((docRef) => {
             const localRestored = { ...restoredObj, id: docRef.id };
             setObjectives(prev => {
-              if (prev.some(o => o.targetId === account10k.id)) return prev;
+              if (prev.some(o => o.targetId === acc.id)) return prev;
               const next = [...prev, localRestored];
               localStorage.setItem('app_objectives', JSON.stringify(next));
               return next;
             });
           })
-          .catch(err => console.error("Error auto-restoring 10k objective in Dashboard:", err));
+          .catch(err => console.error("Error auto-restoring objective in Dashboard:", err));
       }
-    }
-  }, [accounts, objectives]);
-
-  // Auto-cleanup orphaned objectives whose target account no longer exists
-  useEffect(() => {
-    if (!auth.currentUser) return;
-    if (accounts.length > 0 || objectives.length > 0) {
-      const orphaned = objectives.filter(obj => obj.type === 'account' && !accounts.some(acc => acc.id === obj.targetId));
-      if (orphaned.length > 0) {
-        console.log("Dashboard auto-cleaning orphaned objectives:", orphaned);
-        orphaned.forEach(async (obj) => {
-          try {
-            await deleteDoc(doc(db, 'objectives', obj.id));
-          } catch (err) {
-            console.error("Error deleting orphaned objective in Dashboard:", err);
-          }
-        });
-        const cleaned = objectives.filter(obj => obj.type !== 'account' || accounts.some(acc => acc.id === obj.targetId));
-        setObjectives(cleaned);
-        localStorage.setItem('app_objectives', JSON.stringify(cleaned));
-      }
-    }
+    });
   }, [accounts, objectives]);
 
   const hasObAccount = accounts.some(a => a.tradeType === 'ob');

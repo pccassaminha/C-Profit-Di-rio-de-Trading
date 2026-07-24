@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from '../firebase';
 import Papa from 'papaparse';
@@ -8,8 +8,9 @@ import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import { DatePicker } from './DatePicker';
 import { importTradeFile, detectSession } from '../utils/tradeParsers';
+import { TradeShareCard } from './TradeShareCard';
 
-import { Calendar, Trash2, ChevronRight, BarChart2, Timer, ArrowLeft, Edit2, ExternalLink, Link, ArrowRightLeft, UploadCloud, Activity, TrendingUp, TrendingDown, Plus, Save, CheckCircle } from 'lucide-react';
+import { Calendar, Trash2, ChevronRight, BarChart2, Timer, ArrowLeft, Edit2, ExternalLink, Link, ArrowRightLeft, UploadCloud, Activity, TrendingUp, TrendingDown, Plus, Save, CheckCircle, Share2, X } from 'lucide-react';
 
 export default function TradeJournal({ currentView = 'list', onViewChange }: { currentView?: 'list' | 'form' | 'detail', onViewChange?: (view: 'list' | 'form' | 'detail') => void }) {
   const { formatCurrency } = useCurrency();
@@ -84,6 +85,99 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isTradeTypeModalOpen, setIsTradeTypeModalOpen] = useState(false);
+
+  // Share trade modal state
+  const [shareTrade, setShareTrade] = useState<any>(null);
+  const [shareCaption, setShareCaption] = useState<string>('');
+  const [shareFeed, setShareFeed] = useState<'forex' | 'ob'>('forex');
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isPublishingToCommunity, setIsPublishingToCommunity] = useState(false);
+
+  const handleOpenShareTradeModal = (trade: any) => {
+    const isOb = trade.type === 'ob';
+    const actionText = isOb ? (trade.action === 'Buy' ? 'CALL (Acima)' : 'PUT (Abaixo)') : trade.action;
+    const resultText = trade.pnl >= 0 ? `WIN (+${formatCurrency(trade.pnl)})` : `LOSS (${formatCurrency(trade.pnl)})`;
+    
+    const defaultCaption = `Análise e execução do trade em ${trade.symbol} (${actionText}). Resultado: ${resultText}`;
+    
+    setShareTrade(trade);
+    setShareCaption(defaultCaption);
+    setShareFeed(isOb ? 'ob' : 'forex');
+    setIsShareModalOpen(true);
+  };
+
+  const handleConfirmShareToCommunity = async () => {
+    if (!auth.currentUser || !shareTrade) return;
+    
+    try {
+      setIsPublishingToCommunity(true);
+      
+      let userName = auth.currentUser.displayName || 'Trader';
+      let userPhoto = auth.currentUser.photoURL || '';
+      
+      try {
+        const userSnap = await getDoc(doc(db, 'usuarios', auth.currentUser.uid));
+        if (userSnap.exists()) {
+          const uData = userSnap.data();
+          if (uData.nome) userName = uData.nome;
+          if (uData.photoURL) userPhoto = uData.photoURL;
+        }
+      } catch (e) {
+        console.warn("Could not fetch user profile for share:", e);
+      }
+      
+      await addDoc(collection(db, 'community_posts'), {
+        userId: auth.currentUser.uid,
+        userName,
+        userPhoto,
+        legend: shareCaption,
+        imageUrl: shareTrade.studyLink || '',
+        type: shareFeed,
+        tradeDetails: {
+          symbol: shareTrade.symbol || '',
+          action: shareTrade.action || '',
+          pnl: shareTrade.pnl ?? 0,
+          type: shareTrade.type || 'forex',
+          session: shareTrade.session || '',
+          size: shareTrade.size || '',
+          ticket: shareTrade.ticket || '',
+          openPrice: shareTrade.openPrice || '',
+          sl: shareTrade.sl || '',
+          tp: shareTrade.tp || '',
+          notes: shareTrade.notes || '',
+          studyLink: shareTrade.studyLink || '',
+          date: shareTrade.date || '',
+          timeframe: shareTrade.timeframe || ''
+        },
+        likesCount: 0,
+        commentsCount: 0,
+        createdAt: serverTimestamp()
+      });
+      
+      setIsShareModalOpen(false);
+      setShareTrade(null);
+      
+      setModalConfig({
+        isOpen: true,
+        title: "Publicado com Sucesso!",
+        message: "Seu registro de trade foi partilhado na Comunidade com sucesso! Os outros traders já podem interagir.",
+        confirmText: "Entendido",
+        onConfirm: () => closeModal()
+      });
+    } catch (err) {
+      console.error("Error sharing trade to community:", err);
+      setModalConfig({
+        isOpen: true,
+        title: "Erro ao Publicar",
+        message: "Não foi possível publicar o trade na comunidade. Tente novamente.",
+        isError: true,
+        confirmText: "OK",
+        onConfirm: () => closeModal()
+      });
+    } finally {
+      setIsPublishingToCommunity(false);
+    }
+  };
 
   const handleNewTradeClick = () => {
     const defaultTradeType = localStorage.getItem('app_default_trade_type') as 'ask' | 'forex' | 'ob' || 'ask';
@@ -950,12 +1044,12 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteTrade(trade.id);
+                                  handleOpenShareTradeModal(trade);
                                 }}
-                                className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-colors ml-2"
-                                title="Apagar trade"
+                                className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-colors ml-2"
+                                title="Partilhar na Comunidade"
                               >
-                                <Trash2 className="" />
+                                <Share2 className="w-5 h-5 text-primary" />
                               </button>
                               <ChevronRight className="text-on-surface-variant text-sm ml-2" />
                             </div>
@@ -1006,6 +1100,161 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
           </div>
         </div>
       )}
+
+      {/* Share Trade Modal */}
+      {isShareModalOpen && shareTrade && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-surface-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 max-w-xl w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200 my-8">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-outline-variant/20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center">
+                  <Share2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-on-surface font-headline">Partilhar Trade na Comunidade</h3>
+                  <p className="text-xs text-on-surface-variant">Publique o seu trade para a comunidade interagir</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsShareModalOpen(false)} 
+                disabled={isPublishingToCommunity}
+                className="p-2 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container-high transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              {/* Feed selector */}
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                  Feed de Destino
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShareFeed('forex')}
+                    className={`py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-all ${
+                      shareFeed === 'forex' 
+                        ? 'bg-primary/15 border-primary text-primary shadow-sm' 
+                        : 'bg-surface-container-low border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high'
+                    }`}
+                  >
+                    <BarChart2 size={16} />
+                    <span>Forex / Índices</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShareFeed('ob')}
+                    className={`py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-all ${
+                      shareFeed === 'ob' 
+                        ? 'bg-primary/15 border-primary text-primary shadow-sm' 
+                        : 'bg-surface-container-low border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high'
+                    }`}
+                  >
+                    <Timer size={16} />
+                    <span>Opções Binárias</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Caption Input */}
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                  Legenda / Comentário sobre o Trade
+                </label>
+                <textarea
+                  value={shareCaption}
+                  onChange={(e) => setShareCaption(e.target.value)}
+                  rows={3}
+                  placeholder="Escreva algo sobre este trade..."
+                  className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-3 text-sm text-on-surface focus:outline-none focus:border-primary transition-colors resize-none"
+                />
+              </div>
+
+              {/* Facebook-Style Live Preview */}
+              <div>
+                <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                  Pré-visualização do Post (Estilo Facebook)
+                </p>
+                <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-4 shadow-sm space-y-3">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={auth.currentUser?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(auth.currentUser?.displayName || 'Trader')}&background=random`}
+                      alt="Avatar"
+                      className="w-9 h-9 rounded-full object-cover border border-outline-variant/30"
+                    />
+                    <div>
+                      <p className="text-sm font-bold text-on-surface leading-tight">
+                        {auth.currentUser?.displayName || 'Trader'}
+                      </p>
+                      <p className="text-[10px] text-on-surface-variant">Agora mesmo • C Profit Community</p>
+                    </div>
+                  </div>
+
+                  {shareCaption && (
+                    <p className="text-xs text-on-surface whitespace-pre-wrap leading-relaxed">
+                      {shareCaption}
+                    </p>
+                  )}
+
+                  <TradeShareCard 
+                    tradeDetails={{
+                      symbol: shareTrade.symbol,
+                      action: shareTrade.action,
+                      pnl: shareTrade.pnl,
+                      type: shareTrade.type,
+                      session: shareTrade.session,
+                      size: shareTrade.size,
+                      ticket: shareTrade.ticket,
+                      openPrice: shareTrade.openPrice,
+                      sl: shareTrade.sl,
+                      tp: shareTrade.tp,
+                      notes: shareTrade.notes,
+                      studyLink: shareTrade.studyLink,
+                      date: shareTrade.date,
+                      timeframe: shareTrade.timeframe
+                    }} 
+                    imageUrl={shareTrade.studyLink}
+                    userName={auth.currentUser?.displayName || 'Trader'}
+                    interactive={false}
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-outline-variant/20">
+                <button
+                  type="button"
+                  onClick={() => setIsShareModalOpen(false)}
+                  disabled={isPublishingToCommunity}
+                  className="px-5 py-2.5 rounded-xl text-on-surface-variant font-bold text-xs hover:bg-surface-container-high transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmShareToCommunity}
+                  disabled={isPublishingToCommunity}
+                  className="px-6 py-2.5 bg-primary text-on-primary rounded-xl font-bold text-xs hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 min-w-[150px] disabled:opacity-60"
+                >
+                  {isPublishingToCommunity ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                      <span>Publicando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 size={16} />
+                      <span>Publicar na Comunidade</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </>
     );
   }
@@ -1025,6 +1274,13 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
             Voltar para a Lista
           </button>
           <div className="flex gap-3">
+            <button 
+              onClick={() => handleOpenShareTradeModal(selectedTrade)}
+              className="px-4 py-2 bg-primary/10 text-primary rounded-lg font-bold hover:bg-primary/20 transition-colors flex items-center gap-2"
+            >
+              <Share2 className="w-4 h-4" />
+              Partilhar na Comunidade
+            </button>
             <button 
               onClick={() => handleDeleteTrade(selectedTrade.id)}
               className="px-6 py-2 bg-error/10 text-error rounded-lg font-bold hover:bg-error/20 transition-colors flex items-center gap-2"

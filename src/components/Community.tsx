@@ -4,11 +4,9 @@ import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp,
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
+import { TradeShareCard, TradeDetails } from './TradeShareCard';
 
 import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft, Megaphone, Edit2, Ban, ArrowRight, Compass, Bookmark } from 'lucide-react';
-
-
-
 
 interface Post {
   id: string;
@@ -25,6 +23,7 @@ interface Post {
   userLiked?: boolean;
   isPlanningShare?: boolean;
   originalPlanningId?: string;
+  tradeDetails?: TradeDetails;
 }
 
 export default function Community() {
@@ -1232,67 +1231,14 @@ export default function Community() {
               )}
             </div>
 
-            {post.imageUrl && (
-              <div className="px-2 pb-2 cursor-pointer" onClick={() => setViewingPost(post)}>
-                {(() => {
-                  const link = post.imageUrl.toLowerCase();
-                  const isVideo = link.match(/\.(mp4|webm|ogg|mov)$/) || 
-                                  link.includes('youtube.com') || 
-                                  link.includes('youtu.be') || 
-                                  link.includes('vimeo.com');
-                  
-                  if (isVideo) {
-                    if (link.includes('youtube.com') || link.includes('youtu.be')) {
-                      const videoId = link.includes('v=') ? link.split('v=')[1]?.split('&')[0] : link.split('/').pop();
-                      return (
-                        <div className="aspect-video w-full rounded-[32px] overflow-hidden border border-outline-variant/20 shadow-lg mb-2">
-                          <iframe 
-                            src={`https://www.youtube.com/embed/${videoId}`}
-                            className="w-full h-full"
-                            allowFullScreen
-                            title="Community Analysis Video"
-                          ></iframe>
-                        </div>
-                      );
-                    }
-                    if (link.includes('vimeo.com')) {
-                      const videoId = link.split('/').pop();
-                      return (
-                        <div className="aspect-video w-full rounded-[32px] overflow-hidden border border-outline-variant/20 shadow-lg mb-2">
-                          <iframe 
-                            src={`https://player.vimeo.com/video/${videoId}`}
-                            className="w-full h-full"
-                            allowFullScreen
-                            title="Community Analysis Video"
-                          ></iframe>
-                        </div>
-                      );
-                    }
-                    return (
-                      <video 
-                        src={post.imageUrl} 
-                        controls 
-                        className="w-full h-auto rounded-[32px] border border-outline-variant/20 shadow-lg bg-black/20 mb-2"
-                      />
-                    );
-                  }
-
-                  // TradingView link handle
-                  let displayUrl = post.imageUrl;
-                  if (displayUrl.includes('tradingview.com/x/') && !displayUrl.endsWith('.png')) {
-                    displayUrl += '.png';
-                  }
-
-                  return (
-                    <img 
-                      src={displayUrl} 
-                      alt="Análise" 
-                      className="w-full h-auto max-h-[300px] object-cover rounded-[32px] border border-outline-variant/5 bg-black/20" 
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                    />
-                  );
-                })()}
+            {/* Post Media / Link / Trade Card */}
+            {(post.tradeDetails || post.imageUrl) && (
+              <div className="px-6 pb-4 cursor-pointer" onClick={() => setViewingPost(post)}>
+                <TradeShareCard 
+                  tradeDetails={post.tradeDetails} 
+                  imageUrl={post.imageUrl} 
+                  userName={post.userName}
+                />
               </div>
             )}
 
@@ -1852,29 +1798,13 @@ export default function Community() {
               <p className="text-on-surface text-base md:text-lg leading-relaxed whitespace-pre-wrap">{renderTextWithMentions(viewingPost.legend)}</p>
               
               <div className="flex flex-col gap-4 w-full">
-                {viewingPost.imageUrl && (() => {
-                  const link = viewingPost.imageUrl.toLowerCase();
-                  const isVideo = link.match(/\.(mp4|webm|ogg|mov)$/) || link.includes('youtube.com') || link.includes('youtu.be') || link.includes('vimeo.com');
-                  
-                  if (isVideo) {
-                    if (link.includes('youtube.com') || link.includes('youtu.be')) {
-                      const videoId = link.includes('v=') ? link.split('v=')[1]?.split('&')[0] : link.split('/').pop();
-                      return (
-                        <div className="aspect-video w-full rounded-2xl overflow-hidden shadow-lg">
-                          <iframe src={`https://www.youtube.com/embed/${videoId}`} className="w-full h-full" allowFullScreen></iframe>
-                        </div>
-                      );
-                    }
-                    return <video src={viewingPost.imageUrl} controls className="w-full h-auto rounded-3xl shadow-lg bg-black/20" />;
-                  }
-
-                  let displayUrl = viewingPost.imageUrl;
-                  if (displayUrl.includes('tradingview.com/x/') && !displayUrl.endsWith('.png')) {
-                    displayUrl += '.png';
-                  }
-
-                  return <img src={displayUrl} alt="Análise" className="w-full h-auto rounded-3xl shadow-lg border border-outline-variant/10 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(viewingPost.imageUrl, '_blank')} referrerPolicy="no-referrer" />;
-                })()}
+                {(viewingPost.tradeDetails || viewingPost.imageUrl) && (
+                  <TradeShareCard 
+                    tradeDetails={viewingPost.tradeDetails} 
+                    imageUrl={viewingPost.imageUrl} 
+                    userName={viewingPost.userName}
+                  />
+                )}
                 
                 {viewingPost.imageUrls?.filter(url => url !== viewingPost.imageUrl).map((mediaUrl, idx) => {
                   const link = mediaUrl.toLowerCase();
@@ -3199,14 +3129,13 @@ function ProfilePostCard({ post, onLike, onSelectPhoto, isAdmin, onDeletePost }:
         <p className="text-xs sm:text-sm text-on-surface leading-normal whitespace-pre-wrap">{post.legend}</p>
       </div>
 
-      {/* Media elements */}
-      {post.imageUrl && (
-        <div className="rounded-xl overflow-hidden border border-outline-variant/10 max-h-72 mb-3 cursor-pointer" onClick={() => onSelectPhoto(post)}>
-          <img 
-            src={post.imageUrl} 
-            alt="Asset graph" 
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
+      {/* Media elements / Trade Share Card */}
+      {(post.tradeDetails || post.imageUrl) && (
+        <div className="mb-3 cursor-pointer" onClick={() => onSelectPhoto(post)}>
+          <TradeShareCard 
+            tradeDetails={post.tradeDetails} 
+            imageUrl={post.imageUrl} 
+            userName={post.userName}
           />
         </div>
       )}
