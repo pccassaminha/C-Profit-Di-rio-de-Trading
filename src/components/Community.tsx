@@ -4,7 +4,7 @@ import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp,
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
 
-import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft, Megaphone, Edit2, Ban, ArrowRight, Compass } from 'lucide-react';
+import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft, Megaphone, Edit2, Ban, ArrowRight, Compass, Bookmark } from 'lucide-react';
 
 
 
@@ -22,6 +22,8 @@ interface Post {
   commentsCount: number;
   createdAt: any;
   userLiked?: boolean;
+  isPlanningShare?: boolean;
+  originalPlanningId?: string;
 }
 
 export default function Community() {
@@ -481,6 +483,26 @@ export default function Community() {
     setIsCreateModalOpen(true);
   };
 
+  const handleSavePlanning = async (post: Post) => {
+    if (!auth.currentUser || !post.isPlanningShare || !post.originalPlanningId) return;
+    try {
+      // Create a copy of this planning for the user
+      await addDoc(collection(db, 'planning'), {
+        userId: auth.currentUser.uid,
+        content: post.legend, // legend has the content
+        createdAt: serverTimestamp(),
+        title: `Cópia: Planejamento de ${post.userName}`,
+        sentiment: 'neutral',
+        confidence: 'med',
+        isDailyNote: false
+      });
+      alert('Planejamento salvo com sucesso!');
+    } catch (err) {
+      console.error('Error saving planning:', err);
+      alert('Erro ao salvar planejamento.');
+    }
+  };
+
   const handleLike = async (post: Post) => {
     if (!auth.currentUser) return;
     const likeRef = doc(db, 'community_posts', post.id, 'likes', auth.currentUser.uid);
@@ -918,6 +940,7 @@ export default function Community() {
     }
   };
 
+
   const handleShare = (post: Post) => {
     const shareText = `Análise de ${post.userName} no C Profit:\n${post.legend}\nConfira no Terminal C Profit!`;
     if (navigator.share) {
@@ -1240,9 +1263,20 @@ export default function Community() {
                 {post.commentsCount || 0}
               </button>
 
+              {post.isPlanningShare && post.userId !== auth.currentUser?.uid && (
+                <button
+                  onClick={() => handleSavePlanning(post)}
+                  className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl hover:bg-primary/10 text-primary transition-all font-black text-xs uppercase tracking-widest ml-auto"
+                  title="Salvar Planejamento"
+                >
+                  <Bookmark size={18} />
+                  Salvar
+                </button>
+              )}
+
               <button 
                 onClick={() => handleShare(post)}
-                className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl hover:bg-surface-container text-on-surface-variant transition-all font-black text-xs uppercase tracking-widest ml-auto"
+                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-2xl hover:bg-surface-container text-on-surface-variant transition-all font-black text-xs uppercase tracking-widest ${!post.isPlanningShare || post.userId === auth.currentUser?.uid ? 'ml-auto' : ''}`}
               >
                 <Share2 size={18} />
                 Partilhar

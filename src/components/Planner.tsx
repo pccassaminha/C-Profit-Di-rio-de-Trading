@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { Search, Filter, Plus, Image as ImageIcon, X, Send, Calendar, CheckCircle2, AlertCircle, Info, TrendingUp, TrendingDown, Gauge, ShieldCheck, ChevronDown, ChevronUp, Pencil, StickyNote, History } from 'lucide-react';
+import { Search, Filter, Plus, Image as ImageIcon, X, Send, Calendar, CheckCircle2, AlertCircle, Info, TrendingUp, TrendingDown, Gauge, ShieldCheck, ChevronDown, ChevronUp, Pencil, StickyNote, History, MoreVertical, Eye, Share2 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, getWeek, getYear, isSameDay, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DateRangePicker } from './DateRangePicker';
@@ -32,6 +32,9 @@ export default function Planner() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<PlanningEntry | null>(null);
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+  const [publishingEntry, setPublishingEntry] = useState<PlanningEntry | null>(null);
+  const [publishMarket, setPublishMarket] = useState<'ob' | 'forex'>('forex');
   const [isNoteForm, setIsNoteForm] = useState(false);
   const [expandedWeeks, setExpandedWeeks] = useState<string[]>([]);
   const [readingModalEntry, setReadingModalEntry] = useState<PlanningEntry | null>(null);
@@ -106,6 +109,48 @@ export default function Planner() {
       await deleteDoc(doc(db, 'planning', id));
     } catch (error) {
       console.error("Error deleting entry:", error);
+    }
+  };
+
+  const handlePublishToFeed = async () => {
+    if (!publishingEntry || !auth.currentUser) return;
+    try {
+      // Obter dados do usuário para o post
+      const userDoc = await getDoc(doc(db, 'usuarios', auth.currentUser.uid));
+      let userName = 'Usuário';
+      let userPhoto = 'https://ui-avatars.com/api/?name=User&background=random';
+      
+      if (userDoc.exists()) {
+        userName = userDoc.data().nome || 'Usuário';
+        if (userDoc.data().photoURL) userPhoto = userDoc.data().photoURL;
+      } else {
+        const legacyDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (legacyDoc.exists()) {
+          userName = legacyDoc.data().nome || 'Usuário';
+          if (legacyDoc.data().photoURL) userPhoto = legacyDoc.data().photoURL;
+        }
+      }
+
+      const postContent = `${publishingEntry.title}\n\n${publishingEntry.content}`;
+      const images = extractImages(publishingEntry.content);
+
+      await addDoc(collection(db, 'community_posts'), {
+        userId: auth.currentUser.uid,
+        userName,
+        userPhoto,
+        legend: postContent,
+        imageUrls: images,
+        type: publishMarket,
+        likesCount: 0,
+        commentsCount: 0,
+        createdAt: serverTimestamp(),
+        isPlanningShare: true,
+        originalPlanningId: publishingEntry.id,
+      });
+
+      setPublishingEntry(null);
+    } catch (error) {
+      console.error("Error publishing to feed:", error);
     }
   };
 
@@ -298,21 +343,57 @@ export default function Planner() {
                                     )}
                                   </h2>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleEdit(entry); }}
+                                <div className="flex items-center gap-2 relative">
+                                  <button
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      setActiveDropdownId(activeDropdownId === entry.id ? null : entry.id); 
+                                    }}
                                     className="p-3 rounded-2xl bg-surface-container-highest text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-all"
-                                    title="Editar Planejamento"
                                   >
-                                    <Pencil size={20} />
+                                    <MoreVertical size={20} />
                                   </button>
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }}
-                                    className="p-3 rounded-2xl bg-surface-container-highest text-on-surface-variant hover:text-error hover:bg-error/10 transition-all"
-                                    title="Apagar Planejamento"
-                                  >
-                                    <X size={20} />
-                                  </button>
+
+                                  {/* Dropdown Menu */}
+                                  {activeDropdownId === entry.id && (
+                                    <>
+                                      <div 
+                                        className="fixed inset-0 z-40" 
+                                        onClick={(e) => { e.stopPropagation(); setActiveDropdownId(null); }}
+                                      />
+                                      <div className="absolute right-0 top-full mt-2 w-56 bg-surface-container border border-outline-variant/20 rounded-xl shadow-xl z-50 overflow-hidden py-2 animate-in fade-in slide-in-from-top-2">
+                                        <button 
+                                          onClick={(e) => { e.stopPropagation(); setActiveDropdownId(null); setReadingModalEntry(entry); }}
+                                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-on-surface hover:bg-surface-container-highest transition-colors text-left"
+                                        >
+                                          <Eye size={18} className="text-primary" />
+                                          Visualizar
+                                        </button>
+                                        <button 
+                                          onClick={(e) => { e.stopPropagation(); setActiveDropdownId(null); handleEdit(entry); }}
+                                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-on-surface hover:bg-surface-container-highest transition-colors text-left"
+                                        >
+                                          <Pencil size={18} className="text-on-surface-variant" />
+                                          Editar
+                                        </button>
+                                        <button 
+                                          onClick={(e) => { e.stopPropagation(); setActiveDropdownId(null); setPublishingEntry(entry); }}
+                                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-on-surface hover:bg-surface-container-highest transition-colors text-left"
+                                        >
+                                          <Share2 size={18} className="text-secondary" />
+                                          Publicar no Feed
+                                        </button>
+                                        <div className="h-px bg-outline-variant/20 my-1"></div>
+                                        <button 
+                                          onClick={(e) => { e.stopPropagation(); setActiveDropdownId(null); handleDelete(entry.id); }}
+                                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-error hover:bg-error/10 transition-colors text-left"
+                                        >
+                                          <X size={18} />
+                                          Apagar
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               </header>
 
@@ -494,6 +575,64 @@ export default function Planner() {
           </div>
         </div>
       )}
+      {/* Modal de Publicação no Feed */}
+      {publishingEntry && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-surface border border-outline-variant/20 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95">
+            <h3 className="text-xl font-bold text-on-surface mb-2 flex items-center gap-2">
+              <Share2 className="text-secondary" />
+              Publicar no Feed
+            </h3>
+            <p className="text-on-surface-variant text-sm mb-6">
+              Você está prestes a publicar "{publishingEntry.title}" no feed da comunidade. Outros usuários poderão ver e salvar este planejamento.
+            </p>
+            
+            <div className="space-y-4 mb-8">
+              <label className="text-sm font-bold text-on-surface uppercase tracking-wider">Selecione o Mercado</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setPublishMarket('forex')}
+                  className={`p-3 rounded-xl border transition-all text-sm font-bold flex flex-col items-center gap-2 ${
+                    publishMarket === 'forex' 
+                      ? 'bg-primary/10 border-primary text-primary' 
+                      : 'bg-surface-container border-outline-variant/20 text-on-surface hover:border-primary/50'
+                  }`}
+                >
+                  <TrendingUp size={24} />
+                  Forex & Índices
+                </button>
+                <button
+                  onClick={() => setPublishMarket('ob')}
+                  className={`p-3 rounded-xl border transition-all text-sm font-bold flex flex-col items-center gap-2 ${
+                    publishMarket === 'ob' 
+                      ? 'bg-secondary/10 border-secondary text-secondary' 
+                      : 'bg-surface-container border-outline-variant/20 text-on-surface hover:border-secondary/50'
+                  }`}
+                >
+                  <TrendingDown size={24} />
+                  Opções Binárias
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setPublishingEntry(null)}
+                className="flex-1 px-4 py-3 bg-surface-container-highest text-on-surface font-bold rounded-xl hover:bg-surface-container-highest/80 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handlePublishToFeed}
+                className="flex-1 px-4 py-3 bg-secondary text-on-secondary font-bold rounded-xl hover:brightness-110 transition-colors flex justify-center items-center gap-2 shadow-lg shadow-secondary/20"
+              >
+                Publicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal do Modo Leitura de Alta Fidelidade (Folha de Documento Real) */}
       {readingModalEntry && (
         <div className="fixed inset-0 z-[120] flex flex-col justify-between bg-black/95 backdrop-blur-lg p-3 md:p-6 overflow-y-auto">
