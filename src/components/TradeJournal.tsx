@@ -1332,7 +1332,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
             className="bg-surface-container-low border border-outline-variant/20 text-on-surface px-4 py-2.5 rounded-lg text-sm font-bold outline-none cursor-pointer"
           >
             <option value="" disabled>Selecione a Conta</option>
-            {accounts.filter(acc => (tradeType === 'ob' ? acc.tradeType === 'ob' : acc.tradeType !== 'ob') && acc.status !== 'inactive').map(acc => (
+            {accounts.filter(acc => (tradeType === 'ob' ? acc.tradeType === 'ob' : acc.tradeType !== 'ob') && acc.status !== 'inactive' && !acc.isHidden).map(acc => (
               <option key={acc.id} value={acc.id}>
                 Conta {acc.accountNumber}
               </option>

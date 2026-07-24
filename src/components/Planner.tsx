@@ -6,6 +6,7 @@ import { Search, Filter, Plus, Image as ImageIcon, X, Send, Calendar, CheckCircl
 import { format, startOfWeek, endOfWeek, getWeek, getYear, isSameDay, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DateRangePicker } from './DateRangePicker';
+import Modal from './Modal';
 import { DateRange } from 'react-day-picker';
 
 interface PlanningEntry {
@@ -39,6 +40,16 @@ export default function Planner() {
   const [expandedWeeks, setExpandedWeeks] = useState<string[]>([]);
   const [readingModalEntry, setReadingModalEntry] = useState<PlanningEntry | null>(null);
   const [readerTheme, setReaderTheme] = useState<'dark' | 'light'>('light');
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    isError: false,
+    confirmText: "OK",
+    onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
+  });
+  const closeModal = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
+
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -83,8 +94,23 @@ export default function Planner() {
         });
       }
       resetForm();
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: editingEntry ? "Planejamento atualizado com sucesso!" : "Planejamento salvo com sucesso!",
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
     } catch (error) {
       console.error("Error saving planning:", error);
+      setModalConfig({
+        isOpen: true,
+        title: "Erro",
+        message: "Erro ao salvar planejamento.",
+        isError: true,
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
     }
   };
 
@@ -745,6 +771,7 @@ export default function Planner() {
           </div>
         </div>
       )}
+      <Modal {...modalConfig} />
     </div>
   );
 }

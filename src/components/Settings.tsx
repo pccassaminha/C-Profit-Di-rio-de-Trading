@@ -103,15 +103,13 @@ export default function Settings() {
       } catch (e) {
         console.warn("Could not update subcollection accounts");
       }
+      setEditingAccount(null);
       setModalConfig({
         isOpen: true,
         title: "Sucesso",
         message: "Conta atualizada com sucesso!",
         confirmText: "OK",
-        onConfirm: () => {
-          setEditingAccount(null);
-          closeModal();
-        }
+        onConfirm: closeModal
       });
     } catch (error) {
       console.error(error);
@@ -663,6 +661,35 @@ export default function Settings() {
       });
       setIsSaving(false);
     }, 400);
+  };
+
+  
+  const toggleAccountHidden = async (accountId: string, isHidden: boolean) => {
+    try {
+      try {
+        await updateDoc(doc(db, 'accounts', accountId), {
+          isHidden: !isHidden
+        });
+      } catch (e) {
+        console.warn("Could not update root accounts collection");
+      }
+      try {
+        await updateDoc(doc(db, 'usuarios', auth.currentUser!.uid, 'accounts', accountId), {
+          isHidden: !isHidden
+        });
+      } catch (e) {
+        console.warn("Could not update subcollection accounts");
+      }
+    } catch (error) {
+      console.error("Error updating account hidden status: ", error);
+      setModalConfig({
+        isOpen: true,
+        title: "Erro",
+        message: "Erro ao ocultar/reativar a conta.",
+        isError: true,
+        onConfirm: closeModal
+      });
+    }
   };
 
   const toggleAccountStatus = async (accountId: string, currentStatus: string) => {
@@ -1905,7 +1932,14 @@ export default function Settings() {
               accounts.map(account => (
                 <div key={account.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-surface-container border border-outline-variant/10 rounded-lg group relative">
                   <div className="flex flex-col gap-1 flex-1">
-                    <p className="text-on-surface font-bold text-sm">{account.accountNumber} - {account.broker}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-on-surface font-bold text-sm">{account.accountNumber} - {account.broker}</p>
+                      {account.isHidden && (
+                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-neutral-500/20 text-neutral-400 border border-neutral-500/30">
+                          Oculta
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       <p className="text-on-surface-variant text-[10px] uppercase font-bold tracking-tight">{account.accountType} | {account.phase}</p>
                       {account.tradeType !== 'ob' && (
@@ -1948,17 +1982,7 @@ export default function Settings() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingAccount(account);
-                      }}
-                      className="px-4 py-2 rounded-lg text-sm font-bold bg-surface-container-highest text-on-surface-variant hover:text-primary transition-colors flex items-center gap-2"
-                      title="Editar Conta"
-                    >
-                      <Edit2 size={14} />
-                      <span className="hidden sm:inline">Editar</span>
-                    </button>
+
                     <button
                       onClick={() => toggleAccountStatus(account.id, account.status || 'active')}
                       className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${
@@ -1991,6 +2015,30 @@ export default function Settings() {
                               exit={{ opacity: 0, scale: 0.95, y: 10 }}
                               className="absolute right-0 bottom-full mb-2 w-48 bg-surface-container-highest border border-outline-variant/20 rounded-xl shadow-xl overflow-hidden z-50 flex flex-col"
                             >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDropdownId(null);
+                                  setEditingAccount(account);
+                                }}
+                                className="w-full px-4 py-3 text-left text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-3 text-sm font-bold"
+                              >
+                                <Edit2 size={16} />
+                                Editar Conta
+                              </button>
+                              <div className="h-px w-full bg-outline-variant/10"></div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDropdownId(null);
+                                  toggleAccountHidden(account.id, !!account.isHidden);
+                                }}
+                                className="w-full px-4 py-3 text-left text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-3 text-sm font-bold"
+                              >
+                                {account.isHidden ? <Eye size={16} /> : <EyeOff size={16} />}
+                                {account.isHidden ? 'Reativar Conta' : 'Ocultar Conta'}
+                              </button>
+                              <div className="h-px w-full bg-outline-variant/10"></div>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();

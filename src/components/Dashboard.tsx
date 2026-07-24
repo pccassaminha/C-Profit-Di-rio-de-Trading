@@ -552,6 +552,7 @@ export default function Dashboard() {
   const data = useMemo(() => {
     // Filter according to visibleMarkets
     const visibleAccounts = accounts.filter(a => {
+      if (a.isHidden) return false;
       const accTradeType = a.tradeType || 'forex';
       if (visibleMarkets === 'forex' && accTradeType === 'ob') return false;
       if (visibleMarkets === 'ob' && accTradeType !== 'ob') return false;
@@ -1307,6 +1308,7 @@ export default function Dashboard() {
               <option className="bg-[#0f1b30] text-[#f0f4ff]" value="all">Todas as Contas (Soma)</option>
               {accounts.filter(acc => {
                 if (acc.status === 'inactive') return false;
+                if (acc.isHidden) return false;
                 const tt = acc.tradeType || 'forex';
                 if (visibleMarkets === 'forex' && tt === 'ob') return false;
                 if (visibleMarkets === 'ob' && tt !== 'ob') return false;

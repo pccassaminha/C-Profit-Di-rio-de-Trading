@@ -124,7 +124,7 @@ export default function Withdrawals() {
     });
   }, [withdrawals, dateRange]);
 
-  const activeAccounts = accounts.filter(a => a.status !== 'inactive');
+  const activeAccounts = accounts.filter(a => a.status !== 'inactive' && !a.isHidden);
   const activeAccountIds = new Set(activeAccounts.map(a => a.id));
   const activeTrades = trades.filter(t => t.accountId ? activeAccountIds.has(t.accountId) : true);
 

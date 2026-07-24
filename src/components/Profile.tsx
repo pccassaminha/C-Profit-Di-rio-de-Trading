@@ -738,10 +738,23 @@ export default function Profile() {
       });
       setEditingPost(null);
       setEditLegend('');
-      alert('Publicação editada com sucesso!');
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: "Publicação editada com sucesso!",
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
     } catch (err) {
       console.error(err);
-      alert('Erro ao guardar a publicação editada.');
+      setModalConfig({
+        isOpen: true,
+        title: "Erro",
+        message: "Erro ao guardar a publicação editada.",
+        isError: true,
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
     }
   };
 

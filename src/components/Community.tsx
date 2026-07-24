@@ -3,6 +3,7 @@ import { db, auth, storage } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, increment, deleteDoc, getDoc, getDocs, setDoc, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
+import Modal from './Modal';
 
 import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft, Megaphone, Edit2, Ban, ArrowRight, Compass, Bookmark } from 'lucide-react';
 
@@ -60,6 +61,16 @@ export default function Community() {
   const [profileIsFollowing, setProfileIsFollowing] = useState(false);
   const [isEditingProfileDetails, setIsEditingProfileDetails] = useState(false);
   const [isSavingProfileEdits, setIsSavingProfileEdits] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    isError: false,
+    confirmText: "OK",
+    onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
+  });
+  const closeModal = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
+
   const [editFormFields, setEditFormFields] = useState<{
     nome: string;
     phoneNumber: string;
@@ -803,10 +814,23 @@ export default function Community() {
       } : updatedData as any);
       
       setIsEditingProfileDetails(false);
-      alert('Perfil editado com sucesso!');
+      setModalConfig({
+        isOpen: true,
+        title: "Sucesso",
+        message: "Perfil editado com sucesso!",
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
     } catch (err) {
       console.error('Error saving profile edits:', err);
-      alert('Erro ao guardar alterações.');
+      setModalConfig({
+        isOpen: true,
+        title: "Erro",
+        message: "Erro ao guardar alterações.",
+        isError: true,
+        confirmText: "OK",
+        onConfirm: closeModal
+      });
     } finally {
       setIsSavingProfileEdits(false);
     }
@@ -3013,6 +3037,7 @@ export default function Community() {
           </div>
         </div>
       )}
+      <Modal {...modalConfig} />
     </div>
   );
 }
