@@ -8,6 +8,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDoc
 import { motion, AnimatePresence } from 'motion/react';
 
 import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle, Plus, Edit2, Trash2, Wallet, FileText, Flag, X, Save, RefreshCw, Eye, EyeOff, Eraser, Undo, MoreVertical, CandlestickChart } from 'lucide-react';
+import { findObjectiveForAccount, findExistingObjectiveForTarget, deduplicateObjectives } from '../utils/objectiveUtils';
 
 
 
@@ -388,7 +389,7 @@ export default function Settings() {
     const unsubObjectives = onSnapshot(qDbObjectives, (snapshot) => {
       const dbObjectives = snapshot.docs.map(doc => ({
         id: doc.id,
-        type: doc.data().type,
+        type: doc.data().type as 'account' | 'market',
         targetId: doc.data().targetId,
         profitTarget: doc.data().profitTarget,
         maxLoss: doc.data().maxLoss,
@@ -396,7 +397,14 @@ export default function Settings() {
         maxLossPeriod: doc.data().maxLossPeriod || 'Mês',
         hidden: !!doc.data().hidden
       }));
-      setObjectives(dbObjectives);
+      const { cleanObjectives, duplicateIds } = deduplicateObjectives(dbObjectives, accounts);
+      setObjectives(cleanObjectives);
+
+      if (duplicateIds.length > 0 && auth.currentUser) {
+        duplicateIds.forEach(dupId => {
+          deleteDoc(doc(db, 'objectives', dupId)).catch(err => console.warn('Cleaned duplicate objective doc:', err));
+        });
+      }
     }, (error) => {
       console.error("Error fetching objectives in Settings:", error);
     });
@@ -418,8 +426,8 @@ export default function Settings() {
     if (!auth.currentUser || accounts.length === 0) return;
 
     accounts.forEach(acc => {
-      const hasObj = objectives.some(obj => obj.type === 'account' && obj.targetId === acc.id);
-      if (!hasObj) {
+      const existingObj = findObjectiveForAccount(objectives, acc, accounts);
+      if (!existingObj) {
         console.log("Auto-restoring missing objective for account in Settings:", acc.id, acc.accountNumber);
         
         const initialBal = Number(acc.initialBalance) || 10000;
@@ -451,7 +459,7 @@ export default function Settings() {
           .then((docRef) => {
             const localRestored = { ...restoredObj, id: docRef.id };
             setObjectives(prev => {
-              if (prev.some(o => o.targetId === acc.id)) return prev;
+              if (findObjectiveForAccount(prev, acc, accounts)) return prev;
               const next = [...prev, localRestored];
               localStorage.setItem('app_objectives', JSON.stringify(next));
               return next;
@@ -1566,7 +1574,8 @@ export default function Settings() {
 
                   <div className="mt-0">
                     {(() => {
-                      const validObjectives = objectives.filter(obj => obj.type !== 'account' || accounts.some(a => a.id === obj.targetId));
+                      const { cleanObjectives } = deduplicateObjectives(objectives, accounts);
+                      const validObjectives = cleanObjectives.filter(obj => obj.type !== 'account' || accounts.some(a => a.id === obj.targetId || String(a.accountNumber) === String(obj.targetId)));
                       if (validObjectives.length === 0) {
                         return <p className="text-on-surface-variant text-sm text-center py-8">Nenhum objetivo definido. Clique em "Novo Objetivo" para começar.</p>;
                       }
@@ -2367,58 +2376,99 @@ export default function Settings() {
                 </div>
               </div>
 
-              <button 
-                onClick={async () => {
-                  let newObjectives;
-                  const isEditing = !!editingObjective.id;
-                  
-                  if (isEditing) {
-                    if (auth.currentUser) {
-                      try {
-                        await updateDoc(doc(db, 'objectives', editingObjective.id), {
-                          type: editingObjective.type,
-                          targetId: editingObjective.targetId,
-                          profitTarget: editingObjective.profitTarget,
-                          maxLoss: editingObjective.maxLoss,
-                          dailyLoss: editingObjective.dailyLoss,
-                          maxLossPeriod: editingObjective.maxLossPeriod || 'Mês',
-                          hidden: !!editingObjective.hidden
-                        });
-                      } catch (err) {
-                        console.error("Error updating objective:", err);
-                      }
-                    }
-                    newObjectives = objectives.map(o => o.id === editingObjective.id ? { ...editingObjective, hidden: !!editingObjective.hidden } : o);
-                  } else {
-                    let docId = Date.now().toString();
-                    if (auth.currentUser) {
-                      try {
-                        const newDocRef = await addDoc(collection(db, 'objectives'), {
-                          userId: auth.currentUser?.uid,
-                          type: editingObjective.type,
-                          targetId: editingObjective.targetId,
-                          profitTarget: editingObjective.profitTarget,
-                          maxLoss: editingObjective.maxLoss,
-                          dailyLoss: editingObjective.dailyLoss,
-                          maxLossPeriod: editingObjective.maxLossPeriod || 'Mês',
-                          hidden: !!editingObjective.hidden
-                        });
-                        docId = newDocRef.id;
-                      } catch (err) {
-                        console.error("Error creating objective:", err);
-                      }
-                    }
-                    newObjectives = [...objectives, { ...editingObjective, id: docId, hidden: !!editingObjective.hidden }];
-                  }
-                  
-                  setObjectives(newObjectives);
-                  localStorage.setItem('app_objectives', JSON.stringify(newObjectives));
-                  setIsObjectiveModalOpen(false);
-                }}
-                className="w-full bg-primary text-on-primary font-bold py-4 rounded-xl hover:brightness-110 transition-all shadow-lg shadow-primary/20"
-              >
-                Salvar Objetivo
-              </button>
+              {(() => {
+                const existingConflict = findExistingObjectiveForTarget(
+                  objectives,
+                  editingObjective.type,
+                  editingObjective.targetId,
+                  accounts,
+                  editingObjective.id
+                );
+
+                return (
+                  <>
+                    {existingConflict && (
+                      <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs rounded-xl flex items-start gap-2.5">
+                        <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold mb-0.5">Aviso: Conta Com Objetivo Já Registrado</p>
+                          <p className="opacity-90 leading-relaxed">
+                            {editingObjective.type === 'account' ? (
+                              <>
+                                A conta <strong>Nº {accounts.find(a => a.id === editingObjective.targetId)?.accountNumber || editingObjective.targetId}</strong>
+                                {accounts.find(a => a.id === editingObjective.targetId)?.broker ? ` (${accounts.find(a => a.id === editingObjective.targetId)?.broker})` : ''} já possui um objetivo definido.
+                              </>
+                            ) : (
+                              <>
+                                O mercado <strong>{editingObjective.targetId === 'forex' ? 'Forex / Índices' : 'Opções Binárias'}</strong> já possui um objetivo definido.
+                              </>
+                            )}
+                            {' '}Ao salvar, o objetivo existente será atualizado para evitar duplicidades no sistema.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <button 
+                      onClick={async () => {
+                        let newObjectives;
+                        const targetDocId = editingObjective.id || existingConflict?.id;
+                        const isEditing = !!targetDocId;
+                        
+                        if (isEditing && targetDocId) {
+                          if (auth.currentUser) {
+                            try {
+                              await updateDoc(doc(db, 'objectives', targetDocId), {
+                                type: editingObjective.type,
+                                targetId: editingObjective.targetId,
+                                profitTarget: editingObjective.profitTarget,
+                                maxLoss: editingObjective.maxLoss,
+                                dailyLoss: editingObjective.dailyLoss,
+                                maxLossPeriod: editingObjective.maxLossPeriod || 'Mês',
+                                hidden: !!editingObjective.hidden
+                              });
+                            } catch (err) {
+                              console.error("Error updating objective:", err);
+                            }
+                          }
+                          const updatedList = objectives.map(o => o.id === targetDocId ? { ...editingObjective, id: targetDocId, hidden: !!editingObjective.hidden } : o);
+                          const { cleanObjectives } = deduplicateObjectives(updatedList, accounts);
+                          newObjectives = cleanObjectives;
+                        } else {
+                          let docId = Date.now().toString();
+                          if (auth.currentUser) {
+                            try {
+                              const newDocRef = await addDoc(collection(db, 'objectives'), {
+                                userId: auth.currentUser?.uid,
+                                type: editingObjective.type,
+                                targetId: editingObjective.targetId,
+                                profitTarget: editingObjective.profitTarget,
+                                maxLoss: editingObjective.maxLoss,
+                                dailyLoss: editingObjective.dailyLoss,
+                                maxLossPeriod: editingObjective.maxLossPeriod || 'Mês',
+                                hidden: !!editingObjective.hidden
+                              });
+                              docId = newDocRef.id;
+                            } catch (err) {
+                              console.error("Error creating objective:", err);
+                            }
+                          }
+                          const updatedList = [...objectives, { ...editingObjective, id: docId, hidden: !!editingObjective.hidden }];
+                          const { cleanObjectives } = deduplicateObjectives(updatedList, accounts);
+                          newObjectives = cleanObjectives;
+                        }
+                        
+                        setObjectives(newObjectives);
+                        localStorage.setItem('app_objectives', JSON.stringify(newObjectives));
+                        setIsObjectiveModalOpen(false);
+                      }}
+                      className="w-full bg-primary text-on-primary font-bold py-4 rounded-xl hover:brightness-110 transition-all shadow-lg shadow-primary/20"
+                    >
+                      Salvar Objetivo
+                    </button>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

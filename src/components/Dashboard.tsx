@@ -7,6 +7,7 @@ import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
+import { findObjectiveForAccount, deduplicateObjectives } from '../utils/objectiveUtils';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -376,7 +377,7 @@ export default function Dashboard() {
     const unsubObjectives = onSnapshot(qDbObjectives, (snapshot) => {
       const dbObjectives = snapshot.docs.map(doc => ({
         id: doc.id,
-        type: doc.data().type,
+        type: doc.data().type as 'account' | 'market',
         targetId: doc.data().targetId,
         profitTarget: doc.data().profitTarget,
         maxLoss: doc.data().maxLoss,
@@ -384,7 +385,14 @@ export default function Dashboard() {
         maxLossPeriod: doc.data().maxLossPeriod || 'Mês',
         hidden: !!doc.data().hidden
       }));
-      setObjectives(dbObjectives);
+      const { cleanObjectives, duplicateIds } = deduplicateObjectives(dbObjectives, accounts);
+      setObjectives(cleanObjectives);
+
+      if (duplicateIds.length > 0 && auth.currentUser) {
+        duplicateIds.forEach(dupId => {
+          deleteDoc(doc(db, 'objectives', dupId)).catch(err => console.warn('Cleaned duplicate objective doc:', err));
+        });
+      }
     }, (error) => {
       console.error("Error fetching objectives in Dashboard:", error);
     });
@@ -408,8 +416,8 @@ export default function Dashboard() {
     if (!auth.currentUser || accounts.length === 0) return;
 
     accounts.forEach(acc => {
-      const hasObj = objectives.some(obj => obj.type === 'account' && obj.targetId === acc.id);
-      if (!hasObj) {
+      const existingObj = findObjectiveForAccount(objectives, acc, accounts);
+      if (!existingObj) {
         console.log("Restoring/creating objective for existing account in Dashboard:", acc.id, acc.accountNumber);
         
         const initialBal = Number(acc.initialBalance) || 10000;
@@ -441,7 +449,7 @@ export default function Dashboard() {
           .then((docRef) => {
             const localRestored = { ...restoredObj, id: docRef.id };
             setObjectives(prev => {
-              if (prev.some(o => o.targetId === acc.id)) return prev;
+              if (findObjectiveForAccount(prev, acc, accounts)) return prev;
               const next = [...prev, localRestored];
               localStorage.setItem('app_objectives', JSON.stringify(next));
               return next;
@@ -639,8 +647,8 @@ export default function Dashboard() {
           accountsToProcess.forEach(acc => {
             const accTradeType = acc.tradeType || 'forex';
             if (accTradeType === mType) {
-              const accObj = objectives.find(obj => obj.type === 'account' && obj.targetId === acc.id && !obj.hidden);
-              if (accObj) {
+              const accObj = findObjectiveForAccount(objectives, acc, accounts);
+              if (accObj && !accObj.hidden) {
                 if (accObj.profitTarget) totalProfitTarget += Number(accObj.profitTarget) || 0;
                 if (accObj.maxLoss) totalMaxLoss += Number(accObj.maxLoss) || 0;
                 if (accObj.dailyLoss) totalDailyLoss += Number(accObj.dailyLoss) || 0;
@@ -652,8 +660,9 @@ export default function Dashboard() {
       });
     } else {
       // Specific account selected
-      const accountObjective = objectives.find(obj => obj.type === 'account' && obj.targetId === selectedAccount && !obj.hidden);
-      if (accountObjective) {
+      const targetAcc = accounts.find(a => a.id === selectedAccount);
+      const accountObjective = findObjectiveForAccount(objectives, targetAcc || { id: selectedAccount }, accounts);
+      if (accountObjective && !accountObjective.hidden) {
         totalProfitTarget = Number(accountObjective.profitTarget) || 0;
         totalMaxLoss = Number(accountObjective.maxLoss) || 0;
         if (accountObjective.maxLossPeriod) maxLossPeriod = accountObjective.maxLossPeriod;
