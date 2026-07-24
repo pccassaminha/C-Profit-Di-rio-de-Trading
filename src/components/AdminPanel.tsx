@@ -302,20 +302,20 @@ export default function AdminPanel() {
     // Listen to users
     const unsubUsers = onSnapshot(collection(db, 'usuarios'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.warn('AdminPanel usuarios snapshot error:', err));
 
     // Listen to payments
     const qPayments = query(collection(db, 'payments'), orderBy('createdAt', 'desc'));
     const unsubPayments = onSnapshot(qPayments, (snapshot) => {
       setPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.warn('AdminPanel payments snapshot error:', err));
 
     // Listen to coupons
     const qCoupons = query(collection(db, 'coupons'));
     const unsubCoupons = onSnapshot(qCoupons, (snapshot) => {
       const fetchedCoupons = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCoupons(fetchedCoupons);
-    });
+    }, (err) => console.warn('AdminPanel coupons snapshot error:', err));
 
     // Auto-create default coupon once on mount/admin load if not exists
     const checkAndCreateDefaultCoupon = async () => {
@@ -351,17 +351,17 @@ export default function AdminPanel() {
     // Listen to referrals
     const unsubReferrals = onSnapshot(query(collection(db, 'referrals'), orderBy('createdAt', 'desc')), (snapshot) => {
       setAdminReferrals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.warn('AdminPanel referrals snapshot error:', err));
 
     // Listen to affiliate payouts
     const unsubPayouts = onSnapshot(query(collection(db, 'affiliate_payouts'), orderBy('createdAt', 'desc')), (snapshot) => {
       setAdminPayouts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.warn('AdminPanel payouts snapshot error:', err));
 
     // Listen to broadcasts
     const unsubBroadcasts = onSnapshot(query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc')), (snapshot) => {
       setBroadcasts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.warn('AdminPanel broadcasts snapshot error:', err));
 
     // Listen to global settings to keep settings state fully active in real time
     const unsubGlobalSettings = onSnapshot(doc(db, 'settings', 'global'), (docSnap) => {
@@ -371,7 +371,7 @@ export default function AdminPanel() {
           ...docSnap.data() 
         }));
       }
-    });
+    }, (err) => console.warn('AdminPanel global settings snapshot error:', err));
 
     setLoading(false);
     return () => {

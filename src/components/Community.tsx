@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth, storage } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, increment, deleteDoc, getDoc, getDocs, setDoc, limit } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, increment, deleteDoc, getDoc, getDocs, setDoc, limit, runTransaction } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
@@ -187,13 +187,13 @@ export default function Community() {
     if (!auth.currentUser) return;
     const unsub = onSnapshot(query(collection(db, 'users', auth.currentUser.uid, 'blocks')), snap => {
       setBlockedUsers(snap.docs.map(d => d.id));
-    });
+    }, (err) => console.warn('Blocks snapshot error:', err));
     const unsubFriends = onSnapshot(collection(db, 'users', auth.currentUser.uid, 'friends'), snap => {
       setFriendsList(snap.docs.map(d => d.id));
-    });
+    }, (err) => console.warn('Friends snapshot error:', err));
     const unsubDistancing = onSnapshot(collection(db, 'users', auth.currentUser.uid, 'distancing'), snap => {
       setDistancedList(snap.docs.map(d => d.id));
-    });
+    }, (err) => console.warn('Distancing snapshot error:', err));
     return () => {
       unsub();
       unsubFriends();
@@ -204,12 +204,12 @@ export default function Community() {
   useEffect(() => {
     const unsubAll = onSnapshot(collection(db, 'usuarios'), (snap) => {
       setAllCommunityUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (err) => console.warn('Usuarios snapshot error:', err));
     const unsubGlobalSettings = onSnapshot(doc(db, 'settings', 'global'), (snap) => {
       if (snap.exists()) {
         setGlobalSettings(snap.data());
       }
-    });
+    }, (err) => console.warn('Global settings snapshot error:', err));
     return () => {
       unsubAll();
       unsubGlobalSettings();
@@ -344,11 +344,11 @@ export default function Community() {
       setProfileFollowersCount(snap.size);
       const isMeFollowing = snap.docs.some(d => d.id === auth.currentUser?.uid);
       setProfileIsFollowing(isMeFollowing);
-    });
+    }, (err) => console.warn('Followers snapshot error:', err));
 
     const unsubFollowing = onSnapshot(collection(db, 'usuarios', selectedProfileUser.id, 'following'), (snap) => {
       setProfileFollowingCount(snap.size);
-    });
+    }, (err) => console.warn('Following snapshot error:', err));
 
     return () => {
       unsubFollowers();
@@ -408,12 +408,12 @@ export default function Community() {
           return newPost;
         });
       });
-    });
+    }, (err) => console.warn('Community posts snapshot error:', err));
 
     const bQ = query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'));
     const unsubB = onSnapshot(bQ, (snapshot) => {
       setBroadcasts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.warn('Broadcasts snapshot error:', err));
 
     return () => {
       unsubscribe();
@@ -421,11 +421,15 @@ export default function Community() {
     };
   }, [activeFeed]);
 
+  const [userLikedPostIds, setUserLikedPostIds] = useState<Set<string>>(new Set());
+  const likingPostsRef = useRef<Set<string>>(new Set());
+
+  // Effect to check likes per post in Firestore
   const checkedLikesRef = useRef<Set<string>>(new Set());
 
-  // Effect to check likes per post
   useEffect(() => {
     if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
 
     const allPosts = [...posts, ...selectedUserPosts];
     allPosts.forEach(async (post) => {
@@ -433,13 +437,18 @@ export default function Community() {
       checkedLikesRef.current.add(post.id);
 
       try {
-        const likeDoc = await getDoc(doc(db, 'community_posts', post.id, 'likes', auth.currentUser!.uid));
+        const likeDoc = await getDoc(doc(db, 'community_posts', post.id, 'likes', uid));
         if (likeDoc.exists()) {
+          setUserLikedPostIds(prev => {
+            const next = new Set(prev);
+            next.add(post.id);
+            return next;
+          });
           setPosts(current => current.map(p => p.id === post.id ? { ...p, userLiked: true } : p));
           setSelectedUserPosts(current => current.map(p => p.id === post.id ? { ...p, userLiked: true } : p));
         }
       } catch (err) {
-        console.error(err);
+        console.error('Error checking like for post:', post.id, err);
       }
     });
   }, [posts, selectedUserPosts]);
@@ -542,21 +551,63 @@ export default function Community() {
 
   const handleLike = async (post: Post) => {
     if (!auth.currentUser) return;
-    const likeRef = doc(db, 'community_posts', post.id, 'likes', auth.currentUser.uid);
-    const postRef = doc(db, 'community_posts', post.id);
+    const uid = auth.currentUser.uid;
+    const postId = post.id;
+
+    // Prevent concurrent/rapid click duplication for the same post
+    if (likingPostsRef.current.has(postId)) {
+      return;
+    }
+    likingPostsRef.current.add(postId);
+
+    const likeRef = doc(db, 'community_posts', postId, 'likes', uid);
+    const postRef = doc(db, 'community_posts', postId);
 
     try {
-      if (post.userLiked) {
-        await deleteDoc(likeRef);
-        await updateDoc(postRef, { likesCount: increment(-1) });
-        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: false, likesCount: Math.max(0, (p.likesCount || 0) - 1) } : p));
-      } else {
-        await setDoc(likeRef, { createdAt: serverTimestamp() });
-        await updateDoc(postRef, { likesCount: increment(1) });
-        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: true, likesCount: p.likesCount + 1 } : p));
+      let isNowLiked = false;
+      let newLikesCount = 0;
+
+      await runTransaction(db, async (transaction) => {
+        const likeSnap = await transaction.get(likeRef);
+        const postSnap = await transaction.get(postRef);
+
+        const currentCount = postSnap.exists() ? (postSnap.data().likesCount || 0) : 0;
+
+        if (likeSnap.exists()) {
+          // Already liked by this user -> UNLIKE
+          transaction.delete(likeRef);
+          newLikesCount = Math.max(0, currentCount - 1);
+          transaction.update(postRef, { likesCount: newLikesCount });
+          isNowLiked = false;
+        } else {
+          // Not liked yet by this user -> LIKE
+          transaction.set(likeRef, {
+            createdAt: serverTimestamp(),
+            userId: uid
+          });
+          newLikesCount = currentCount + 1;
+          transaction.update(postRef, { likesCount: newLikesCount });
+          isNowLiked = true;
+        }
+      });
+
+      setUserLikedPostIds(prev => {
+        const next = new Set(prev);
+        if (isNowLiked) next.add(postId);
+        else next.delete(postId);
+        return next;
+      });
+
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, userLiked: isNowLiked, likesCount: newLikesCount } : p));
+      setSelectedUserPosts(prev => prev.map(p => p.id === postId ? { ...p, userLiked: isNowLiked, likesCount: newLikesCount } : p));
+      if (viewingPost && viewingPost.id === postId) {
+        setViewingPost(prev => prev ? { ...prev, userLiked: isNowLiked, likesCount: newLikesCount } : null);
       }
+
     } catch (err) {
-      console.error(err);
+      console.error('Error toggling like:', err);
+    } finally {
+      likingPostsRef.current.delete(postId);
     }
   };
 
@@ -565,7 +616,7 @@ export default function Community() {
     const q = query(collection(db, 'community_posts', postId, 'comments'), orderBy('createdAt', 'asc'));
     onSnapshot(q, (snapshot) => {
       setComments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.warn('Load comments snapshot error:', err));
   };
 
   const handleAddComment = async (postId: string) => {
@@ -923,26 +974,7 @@ export default function Community() {
   };
 
   const handleLikeProfilePost = async (post: Post) => {
-    if (!auth.currentUser) return;
-    const likeRef = doc(db, 'community_posts', post.id, 'likes', auth.currentUser.uid);
-    const postRef = doc(db, 'community_posts', post.id);
-
-    try {
-      const isCurrentlyLiked = post.userLiked;
-      if (isCurrentlyLiked) {
-        await deleteDoc(likeRef);
-        await updateDoc(postRef, { likesCount: increment(-1) });
-        setSelectedUserPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: false, likesCount: Math.max(0, (p.likesCount || 0) - 1) } : p));
-        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: false, likesCount: Math.max(0, (p.likesCount || 0) - 1) } : p));
-      } else {
-        await setDoc(likeRef, { createdAt: serverTimestamp() });
-        await updateDoc(postRef, { likesCount: increment(1) });
-        setSelectedUserPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: true, likesCount: p.likesCount + 1 } : p));
-        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, userLiked: true, likesCount: p.likesCount + 1 } : p));
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    await handleLike(post);
   };
 
   const handleUserClick = (userId: string, userName: string, userPhoto: string) => {
@@ -3029,7 +3061,7 @@ function ProfilePostCard({ post, onLike, onSelectPhoto, isAdmin, onDeletePost }:
         ...d.data(),
       }));
       setComments(fetchedComments);
-    });
+    }, (err) => console.warn('Post comments snapshot error:', err));
 
     return () => unsubscribe();
   }, [showComments, post.id]);

@@ -142,6 +142,7 @@ export default function Topbar({
 
   // Subscribe to real-time broadcasts
   useEffect(() => {
+    if (!currentUser) return;
     const bQ = query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(bQ, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -150,11 +151,11 @@ export default function Topbar({
       }));
       setBroadcasts(docs);
     }, (error) => {
-      console.error('Error fetching broadcasts:', error);
+      console.warn('Error fetching broadcasts:', error);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]);
 
   // Subscribe to real-time chat unreads
   useEffect(() => {
