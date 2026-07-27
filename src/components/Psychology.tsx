@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import { renderFormattedText } from '../utils/textFormatter';
 
 import { Link, Save, Send, Brain, Edit2, Trash2, BrainCircuit } from 'lucide-react';
 
@@ -157,7 +158,7 @@ export default function Psychology() {
             </div>
             
             <p className="text-on-surface whitespace-pre-wrap mb-4 text-base leading-relaxed">
-              {note.content}
+              {renderFormattedText(note.content)}
             </p>
 
             {note.link && (

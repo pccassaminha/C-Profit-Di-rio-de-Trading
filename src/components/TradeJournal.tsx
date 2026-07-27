@@ -9,6 +9,7 @@ import Modal from './Modal';
 import { DatePicker } from './DatePicker';
 import { importTradeFile, detectSession } from '../utils/tradeParsers';
 import { TradeShareCard } from './TradeShareCard';
+import { renderFormattedText } from '../utils/textFormatter';
 
 import { Calendar, Trash2, ChevronRight, BarChart2, Timer, ArrowLeft, Edit2, ExternalLink, Link, ArrowRightLeft, UploadCloud, Activity, TrendingUp, TrendingDown, Plus, Save, CheckCircle, Share2, X } from 'lucide-react';
 
@@ -1444,7 +1445,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 <div>
                   <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-2">Notas / Razão</p>
                   <div className="bg-surface-container p-4 rounded-xl text-sm text-on-surface-variant whitespace-pre-wrap">
-                    {selectedTrade.notes}
+                    {renderFormattedText(selectedTrade.notes)}
                   </div>
                 </div>
               )}
@@ -1453,7 +1454,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                 <div>
                   <p className="text-xs font-label uppercase tracking-widest text-slate-500 mb-2">Notas Psicológicas</p>
                   <div className="bg-surface-container p-4 rounded-xl text-sm text-on-surface-variant whitespace-pre-wrap">
-                    {selectedTrade.psychologyNotes}
+                    {renderFormattedText(selectedTrade.psychologyNotes)}
                   </div>
                 </div>
               )}

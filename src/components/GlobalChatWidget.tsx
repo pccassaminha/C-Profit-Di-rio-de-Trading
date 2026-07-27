@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { renderFormattedText } from '../utils/textFormatter';
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 
 import { Send, Users, UserPlus, Settings, Info, Lock, Key, Edit2, Trash2, X, ShieldCheck, MessageSquare, Maximize2, Minimize2, MoreHorizontal, Image, ExternalLink, MessageCircle, ArrowLeft, CheckCheck } from 'lucide-react';
@@ -505,13 +506,14 @@ export default function GlobalChatWidget({ isSidebarOpen }: { isSidebarOpen: boo
   };
 
   const renderMessageText = (text: string) => {
+    if (!text) return text;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
     return parts.map((part, i) => {
       if (part.match(urlRegex)) {
         return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline font-bold break-all hover:opacity-80 transition-opacity">{part}</a>;
       }
-      return <span key={i}>{part}</span>;
+      return <React.Fragment key={i}>{renderFormattedText(part)}</React.Fragment>;
     });
   };
 

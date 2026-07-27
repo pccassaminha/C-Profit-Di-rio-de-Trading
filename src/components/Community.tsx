@@ -5,6 +5,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import { TradeShareCard, TradeDetails } from './TradeShareCard';
+import { renderFormattedText } from '../utils/textFormatter';
 
 import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft, Megaphone, Edit2, Ban, ArrowRight, Compass, Bookmark } from 'lucide-react';
 
@@ -1023,45 +1024,45 @@ export default function Community() {
   };
 
 
-  const handleShare = (post: Post) => {
-    const shareText = `Análise de ${post.userName} no C Profit:\n${post.legend}\nConfira no Terminal C Profit!`;
+  const handleShare = async (post: Post) => {
+    const appUrl = window.location.origin || window.location.href;
+
+    // Clean up bold tags or formatting for plain text share
+    let excerpt = post.legend ? post.legend.replace(/\*\*/g, '').trim() : '';
+    if (excerpt.length > 200) {
+      excerpt = excerpt.substring(0, 197) + '...';
+    }
+
+    let tradeSummary = '';
+    if (post.tradeDetails) {
+      const type = post.tradeDetails.type ? post.tradeDetails.type.toUpperCase() : 'TRADE';
+      tradeSummary = `\n📈 Ativo: ${post.tradeDetails.symbol || 'Mercado'} (${type})`;
+    }
+
+    const shareText = `📊 Análise de ${post.userName} na Comunidade C Profit:\n\n"${excerpt}"${tradeSummary}\n\n👉 Para ver a publicação completa e criar a sua conta no C Profit, aceda ao link:\n${appUrl}\n\nFique por dentro de todos os relatórios e estratégias de mercado!`;
+
     if (navigator.share) {
-      navigator.share({
-        title: 'C Profit Community',
-        text: shareText,
-        url: window.location.href
-      });
+      try {
+        await navigator.share({
+          title: `Análise de ${post.userName} - C Profit`,
+          text: shareText,
+          url: appUrl,
+        });
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') {
+          await navigator.clipboard.writeText(shareText);
+          alert('Conteúdo da publicação e link copiados com sucesso!');
+        }
+      }
     } else {
-      navigator.clipboard.writeText(shareText);
-      alert('Link e legenda copiados para a área de transferência!');
+      await navigator.clipboard.writeText(shareText);
+      alert('Conteúdo da publicação e link copiados para a área de transferência!');
     }
   };
 
   const renderTextWithMentions = (text: string) => {
     if (!text) return text;
-    const mentionRegex = /@([a-zA-Z0-9_\s]+?)(?=\s|$|[,.?!])/g;
-    const parts = text.split(/(?=@)/);
-    
-    return parts.map((part, index) => {
-      if (part.startsWith('@')) {
-        const spaceIndex = part.indexOf(' ');
-        let name = part.substring(1);
-        let rest = '';
-        if (spaceIndex !== -1) {
-           name = part.substring(1, spaceIndex);
-           rest = part.substring(spaceIndex);
-        }
-        return (
-          <span key={index}>
-            <span className="font-extrabold text-primary bg-primary/10 px-1 rounded inline-flex items-center">
-              {name}
-            </span>
-            {rest}
-          </span>
-        );
-      }
-      return <span key={index}>{part}</span>;
-    });
+    return renderFormattedText(text, { mentions: true });
   };
 
   // Post Feed Scoring Algorithm (More likes, more comments + Recency factor)
@@ -1182,7 +1183,7 @@ export default function Community() {
       {/* Posts Feed */}
       <div className="space-y-8">
         {sortedAndFilteredPosts.map(post => (
-          <div key={post.id} className="bg-surface-container-low border border-outline-variant/10 rounded-[40px] overflow-hidden shadow-2xl group animate-in slide-in-from-bottom duration-500">
+          <div key={post.id} className={`bg-surface-container-low border border-outline-variant/10 rounded-[40px] shadow-2xl group animate-in slide-in-from-bottom duration-500 relative ${activeDropdown === post.id ? 'z-30' : 'z-10'}`}>
             {/* Post Header */}
             <div className="p-6 flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -1208,7 +1209,7 @@ export default function Community() {
                   <MoreVertical size={20} />
                 </button>
                 {activeDropdown === post.id && (
-                  <div className="absolute top-10 right-0 w-48 bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-xl overflow-hidden py-2 z-10 animate-in fade-in slide-in-from-top-2">
+                  <div className="absolute top-10 right-0 w-48 bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-xl overflow-hidden py-2 z-50 animate-in fade-in slide-in-from-top-2">
                      {post.userId === auth.currentUser?.uid && (
                       <button 
                         onClick={() => {

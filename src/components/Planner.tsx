@@ -189,8 +189,12 @@ export default function Planner() {
   };
 
   const formatContent = (text: string, theme: 'dark' | 'light' = 'dark') => {
+    if (!text) return "";
     // Escapar tags HTML para evitar XSS básico
     let formatted = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    // Identificar negrito **texto**
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-extrabold text-on-surface">$1</strong>');
 
     // Identificar emojis de números
     formatted = formatted.replace(/([1-9]️⃣)/g, `<span class="inline-flex items-center justify-center w-6 h-6 ${theme === 'dark' ? 'bg-primary text-on-primary' : 'bg-primary text-white'} rounded-full font-bold mr-2">$1</span>`);
@@ -346,10 +350,10 @@ export default function Planner() {
                         return (
                           <article 
                             key={entry.id} 
-                            className={`bg-surface-container-low border border-outline-variant/20 rounded-[2rem] overflow-hidden shadow-lg transition-all duration-500 group ${isExpanded ? 'ring-2 ring-primary/20 shadow-primary/5 bg-surface-container' : 'hover:border-primary/30'} ${entry.isDailyNote ? 'border-l-4 border-l-secondary' : ''}`}
+                            className={`bg-surface-container-low border border-outline-variant/20 rounded-[2rem] shadow-lg transition-all duration-500 group relative ${activeDropdownId === entry.id ? 'z-30' : 'z-10'} ${isExpanded ? 'ring-2 ring-primary/20 shadow-primary/5 bg-surface-container' : 'hover:border-primary/30'} ${entry.isDailyNote ? 'border-l-4 border-l-secondary' : ''}`}
                           >
                             <div 
-                              className={`p-6 md:p-8 cursor-pointer transition-colors ${isExpanded ? 'bg-primary/5' : 'hover:bg-surface-container/50'}`}
+                              className={`p-6 md:p-8 cursor-pointer transition-colors rounded-[2rem] ${isExpanded ? 'bg-primary/5' : 'hover:bg-surface-container/50'}`}
                               onClick={() => setExpandedId(isExpanded ? null : entry.id)}
                             >
                               <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
