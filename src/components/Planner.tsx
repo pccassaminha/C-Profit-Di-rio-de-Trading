@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { Search, Filter, Plus, Image as ImageIcon, X, Send, Calendar, CheckCircle2, AlertCircle, Info, TrendingUp, TrendingDown, Gauge, ShieldCheck, ChevronDown, ChevronUp, Pencil, StickyNote, History, MoreVertical, Eye, Share2 } from 'lucide-react';
+import { Search, Filter, Plus, Image as ImageIcon, X, Send, Calendar, CheckCircle2, AlertCircle, Info, TrendingUp, TrendingDown, Gauge, ShieldCheck, ChevronDown, ChevronUp, Pencil, StickyNote, History, MoreVertical, Eye, Share2, ZoomIn, ZoomOut, RotateCcw, Type } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, getWeek, getYear, isSameDay, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DateRangePicker } from './DateRangePicker';
@@ -41,6 +41,7 @@ export default function Planner() {
   const [expandedWeeks, setExpandedWeeks] = useState<string[]>([]);
   const [readingModalEntry, setReadingModalEntry] = useState<PlanningEntry | null>(null);
   const [readerTheme, setReaderTheme] = useState<'dark' | 'light'>('light');
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
     title: "",
@@ -445,10 +446,37 @@ export default function Planner() {
                                   <div className="space-y-6">
                                     {/* Barra de Ferramentas / Modo Leitura */}
                                     <div className="flex justify-between items-center bg-surface-container-high/40 p-3 rounded-2xl border border-outline-variant/10">
-                                      <span className="text-[11px] font-mono text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5 ml-2">
-                                        <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                                        Leitura de Documento Ativa
-                                      </span>
+                                      <div className="flex items-center gap-3">
+                                         <span className="text-[11px] font-mono text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5 ml-2 hidden sm:flex">
+                                           <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                                           Leitura Ativa
+                                         </span>
+                                         <div className="bg-surface-container-highest/80 border border-outline-variant/20 p-1 rounded-xl flex items-center gap-1 shadow-sm">
+                                           <button
+                                             onClick={(e) => { e.stopPropagation(); setZoomLevel(prev => Math.max(prev - 15, 70)); }}
+                                             disabled={zoomLevel <= 70}
+                                             className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container disabled:opacity-30 transition-all"
+                                             title="Diminuir Fonte (Zoom Out)"
+                                           >
+                                             <ZoomOut size={15} />
+                                           </button>
+                                           <button
+                                             onClick={(e) => { e.stopPropagation(); setZoomLevel(100); }}
+                                             className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-black text-primary hover:bg-primary/10 transition-all min-w-[48px] text-center"
+                                             title="Resetar Tamanho (100%)"
+                                           >
+                                             {zoomLevel}%
+                                           </button>
+                                           <button
+                                             onClick={(e) => { e.stopPropagation(); setZoomLevel(prev => Math.min(prev + 15, 200)); }}
+                                             disabled={zoomLevel >= 200}
+                                             className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container disabled:opacity-30 transition-all"
+                                             title="Aumentar Fonte (Zoom In)"
+                                           >
+                                             <ZoomIn size={15} />
+                                           </button>
+                                         </div>
+                                       </div>
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -490,6 +518,7 @@ export default function Planner() {
                                       {/* O Conteúdo Formatado com letras mais brancas e contraste forte */}
                                       <div 
                                         className="text-neutral-50 text-base md:text-[17px] leading-relaxed font-body whitespace-pre-wrap selection:bg-primary/40 antialiased space-y-4"
+                                        style={{ fontSize: `${zoomLevel}%` }}
                                         dangerouslySetInnerHTML={{ __html: formatContent(entry.content, 'dark') }}
                                       />
                                     </div>
@@ -672,7 +701,7 @@ export default function Planner() {
       {readingModalEntry && (
         <div className="fixed inset-0 z-[120] flex flex-col justify-between bg-black/95 backdrop-blur-lg p-3 md:p-6 overflow-y-auto">
           {/* Barra de Ações Superior do Leitor */}
-          <div className="w-full max-w-5xl mx-auto flex items-center justify-between py-4 border-b border-white/10 mb-6 shrink-0 print:hidden text-white">
+          <div className="w-full max-w-7xl mx-auto flex items-center justify-between py-4 border-b border-white/10 mb-6 shrink-0 print:hidden text-white">
             <div className="flex items-center gap-3">
               <span className="p-2 rounded-lg bg-primary/10 text-primary">
                 <StickyNote size={20} />
@@ -685,6 +714,33 @@ export default function Planner() {
 
             {/* Controles de Vista */}
             <div className="flex items-center gap-2">
+              {/* Controles de Zoom da Fonte / Folha */}
+              <div className="bg-neutral-900 border border-neutral-800 p-0.5 rounded-xl flex items-center shadow-inner gap-1">
+                <button
+                  onClick={() => setZoomLevel(prev => Math.max(prev - 15, 70))}
+                  disabled={zoomLevel <= 70}
+                  className="p-1.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 disabled:opacity-30 transition-all flex items-center justify-center"
+                  title="Diminuir Fonte (Zoom Out)"
+                >
+                  <ZoomOut size={16} />
+                </button>
+                <button
+                  onClick={() => setZoomLevel(100)}
+                  className="px-2 py-1 rounded-lg text-xs font-mono font-black text-primary hover:bg-primary/10 transition-all min-w-[46px] text-center"
+                  title="Resetar Tamanho da Fonte (100%)"
+                >
+                  {zoomLevel}%
+                </button>
+                <button
+                  onClick={() => setZoomLevel(prev => Math.min(prev + 15, 200))}
+                  disabled={zoomLevel >= 200}
+                  className="p-1.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 disabled:opacity-30 transition-all flex items-center justify-center"
+                  title="Aumentar Fonte (Zoom In)"
+                >
+                  <ZoomIn size={16} />
+                </button>
+              </div>
+
               {/* Seletor de Tema da Folha */}
               <div className="bg-neutral-900 border border-neutral-800 p-0.5 rounded-xl flex items-center shadow-inner">
                 <button
@@ -725,7 +781,7 @@ export default function Planner() {
           </div>
 
           {/* A Folha Física em Si */}
-          <div className="flex-1 w-full max-w-4xl mx-auto flex items-start justify-center pb-12">
+          <div className="flex-1 w-full max-w-7xl mx-auto flex items-start justify-center pb-12">
             <div 
               className={`w-full rounded-2xl md:rounded-[2.5rem] shadow-[0_30px_70px_rgba(0,0,0,0.8)] relative overflow-hidden transition-colors duration-300 p-8 md:p-16 border ${
                 readerTheme === 'light' 
@@ -766,6 +822,7 @@ export default function Planner() {
                 className={`text-base md:text-[18px] leading-relaxed font-body whitespace-pre-wrap selection:bg-primary/20 space-y-6 antialiased ${
                   readerTheme === 'light' ? 'text-neutral-800 font-medium' : 'text-slate-100 font-normal'
                 }`}
+                style={{ fontSize: `${zoomLevel}%` }}
                 dangerouslySetInnerHTML={{ __html: formatContent(readingModalEntry.content, readerTheme) }}
               />
 
