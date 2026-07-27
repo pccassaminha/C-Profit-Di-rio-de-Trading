@@ -8,6 +8,7 @@ import { ptBR } from 'date-fns/locale';
 import { DateRangePicker } from './DateRangePicker';
 import Modal from './Modal';
 import { DateRange } from 'react-day-picker';
+import { parseAndFormatTables } from '../utils/tableFormatter';
 
 interface PlanningEntry {
   id: string;
@@ -193,6 +194,17 @@ export default function Planner() {
     // Escapar tags HTML para evitar XSS básico
     let formatted = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+    // Identificar cabeçalhos numerados (ex: "18. Matriz C Profit Macro") e markdown (# Cabeçalho)
+    const h3Class = theme === 'dark' 
+      ? 'text-white font-black text-xl mt-6 mb-3 font-headline border-b border-outline-variant/20 pb-2 flex items-center gap-2' 
+      : 'text-neutral-900 font-black text-xl mt-6 mb-3 font-headline border-b border-neutral-300 pb-2 flex items-center gap-2';
+    
+    formatted = formatted.replace(/^(#+)\s+(.+)$/gm, `<h3 class="${h3Class}">$2</h3>`);
+    formatted = formatted.replace(/^(\d+\.\s+[^\n]+)$/gm, `<h3 class="${h3Class}">$1</h3>`);
+
+    // Parse e formata tabelas/matrizes coladas (com colunas separadas por |, tab ou múltiplos espaços)
+    formatted = parseAndFormatTables(formatted, theme);
+
     // Identificar negrito **texto**
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-extrabold text-on-surface">$1</strong>');
 
@@ -206,13 +218,6 @@ export default function Planner() {
     // Identificar Risk-on / Risk-off
     formatted = formatted.replace(/\bRisk-on\b/gi, '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-black border border-emerald-500/30">RISK-ON</span>');
     formatted = formatted.replace(/\bRisk-off\b/gi, '<span class="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-xs font-black border border-rose-500/30">RISK-OFF</span>');
-
-    // Identificar cabeçalhos
-    const h3Class = theme === 'dark' 
-      ? 'text-white font-black text-xl mt-6 mb-3 font-headline border-b border-outline-variant/20 pb-2' 
-      : 'text-neutral-900 font-black text-xl mt-6 mb-3 font-headline border-b border-neutral-300 pb-2';
-    
-    formatted = formatted.replace(/^(#+)\s+(.+)$/gm, `<h3 class="${h3Class}">$2</h3>`);
 
     return formatted;
   };
