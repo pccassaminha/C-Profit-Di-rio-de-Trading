@@ -44,8 +44,8 @@ export function parseAndFormatTables(text: string, theme: 'dark' | 'light' = 'da
     const headerRow = currentTableRows[0];
     const bodyRows = hasHeader ? currentTableRows.slice(1) : currentTableRows;
 
-    let html = `<div class="my-6 overflow-x-auto rounded-2xl border border-outline-variant/20 bg-surface-container-low/80 shadow-xl">`;
-    html += `<table class="w-full text-left border-collapse text-xs md:text-sm">`;
+    let html = `<div class="my-6 overflow-x-auto rounded-2xl border border-outline-variant/20 bg-surface-container-low/90 shadow-xl p-1 md:p-2 scrollbar-thin">`;
+    html += `<table class="w-full min-w-[600px] md:min-w-[700px] text-left border-collapse text-xs md:text-sm">`;
 
     if (hasHeader) {
       html += `<thead class="bg-surface-container-high/90 border-b border-outline-variant/30 text-[11px] font-mono uppercase tracking-wider text-primary"><tr>`;
@@ -132,6 +132,42 @@ export function formatCellContent(cell: string, theme: 'dark' | 'light' = 'dark'
   // Neutro / Neutro/pressionado / Neutro/correção / Neutro/vendido
   formatted = formatted.replace(/\b(Neutro(?:\/[a-zA-Záàâãéèêíóôõúç]+)?|Correção)\b/gi, 
     '<span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">$1</span>');
+
+  return formatted;
+}
+
+export function formatCommunityContent(text: string, theme: 'dark' | 'light' = 'dark'): string {
+  if (!text) return '';
+
+  // Escapar tags HTML para evitar XSS básico
+  let formatted = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // Formatar menções @usuario
+  formatted = formatted.replace(/@([a-zA-Z0-9_\u00C0-\u00FF\s]+?)(?=\s|$|[,.?!])/g, (match, username) => {
+    return `<span class="font-extrabold text-primary bg-primary/10 px-1 rounded inline-flex items-center">@${username}</span>`;
+  });
+
+  // Identificar cabeçalhos numerados (ex: "18. Matriz C Profit Macro") e markdown (# Cabeçalho)
+  const h3Class = theme === 'dark' 
+    ? 'text-white font-black text-xl mt-4 mb-2 font-headline border-b border-outline-variant/20 pb-2 flex items-center gap-2' 
+    : 'text-neutral-900 font-black text-xl mt-4 mb-2 font-headline border-b border-neutral-300 pb-2 flex items-center gap-2';
+  
+  formatted = formatted.replace(/^(#+)\s+(.+)$/gm, `<h3 class="${h3Class}">$2</h3>`);
+  formatted = formatted.replace(/^(\d+\.\s+[^\n]+)$/gm, `<h3 class="${h3Class}">$1</h3>`);
+
+  // Parse e formata tabelas/matrizes coladas
+  formatted = parseAndFormatTables(formatted, theme);
+
+  // Identificar negrito **texto**
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-extrabold text-on-surface">$1</strong>');
+
+  // Identificar Forte/Fraco
+  formatted = formatted.replace(/\bForte\b/gi, '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-black uppercase tracking-wider">Forte</span>');
+  formatted = formatted.replace(/\bFraco\b/gi, '<span class="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-xs font-black uppercase tracking-wider">Fraco</span>');
+
+  // Identificar Risk-on / Risk-off
+  formatted = formatted.replace(/\bRisk-on\b/gi, '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-black border border-emerald-500/30">RISK-ON</span>');
+  formatted = formatted.replace(/\bRisk-off\b/gi, '<span class="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-xs font-black border border-rose-500/30">RISK-OFF</span>');
 
   return formatted;
 }

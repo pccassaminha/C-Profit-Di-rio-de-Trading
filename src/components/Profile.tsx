@@ -8,6 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Eye, EyeOff, MessageSquare, ThumbsUp, Trash2, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Mail, User, Home, Smartphone, KeyRound, Image as ImageIcon, Plus, ShieldCheck, HelpCircle, MoreVertical, Globe } from 'lucide-react';
 import Modal from './Modal';
 import CountryDropdown from './CountryDropdown';
+import { formatCommunityContent } from '../utils/tableFormatter';
 
 const compressImageToBase64 = (file: File, maxWidth = 300, maxHeight = 300, quality = 0.7): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -1084,7 +1085,10 @@ export default function Profile() {
                         </div>
 
                         {/* Feed Card text */}
-                        <p className="text-xs sm:text-sm text-on-surface leading-normal whitespace-pre-wrap">{post.legend}</p>
+                        <div 
+                          className="text-xs sm:text-sm text-on-surface leading-normal whitespace-pre-wrap space-y-2"
+                          dangerouslySetInnerHTML={{ __html: formatCommunityContent(post.legend) }}
+                        />
 
                         {/* Image asset attachments */}
                         {post.imageUrl && (

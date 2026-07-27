@@ -6,6 +6,7 @@ import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
 import { TradeShareCard, TradeDetails } from './TradeShareCard';
 import { renderFormattedText } from '../utils/textFormatter';
+import { formatCommunityContent } from '../utils/tableFormatter';
 
 import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft, Megaphone, Edit2, Ban, ArrowRight, Compass, Bookmark } from 'lucide-react';
 
@@ -1082,7 +1083,7 @@ export default function Community() {
     .sort((a, b) => getPostScore(b) - getPostScore(a));
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="p-4 md:p-8 max-w-[1500px] mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="text-center space-y-2">
         <h2 className="text-4xl md:text-5xl font-black text-on-surface font-headline uppercase italic tracking-tighter">
           Traders da <span className="text-primary italic">Nguimbi</span>
@@ -1258,7 +1259,10 @@ export default function Community() {
 
             {/* Post Content */}
             <div className="px-6 pb-4 cursor-pointer" onClick={() => setViewingPost(post)}>
-              <p className="text-on-surface text-base leading-relaxed whitespace-pre-wrap line-clamp-4">{renderTextWithMentions(post.legend)}</p>
+              <div 
+                className="text-on-surface text-base leading-relaxed whitespace-pre-wrap line-clamp-4 space-y-2"
+                dangerouslySetInnerHTML={{ __html: formatCommunityContent(post.legend) }}
+              />
               {post.legend.length > 200 && (
                  <span className="text-secondary text-sm font-bold mt-2 inline-block">Ver mais</span>
               )}
@@ -1792,8 +1796,8 @@ export default function Community() {
 
       {/* View Post Modal */}
       {viewingPost && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/95 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-surface border border-outline-variant/20 rounded-[40px] max-w-2xl w-full max-h-[90vh] flex flex-col shadow-3xl overflow-hidden relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-background/95 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-surface border border-outline-variant/20 rounded-[40px] max-w-4xl lg:max-w-5xl w-full max-h-[90vh] flex flex-col shadow-3xl overflow-hidden relative">
             <button 
               onClick={() => setViewingPost(null)}
               className="absolute top-6 right-6 p-2 rounded-full hover:bg-surface-container-high transition-colors z-10"
@@ -1828,7 +1832,10 @@ export default function Community() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 scrollbar-hide">
-              <p className="text-on-surface text-base md:text-lg leading-relaxed whitespace-pre-wrap">{renderTextWithMentions(viewingPost.legend)}</p>
+              <div 
+                className="text-on-surface text-base md:text-lg leading-relaxed whitespace-pre-wrap space-y-4"
+                dangerouslySetInnerHTML={{ __html: formatCommunityContent(viewingPost.legend) }}
+              />
               
               <div className="flex flex-col gap-4 w-full">
                 {(viewingPost.tradeDetails || viewingPost.imageUrl) && (
@@ -3159,7 +3166,10 @@ function ProfilePostCard({ post, onLike, onSelectPhoto, isAdmin, onDeletePost }:
 
       {/* Content */}
       <div className="pb-3.5">
-        <p className="text-xs sm:text-sm text-on-surface leading-normal whitespace-pre-wrap">{post.legend}</p>
+        <div 
+          className="text-xs sm:text-sm text-on-surface leading-normal whitespace-pre-wrap space-y-2"
+          dangerouslySetInnerHTML={{ __html: formatCommunityContent(post.legend) }}
+        />
       </div>
 
       {/* Media elements / Trade Share Card */}

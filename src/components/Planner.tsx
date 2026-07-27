@@ -277,8 +277,8 @@ export default function Planner() {
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* Conteúdo Principal */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-12">
-        <div className="max-w-[1200px] mx-auto space-y-12">
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
+        <div className="max-w-[1500px] mx-auto space-y-12">
           {/* Cabeçalho e Filtros Centralizados */}
           <div className="flex flex-col items-center gap-10">
             <div className="text-center">
