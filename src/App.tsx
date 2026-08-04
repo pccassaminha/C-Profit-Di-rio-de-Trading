@@ -195,9 +195,7 @@ export default function App() {
     setTimeout(() => setCopiedCoupon(false), 3000);
   };
 
-  const showCouponBanner = !!user && 
-    (userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30' || userPlan?.plan_type === 'Iniciante' || isExpired) && 
-    !isBannerDismissed;
+  const showCouponBanner = false;
 
   return (
     <div className="bg-background text-white font-body min-h-screen flex selection:bg-primary-container selection:text-white relative">

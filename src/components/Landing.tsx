@@ -88,7 +88,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
         </h1>
 
         <p className="max-w-[560px] text-[17px] text-on-surface-variant leading-[1.7] mb-[48px] animate-in slide-in-from-bottom-6 duration-700 delay-200 fill-mode-both">
-          O diário de trading definitivo para <strong className="text-on-surface font-bold">Forex, Índices e Opções Binárias</strong>. Registe-se agora e <strong className="text-primary font-black uppercase bg-primary/10 px-2 py-0.5 rounded-md inline-block">faça um teste de 30 dias por 500 Kz</strong> para explorar todo o terminal sem barreiras!
+          O diário de trading definitivo para <strong className="text-on-surface font-bold">Forex, Índices e Opções Binárias</strong>. Registe-se agora e <strong className="text-primary font-black uppercase bg-primary/10 px-2 py-0.5 rounded-md inline-block">inicie gratuitamente o seu diário de trades</strong> para explorar a plataforma!
         </p>
 
         <div className="flex items-center gap-[24px] flex-wrap justify-center animate-in slide-in-from-bottom-6 duration-700 delay-300 fill-mode-both">
@@ -972,11 +972,11 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                 <button
                   onClick={() => {
                     closePromoPopup();
-                    onRegisterClick('trial_30');
+                    onRegisterClick('iniciante');
                   }}
                   className="w-full py-4 rounded-xl bg-transparent hover:bg-cyan-500/10 border border-cyan-500/60 text-cyan-400 hover:text-white hover:border-cyan-500 text-xs font-black uppercase tracking-wider transition-all text-center cursor-pointer flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(6,182,212,0.15)]"
                 >
-                  <Zap size={14} className="text-cyan-400 animate-pulse" /> INICIAL TESTE DE 30 DIAS
+                  <Zap size={14} className="text-cyan-400 animate-pulse" /> INICIAR GRÁTIS
                 </button>
               </div>
 

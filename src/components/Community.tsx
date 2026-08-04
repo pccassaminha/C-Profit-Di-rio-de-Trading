@@ -1084,7 +1084,10 @@ export default function Community() {
     .sort((a, b) => getPostScore(b) - getPostScore(a));
 
   if (!isPro) {
-    const progressPercent = Math.min(100, Math.round((referralCount / 50) * 100));
+    const freeMonthsEarned = Math.floor(referralCount / 10);
+    const stepProgress = referralCount % 10;
+    const progressPercent = Math.min(100, Math.round((stepProgress / 10) * 100));
+
     return (
       <div className="p-4 md:p-8 max-w-[1500px] mx-auto space-y-8 animate-in fade-in duration-500 relative">
         <AdBanner isPro={isPro} globalSettings={globalSettings} />
@@ -1112,9 +1115,9 @@ export default function Community() {
             <div className="flex items-center justify-between text-xs font-bold">
               <span className="flex items-center gap-1.5 text-white">
                 <Users className="w-4 h-4 text-primary" />
-                <span>Desbloqueio Grátis por Afiliados</span>
+                <span>Plano de Carreira • 1 Mês Grátis a cada 10 Convidados</span>
               </span>
-              <span className="text-primary font-black font-mono">{referralCount} / 50 convidados</span>
+              <span className="text-primary font-black font-mono">{stepProgress} / 10 convidados</span>
             </div>
 
             <div className="w-full bg-surface-container-low h-3 rounded-full overflow-hidden border border-outline-variant/10">
@@ -1125,7 +1128,7 @@ export default function Community() {
             </div>
 
             <p className="text-[11px] text-on-surface-variant leading-normal">
-              💡 <strong>Dica:</strong> Convide 50 amigos no programa de afiliados para desbloquear a Comunidade VIP e o Panorama Global gratuitamente!
+              💡 <strong>Plano de Carreira:</strong> A cada 10 amigos convidados, você ganha 1 Mês de Acesso Premium 100% Grátis! ({stepProgress}/10 para o próximo mês grátis • Total acumulado: {freeMonthsEarned} mês(es))
             </p>
           </div>
 
@@ -1150,7 +1153,7 @@ export default function Community() {
               className="w-full sm:w-auto bg-surface-container-highest hover:bg-surface-container-highest/80 text-white font-bold uppercase tracking-wider text-xs px-6 py-3.5 rounded-xl border border-outline-variant/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Users className="w-4 h-4 text-primary" />
-              <span>Convidar Amigos ({referralCount}/50)</span>
+              <span>Convidar Amigos ({stepProgress}/10)</span>
             </button>
           </div>
         </div>

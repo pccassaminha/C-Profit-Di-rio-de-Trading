@@ -115,8 +115,8 @@ export const useTrades = (manualTrades: any[] = []) => {
     const unsubReferrals = onSnapshot(qReferrals, (snapshot) => {
       const count = snapshot.docs.length;
       setReferralCount(count);
-      // auto-unlock if reached 50 referrals
-      if (count >= 50) {
+      // auto-unlock if reached at least 10 referrals (Plano de Carreira: 10 convidados = 1 Mês Grátis)
+      if (count >= 10) {
         updateDoc(doc(db, 'usuarios', uid), { unlockedByAffiliates: true }).catch(() => {});
       }
     }, (err) => {
@@ -248,7 +248,7 @@ export const useTrades = (manualTrades: any[] = []) => {
     const isPro = (() => {
       if (isSuperAdmin) return true;
       if (!finalUserPlan) return false;
-      if (finalUserPlan.unlockedByAffiliates || referralCount >= 50) return true;
+      if (finalUserPlan.unlockedByAffiliates || referralCount >= 10) return true;
 
       const paidPlans = ['mensal_2', 'mensal_6', 'trimestral_6', 'semestral_8', 'semestral_6', 'anual_16', 'ilimitado', 'Unlimited Elite'];
       if (paidPlans.includes(finalUserPlan.plan_type)) {

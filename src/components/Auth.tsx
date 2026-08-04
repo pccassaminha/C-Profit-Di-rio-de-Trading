@@ -104,7 +104,7 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
   }, [initialCoupon]);
 
   const BASE_PLANS = [
-    { id: 'trial_30', name: 'Teste (30 Dias)', rawPrice: 500, defaultTag: 'Grátis c/ Convite', defaultPrice: '500 Kz', oldPrice: 500 },
+    { id: 'iniciante', name: 'Testar Grátis o Seu Diário de Trades', rawPrice: 0, defaultTag: '100% Grátis', defaultPrice: 'Grátis', oldPrice: 0 },
     { id: 'mensal_6', name: 'Plano Mensal', rawPrice: 8824, defaultTag: 'Básico', defaultPrice: '8.824 Kz', oldPrice: 13236 },
     { id: 'trimestral_6', name: 'Trimestral', rawPrice: 26472, defaultTag: '-33% OFF', defaultPrice: '26.472 Kz', oldPrice: 39708 },
     { id: 'semestral_8', name: 'Semestral', rawPrice: 52944, defaultTag: 'Best Choice', defaultPrice: '52.944 Kz', oldPrice: 79416 },

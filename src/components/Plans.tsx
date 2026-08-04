@@ -313,18 +313,18 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
   const plans = [
     {
-      id: 'trial_30',
-      name: 'Plano Teste 30 Dias',
-      oldPrice: '5.000',
-      discount: '90% OFF',
-      savingsText: 'Apenas Kz 500 por 30 dias',
-      price: '500',
-      period: 'por 30 dias',
-      days: 30,
-      limits: '2 Contas Forex + 2 Contas OB',
-      totalLimit: 4,
-      features: ['Acesso ao Panorama Global', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade', 'Válido para novos registros'],
-      current: userPlan?.plan_type === 'trial_30' || userPlan?.plan_type === 'trial_15'
+      id: 'iniciante',
+      name: 'Testar Grátis o Seu Diário de Trades',
+      oldPrice: '0',
+      discount: '100% GRÁTIS',
+      savingsText: 'Acesso Gratuito ao Diário de Trades',
+      price: '0',
+      period: 'sempre grátis',
+      days: 365,
+      limits: '2 Contas de Trading',
+      totalLimit: 2,
+      features: ['Diário de Trades Gratuito', 'Gestão de 2 Contas de Trading', 'Estatísticas de Desempenho & Win Rate', 'Histórico Completo de Ordens', 'Suporte Técnico Integrado'],
+      current: userPlan?.plan_type === 'Iniciante' || !userPlan?.plan_type || userPlan?.plan_type === 'trial_30' || userPlan?.plan_type === 'trial_15'
     },
     {
       id: 'mensal_6',
@@ -573,16 +573,16 @@ Fico no aguardo, obrigado!`;
     setIsSubmitting(true);
     try {
       const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 30);
+      expiryDate.setFullYear(expiryDate.getFullYear() + 10);
       
       const userRef = doc(db, 'usuarios', auth.currentUser.uid);
       await setDoc(userRef, {
-        plan_type: 'trial_30',
+        plan_type: 'Iniciante',
         expiry_date: expiryDate.toISOString(),
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
-      alert('Plano Trial Grátis (30 Dias) ativado com sucesso! Aproveite.');
+      alert('Diário de Trades Gratuito ativado com sucesso! Bons registos!');
     } catch (err) {
       console.error(err);
       alert('Erro ao ativar Plano Grátis.');
@@ -698,13 +698,7 @@ Fico no aguardo, obrigado!`;
       <div className="plans-ticker-container select-none">
         <div className="plans-ticker-track">
           {[...finalPlans, ...finalPlans].map((plan, idx) => {
-            const hasUsedTrial = !!(
-              userPlan?.hadTrial30 || 
-              userPlan?.plan_type === 'trial_30' || 
-              userPlan?.plan_type === 'trial_15' || 
-              payments.some(p => p.planId === 'trial_30' && (p.status === 'approved' || p.status === 'pending'))
-            );
-            const isTrialBlocked = plan.id === 'trial_30' && hasUsedTrial;
+            const isTrialBlocked = false;
 
             return (
               <div 
@@ -792,29 +786,25 @@ Fico no aguardo, obrigado!`;
 
                 <button 
                   onClick={() => {
-                    if (plan.id === 'trial_30' && hasUsedTrial) {
-                      alert('O plano de teste de 500 Kz só pode ser usufruído uma única vez por usuário. Por favor, selecione um plano a partir de 5.000 Kz.');
-                      return;
-                    }
                     if (!auth.currentUser && onAuthRequired) {
-                      const initialCoupon = plan.id === 'trial_30' ? '' : 'CPROFIT83%OFF';
+                      const initialCoupon = plan.id === 'iniciante' ? '' : 'CPROFIT83%OFF';
                       onAuthRequired(plan.id, initialCoupon);
+                    } else if (plan.id === 'iniciante') {
+                      handleActivateFreeTrial();
                     } else if (!plan.current) {
                       setShowPaymentModal(plan);
                     }
                   }}
-                  disabled={plan.current || (plan.id === 'trial_30' && hasUsedTrial)}
+                  disabled={plan.current}
                   className={`w-full py-[12px] rounded-[8px] font-headline text-[12px] font-bold tracking-[0.08em] uppercase transition-all flex items-center justify-center border ${
                     plan.current
                       ? 'bg-[#00f5a0]/10 text-[#00f5a0] border-[#00f5a0]/20 cursor-default'
-                      : (plan.id === 'trial_30' && hasUsedTrial)
-                        ? 'bg-neutral-800/10 text-neutral-600 border-neutral-800 cursor-not-allowed'
-                        : plan.featured
-                          ? 'bg-primary text-background border-transparent hover:bg-primary-fixed-dim shadow-[0_8px_20px_rgba(0,245,160,0.25)]'
-                          : 'bg-transparent text-on-surface border-outline-variant hover:bg-white/5'
+                      : plan.featured
+                        ? 'bg-primary text-background border-transparent hover:bg-primary-fixed-dim shadow-[0_8px_20px_rgba(0,245,160,0.25)]'
+                        : 'bg-transparent text-on-surface border-outline-variant hover:bg-white/5'
                   }`}
                 >
-                  {plan.current ? 'Plano Ativo' : (plan.id === 'trial_30' && hasUsedTrial) ? 'Plano Bloqueado' : 'Adquirir Plano'}
+                  {plan.current ? 'Plano Ativo' : plan.id === 'iniciante' ? 'Testar Grátis Agora' : 'Adquirir Plano'}
                 </button>
               </div>
             );
