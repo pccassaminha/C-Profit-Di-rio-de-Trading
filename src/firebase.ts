@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, persistentLocalCache, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 const firebaseConfig = {
   apiKey: "AIzaSyDBEOdBHS3mxxE1Vhw2pSh0BjGaK6M8GBw",
@@ -17,18 +17,17 @@ export const app = initializeApp(firebaseConfig);
 
 let firestoreDb;
 try {
-  firestoreDb = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    }),
-    experimentalForceLongPolling: true
-  }, undefined);
-} catch (cacheErr) {
-  console.warn("[Firebase] Failed to initialize persistent local cache, falling back to in-memory local cache:", cacheErr);
-  firestoreDb = initializeFirestore(app, {
-    localCache: memoryLocalCache(),
-    experimentalForceLongPolling: true
-  }, undefined);
+  firestoreDb = getFirestore(app);
+} catch {
+  try {
+    firestoreDb = initializeFirestore(app, {
+      localCache: memoryLocalCache(),
+      experimentalAutoDetectLongPolling: true
+    });
+  } catch (cacheErr) {
+    console.warn("[Firebase] Defaulting to standard Firestore instance:", cacheErr);
+    firestoreDb = initializeFirestore(app, {});
+  }
 }
 
 export const db = firestoreDb;

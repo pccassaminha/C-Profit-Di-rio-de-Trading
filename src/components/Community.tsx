@@ -3,12 +3,13 @@ import { db, auth, storage } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, increment, deleteDoc, getDoc, getDocs, setDoc, limit, runTransaction } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 import Modal from './Modal';
 import { TradeShareCard, TradeDetails } from './TradeShareCard';
 import { renderFormattedText } from '../utils/textFormatter';
 import { formatCommunityContent } from '../utils/tableFormatter';
 
-import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft, Megaphone, Edit2, Ban, ArrowRight, Compass, Bookmark } from 'lucide-react';
+import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft, Megaphone, Edit2, Ban, ArrowRight, Compass, Bookmark, Crown } from 'lucide-react';
 
 interface Post {
   id: string;
@@ -29,8 +30,8 @@ interface Post {
 }
 
 export default function Community() {
-  const { userPlan } = useTrades();
-  const [activeFeed, setActiveFeed] = useState<'forex' | 'ob'>('forex');
+  const { userPlan, isPro, referralCount } = useTrades();
+  const [activeFeed, setActiveFeed] = useState<'forex' | 'ob' | 'macro'>('forex');
   const [showFilter, setShowFilter] = useState(true);
   const [viewingPost, setViewingPost] = useState<Post | null>(null);
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
@@ -1081,6 +1082,89 @@ export default function Community() {
   const sortedAndFilteredPosts = [...posts]
     .filter(p => !blockedUsers.includes(p.userId) && !distancedList.includes(p.userId))
     .sort((a, b) => getPostScore(b) - getPostScore(a));
+
+  if (!isPro) {
+    const progressPercent = Math.min(100, Math.round((referralCount / 50) * 100));
+    return (
+      <div className="p-4 md:p-8 max-w-[1500px] mx-auto space-y-8 animate-in fade-in duration-500 relative">
+        <AdBanner isPro={isPro} globalSettings={globalSettings} />
+
+        <div className="bg-gradient-to-b from-surface-container/95 via-surface-container-high/95 to-surface-container/95 backdrop-blur-xl border-2 border-primary/30 rounded-3xl p-6 sm:p-10 text-center space-y-6 shadow-[0_20px_60px_rgba(0,0,0,0.6)] relative z-20 max-w-3xl mx-auto my-8">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary/20 to-amber-500/20 border border-primary/40 flex items-center justify-center text-primary mx-auto shadow-lg shadow-primary/10">
+            <Lock className="w-8 h-8 text-amber-400" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full">
+              <Crown className="w-3.5 h-3.5" />
+              <span>Comunidade Exclusiva para Assinantes</span>
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black text-white font-headline tracking-tight">
+              Comunidade VIP Bloqueada
+            </h2>
+            <p className="text-on-surface-variant text-sm max-w-xl mx-auto leading-relaxed">
+              Conecte-se com a elite dos traders. Compartilhe setups de alta precisão, relatórios de planejamento de trade, análises de forças correlacionais de moedas e debata o mercado ao vivo.
+            </p>
+          </div>
+
+          {/* Referral Unlock Progress */}
+          <div className="bg-surface-container-highest/60 border border-outline-variant/15 rounded-2xl p-4 sm:p-5 max-w-lg mx-auto text-left space-y-3">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="flex items-center gap-1.5 text-white">
+                <Users className="w-4 h-4 text-primary" />
+                <span>Desbloqueio Grátis por Afiliados</span>
+              </span>
+              <span className="text-primary font-black font-mono">{referralCount} / 50 convidados</span>
+            </div>
+
+            <div className="w-full bg-surface-container-low h-3 rounded-full overflow-hidden border border-outline-variant/10">
+              <div 
+                className="bg-gradient-to-r from-primary via-emerald-400 to-amber-400 h-full rounded-full transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+
+            <p className="text-[11px] text-on-surface-variant leading-normal">
+              💡 <strong>Dica:</strong> Convide 50 amigos no programa de afiliados para desbloquear a Comunidade VIP e o Panorama Global gratuitamente!
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => {
+                const event = new CustomEvent('navigateToTab', { detail: 'plans' });
+                window.dispatchEvent(event);
+              }}
+              className="w-full sm:w-auto bg-gradient-to-r from-primary to-emerald-400 text-black font-black uppercase tracking-wider text-xs px-6 py-3.5 rounded-xl shadow-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Crown className="w-4 h-4" />
+              <span>Seja Assinante / Fazer Upgrade</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const event = new CustomEvent('navigateToTab', { detail: 'affiliates_user' });
+                window.dispatchEvent(event);
+              }}
+              className="w-full sm:w-auto bg-surface-container-highest hover:bg-surface-container-highest/80 text-white font-bold uppercase tracking-wider text-xs px-6 py-3.5 rounded-xl border border-outline-variant/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Users className="w-4 h-4 text-primary" />
+              <span>Convidar Amigos ({referralCount}/50)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Blurred Background Preview */}
+        <div className="filter blur-md opacity-25 pointer-events-none select-none space-y-6">
+          <div className="text-center space-y-2">
+            <h2 className="text-4xl font-black">Feed da Comunidade</h2>
+          </div>
+          <div className="h-96 bg-surface-container rounded-2xl p-6 border border-white/10" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 max-w-[1500px] mx-auto space-y-8 animate-in fade-in duration-500">

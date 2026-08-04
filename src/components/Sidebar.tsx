@@ -1,10 +1,10 @@
 import React from 'react';
 import { useTrades } from '../hooks/useTrades';
-import { LayoutDashboard, FileText, Calendar, CreditCard, Wallet, Globe, Users, Handshake, Crown, Settings, HelpCircle, LogOut } from 'lucide-react';
+import { LayoutDashboard, FileText, Calendar, CreditCard, Wallet, Globe, Users, Handshake, Crown, Settings, HelpCircle, LogOut, Lock } from 'lucide-react';
 import { auth } from '../firebase';
 
 export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab: string, setActiveTab: (tab: string) => void, isOpen: boolean }) {
-  const { userPlan } = useTrades();
+  const { userPlan, isPro } = useTrades();
   const currentUser = auth.currentUser;
   
   // Super Admin check - only this email can see the admin panel
@@ -22,20 +22,20 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
       'trial_15': 'Trial 15 Dias',
       'trial_30': 'Teste 30 Dias',
       'Unlimited Elite': 'Unlimited Elite',
-      'Iniciante': 'Sem Acesso'
+      'Iniciante': 'Gratuito (2 Contas)'
     };
     return maps[type] || type;
   };
 
   const navItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Performance' },
-    { id: 'journal', icon: FileText, label: 'Diário de Trades' },
-    { id: 'planner', icon: Calendar, label: 'Planejamento' },
-    { id: 'payments', icon: CreditCard, label: 'Pagamentos' },
-    { id: 'withdrawals', icon: Wallet, label: 'Levantamentos' },
-    { id: 'panorama', icon: Globe, label: 'Panorama Global' },
-    { id: 'community', icon: Users, label: 'Comunidade' },
-    { id: 'affiliates_user', icon: Handshake, label: 'Área de Afiliado' },
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Performance', isLocked: false },
+    { id: 'journal', icon: FileText, label: 'Diário de Trades', isLocked: false },
+    { id: 'planner', icon: Calendar, label: 'Planejamento', isLocked: false },
+    { id: 'payments', icon: CreditCard, label: 'Pagamentos', isLocked: false },
+    { id: 'withdrawals', icon: Wallet, label: 'Levantamentos', isLocked: false },
+    { id: 'panorama', icon: Globe, label: 'Panorama Global', isLocked: !isPro },
+    { id: 'community', icon: Users, label: 'Comunidade', isLocked: !isPro },
+    { id: 'affiliates_user', icon: Handshake, label: 'Área de Afiliado', isLocked: false },
   ];
 
   return (
@@ -61,14 +61,21 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
             key={item.id}
             onClick={() => setActiveTab(item.id)}
             title={!isOpen ? item.label : undefined}
-            className={`w-full flex items-center py-3 transition-all duration-150 ${isOpen ? 'px-6 gap-3' : 'justify-center px-0'} ${
+            className={`w-full flex items-center py-3 transition-all duration-150 relative ${isOpen ? 'px-6 gap-3' : 'justify-center px-0'} ${
               activeTab === item.id
                 ? 'text-primary border-l-4 border-primary bg-surface-container'
                 : 'text-on-surface-variant hover:text-primary hover:bg-surface-container border-l-4 border-transparent'
             }`}
           >
             <item.icon className="w-5 h-5 shrink-0" strokeWidth={activeTab === item.id ? 2.5 : 2} />
-            {isOpen && <span className={`font-body whitespace-nowrap ${activeTab === item.id ? 'font-bold' : 'font-medium'}`}>{item.label}</span>}
+            {isOpen && (
+              <span className={`font-body whitespace-nowrap flex items-center justify-between w-full ${activeTab === item.id ? 'font-bold' : 'font-medium'}`}>
+                <span>{item.label}</span>
+                {item.isLocked && (
+                  <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0 ml-1" />
+                )}
+              </span>
+            )}
           </button>
         ))}
       </nav>

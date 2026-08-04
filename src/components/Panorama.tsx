@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Flame, Gauge, TrendingUp, Grid, Layers2, Activity, LineChart } from 'lucide-react';
+import { Calendar, Flame, Gauge, TrendingUp, Grid, Layers2, Activity, LineChart, Lock, Crown, Users, ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
 import Charts from './Charts';
+import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 
 interface WidgetProps {
   widgetType: 'events' | 'forex-heat-map' | 'market-quotes' | 'technical-analysis' | 'stock-heatmap' | 'crypto-coins-heatmap' | 'ticker-tape';
@@ -138,6 +140,7 @@ function InvestingCalendarWidget({ height = '500px' }: { height?: string }) {
 }
 
 export default function Panorama() {
+  const { isPro, referralCount, globalSettings } = useTrades();
   const [layoutMode, setLayoutMode] = useState<'grid' | 'tabs' | 'charts'>('grid');
   const [activeTab, setActiveTab] = useState<'calendar' | 'heatmap' | 'technical' | 'quotes'>('calendar');
   const [calendarSource, setCalendarSource] = useState<'tradingview' | 'investing'>(() => {
@@ -408,6 +411,90 @@ export default function Panorama() {
         };
     }
   };
+
+  if (!isPro) {
+    const progressPercent = Math.min(100, Math.round((referralCount / 50) * 100));
+    return (
+      <div id="panorama-container" className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8 animate-in fade-in duration-500 relative">
+        <AdBanner isPro={isPro} globalSettings={globalSettings} />
+
+        {/* Lock Overlay Card */}
+        <div className="bg-gradient-to-b from-surface-container/95 via-surface-container-high/95 to-surface-container/95 backdrop-blur-xl border-2 border-primary/30 rounded-3xl p-6 sm:p-10 text-center space-y-6 shadow-[0_20px_60px_rgba(0,0,0,0.6)] relative z-20 max-w-3xl mx-auto my-8">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary/20 to-amber-500/20 border border-primary/40 flex items-center justify-center text-primary mx-auto shadow-lg shadow-primary/10">
+            <Lock className="w-8 h-8 text-amber-400" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full">
+              <Crown className="w-3.5 h-3.5" />
+              <span>Recurso Exclusivo para Assinantes</span>
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black text-white font-headline tracking-tight">
+              Panorama Global Bloqueado
+            </h2>
+            <p className="text-on-surface-variant text-sm max-w-xl mx-auto leading-relaxed">
+              O Panorama Global inclui o Calendário Econômico Institucional em tempo real, Mapa de Calor de Moedas, Análise Técnica Automatizada e Projeções Macroeconômicas de Mercado.
+            </p>
+          </div>
+
+          {/* Referral Unlock Progress */}
+          <div className="bg-surface-container-highest/60 border border-outline-variant/15 rounded-2xl p-4 sm:p-5 max-w-lg mx-auto text-left space-y-3">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="flex items-center gap-1.5 text-white">
+                <Users className="w-4 h-4 text-primary" />
+                <span>Desbloqueio Grátis por Afiliados</span>
+              </span>
+              <span className="text-primary font-black font-mono">{referralCount} / 50 convidados</span>
+            </div>
+
+            <div className="w-full bg-surface-container-low h-3 rounded-full overflow-hidden border border-outline-variant/10">
+              <div 
+                className="bg-gradient-to-r from-primary via-emerald-400 to-amber-400 h-full rounded-full transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+
+            <p className="text-[11px] text-on-surface-variant leading-normal">
+              💡 <strong>Dica:</strong> Convide 50 amigos no programa de afiliados para desbloquear acesso total e ilimitado ao plano Premium gratuitamente!
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => {
+                const event = new CustomEvent('navigateToTab', { detail: 'plans' });
+                window.dispatchEvent(event);
+              }}
+              className="w-full sm:w-auto bg-gradient-to-r from-primary to-emerald-400 text-black font-black uppercase tracking-wider text-xs px-6 py-3.5 rounded-xl shadow-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Crown className="w-4 h-4" />
+              <span>Ver Planos e Assinar</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const event = new CustomEvent('navigateToTab', { detail: 'affiliates_user' });
+                window.dispatchEvent(event);
+              }}
+              className="w-full sm:w-auto bg-surface-container-highest hover:bg-surface-container-highest/80 text-white font-bold uppercase tracking-wider text-xs px-6 py-3.5 rounded-xl border border-outline-variant/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Users className="w-4 h-4 text-primary" />
+              <span>Convidar Amigos ({referralCount}/50)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Blurred Background Preview */}
+        <div className="filter blur-md opacity-25 pointer-events-none select-none space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-bold">Grade de Mercado & Calendário Econômico</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-96 bg-surface-container rounded-2xl p-6 border border-white/10" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div id="panorama-container" className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8 animate-in fade-in duration-500">

@@ -6,6 +6,7 @@ import { collection, addDoc, onSnapshot, query, where, serverTimestamp, doc, upd
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 import Modal from './Modal';
 import { findObjectiveForAccount, deduplicateObjectives } from '../utils/objectiveUtils';
 import jsPDF from 'jspdf';
@@ -171,7 +172,9 @@ export default function Dashboard() {
     uniqueAccounts, 
     limitReached, 
     userPlan,
-    isExpired 
+    isExpired,
+    isPro,
+    globalSettings
   } = useTrades();
 
   // Add Account Form State
@@ -1241,6 +1244,9 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* AdSense / Platform Banner for Free Users */}
+      <AdBanner isPro={isPro} globalSettings={globalSettings} />
+
       {/* Top Nav / Tabs */}
       {limitReached && (
         <div className="bg-error/10 border border-error/50 p-6 rounded-[24px] mb-6 flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top duration-500">
@@ -1535,7 +1541,7 @@ export default function Dashboard() {
               </h4>
               <div className="flex-1 flex flex-col items-center justify-center py-4">
                 <p className={`font-black text-2xl md:text-3xl ${data.prevMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center justify-center gap-1.5`}>
-                  {data.prevMonthPnl >= 0 ? <TrendingUp className="text-xl md:text-2xl" /> : <trending_down className="text-xl md:text-2xl" />}
+                  {data.prevMonthPnl >= 0 ? <TrendingUp className="text-xl md:text-2xl" /> : <TrendingDown className="text-xl md:text-2xl" />}
                   {data.prevMonthPnl >= 0 ? '+' : ''}{formatCurrency(data.prevMonthPnl)}
                 </p>
               </div>
@@ -1552,7 +1558,7 @@ export default function Dashboard() {
               </h4>
               <div className="flex-1 flex flex-col items-center justify-center py-4">
                 <p className={`font-black text-2xl md:text-3xl ${data.currentMonthPnl >= 0 ? 'text-secondary' : 'text-error'} flex items-center justify-center gap-1.5`}>
-                  {data.currentMonthPnl >= 0 ? <TrendingUp className="text-xl md:text-2xl" /> : <trending_down className="text-xl md:text-2xl" />}
+                  {data.currentMonthPnl >= 0 ? <TrendingUp className="text-xl md:text-2xl" /> : <TrendingDown className="text-xl md:text-2xl" />}
                   {data.currentMonthPnl >= 0 ? '+' : ''}{formatCurrency(data.currentMonthPnl)}
                 </p>
               </div>

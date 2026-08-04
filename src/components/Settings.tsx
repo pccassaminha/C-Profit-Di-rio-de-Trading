@@ -1603,7 +1603,7 @@ export default function Settings() {
                                     className={`transition-colors ${obj.hidden ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
                                     title={obj.hidden ? "Mostrar no Dashboard" : "Ocultar no Dashboard"}
                                   >
-                                    {obj.hidden ? <visibility_off className="text-sm" /> : <visibility className="text-sm" />}
+                                    {obj.hidden ? <EyeOff className="text-sm" /> : <Eye className="text-sm" />}
                                   </button>
                                   <button 
                                     onClick={() => {

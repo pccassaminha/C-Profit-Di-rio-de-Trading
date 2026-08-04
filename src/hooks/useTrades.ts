@@ -9,11 +9,12 @@ import { collection, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc }
  */
 export const useTrades = (manualTrades: any[] = []) => {
   const [firebaseTrades, setFirebaseTrades] = useState<any[]>([]);
-  const [userPlan, setUserPlan] = useState<{ plan_type: string, account_limit: number, expiry_date?: any, role?: string } | null>(null);
+  const [userPlan, setUserPlan] = useState<{ plan_type: string, account_limit: number, expiry_date?: any, role?: string, unlockedByAffiliates?: boolean, hadTrial30?: boolean } | null>(null);
+  const [referralCount, setReferralCount] = useState<number>(0);
   const [globalSettings, setGlobalSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. Buscar plano e configurações em tempo real
+  // 1. Buscar plano, afiliados e configurações em tempo real
   useEffect(() => {
     if (!auth.currentUser) {
       setLoading(false);
@@ -49,11 +50,12 @@ export const useTrades = (manualTrades: any[] = []) => {
       if (userDoc.exists()) {
         const data = userDoc.data();
         let limit = data.account_limit || 2;
+        if (data.plan_type === 'Iniciante' || !data.plan_type) limit = 2; // Strict 2 accounts limit for Free
         if (data.plan_type === 'mensal_6' || data.plan_type === 'mensal_2') limit = 12; // 6 OB + 6 Forex
         if (data.plan_type === 'trimestral_6') limit = 12; // 6 OB + 6 Forex
         if (data.plan_type === 'semestral_8' || data.plan_type === 'semestral_6') limit = 16; // 8 OB + 8 Forex
         if (data.plan_type === 'anual_16') limit = 32; // 16 OB + 16 Forex
-        if (data.plan_type === 'ilimitado' || data.plan_type === 'Unlimited Elite' || data.role === 'admin') limit = 999; 
+        if (data.plan_type === 'ilimitado' || data.plan_type === 'Unlimited Elite' || data.role === 'admin' || data.unlockedByAffiliates) limit = 999; 
 
         const isEmailSuperAdmin = auth.currentUser?.email === 'exportacoes.extras@gmail.com' || auth.currentUser?.email === 'omilionario.extra@gmail.com';
         if (isEmailSuperAdmin && data.role !== 'admin') {
@@ -66,6 +68,7 @@ export const useTrades = (manualTrades: any[] = []) => {
           account_limit: limit,
           expiry_date: data.expiry_date || null,
           role: data.role || (isEmailSuperAdmin ? 'admin' : 'user'),
+          unlockedByAffiliates: !!data.unlockedByAffiliates,
           hadTrial30: !!data.hadTrial30
         });
       } else {
@@ -74,11 +77,12 @@ export const useTrades = (manualTrades: any[] = []) => {
           if (oldUserDoc.exists()) {
             const data = oldUserDoc.data();
             let limit = data.account_limit || 2;
+            if (data.plan_type === 'Iniciante' || !data.plan_type) limit = 2;
             if (data.plan_type === 'mensal_6' || data.plan_type === 'mensal_2') limit = 12;
             if (data.plan_type === 'trimestral_6') limit = 12;
             if (data.plan_type === 'semestral_8' || data.plan_type === 'semestral_6') limit = 16;
             if (data.plan_type === 'anual_16') limit = 32;
-            if (data.plan_type === 'ilimitado' || data.plan_type === 'Unlimited Elite' || data.role === 'admin') limit = 999; 
+            if (data.plan_type === 'ilimitado' || data.plan_type === 'Unlimited Elite' || data.role === 'admin' || data.unlockedByAffiliates) limit = 999; 
 
             const isEmailSuperAdmin = auth.currentUser?.email === 'exportacoes.extras@gmail.com' || auth.currentUser?.email === 'omilionario.extra@gmail.com';
             if (isEmailSuperAdmin && data.role !== 'admin') {
@@ -91,6 +95,7 @@ export const useTrades = (manualTrades: any[] = []) => {
               account_limit: limit,
               expiry_date: data.expiry_date || null,
               role: data.role || (isEmailSuperAdmin ? 'admin' : 'user'),
+              unlockedByAffiliates: !!data.unlockedByAffiliates,
               hadTrial30: !!data.hadTrial30
             });
           } else {
@@ -100,6 +105,23 @@ export const useTrades = (manualTrades: any[] = []) => {
         return unsubOldUser;
       }
     }, (error) => { console.warn("Error listening to user doc:", error); });
+
+    // Subscrição em tempo real aos afiliados/indicações do utilizador
+    const myRefCode = uid.substring(0, 6).toUpperCase();
+    const qReferrals = query(
+      collection(db, 'referrals'),
+      where('referrerId', 'in', [uid, myRefCode])
+    );
+    const unsubReferrals = onSnapshot(qReferrals, (snapshot) => {
+      const count = snapshot.docs.length;
+      setReferralCount(count);
+      // auto-unlock if reached 50 referrals
+      if (count >= 50) {
+        updateDoc(doc(db, 'usuarios', uid), { unlockedByAffiliates: true }).catch(() => {});
+      }
+    }, (err) => {
+      console.warn("Error listening to user referrals:", err);
+    });
 
     // Subscrição em tempo real às configurações globais
     const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (settingsDoc) => {
@@ -114,6 +136,7 @@ export const useTrades = (manualTrades: any[] = []) => {
 
     return () => {
       unsubUser();
+      unsubReferrals();
       unsubSettings();
     };
   }, [auth.currentUser]);
@@ -188,7 +211,7 @@ export const useTrades = (manualTrades: any[] = []) => {
   }, []);
 
   // 3. Lógica de União, Deduplicação e Limites
-  const { allTrades, uniqueAccounts, limitReached, isExpired } = useMemo(() => {
+  const { allTrades, uniqueAccounts, limitReached, isExpired, isPro } = useMemo(() => {
     const tradesMap = new Map();
 
     // Deduplicação por Ticket - Prioridade para 'automatic' (Firebase)
@@ -221,25 +244,38 @@ export const useTrades = (manualTrades: any[] = []) => {
 
     const limitReached = finalUserPlan ? accountLogins.size > finalUserPlan.account_limit : false;
     
-    // Verificação de Expiração
-    let isExpired = false;
-    if (!isSuperAdmin) {
-      if (!finalUserPlan || finalUserPlan.plan_type === 'Iniciante') {
-        isExpired = true;
-      } else if (finalUserPlan.expiry_date) {
+    // Verificação de Status Pro e Expiração
+    const isPro = (() => {
+      if (isSuperAdmin) return true;
+      if (!finalUserPlan) return false;
+      if (finalUserPlan.unlockedByAffiliates || referralCount >= 50) return true;
+
+      const paidPlans = ['mensal_2', 'mensal_6', 'trimestral_6', 'semestral_8', 'semestral_6', 'anual_16', 'ilimitado', 'Unlimited Elite'];
+      if (paidPlans.includes(finalUserPlan.plan_type)) {
+        if (!finalUserPlan.expiry_date) return true;
         const now = new Date();
         const expiry = finalUserPlan.expiry_date.toDate ? finalUserPlan.expiry_date.toDate() : new Date(finalUserPlan.expiry_date);
-        isExpired = now > expiry;
+        return now <= expiry;
       }
+      return false;
+    })();
+
+    let isExpired = false;
+    if (!isSuperAdmin && finalUserPlan && finalUserPlan.plan_type !== 'Iniciante' && finalUserPlan.expiry_date) {
+      const now = new Date();
+      const expiry = finalUserPlan.expiry_date.toDate ? finalUserPlan.expiry_date.toDate() : new Date(finalUserPlan.expiry_date);
+      isExpired = now > expiry;
     }
 
     return { 
       allTrades: sortedTrades, 
       uniqueAccounts: Array.from(accountLogins),
       limitReached,
-      isExpired
+      isExpired,
+      isPro,
+      referralCount
     };
-  }, [manualTrades, firebaseTrades, finalUserPlan, isSuperAdmin]);
+  }, [manualTrades, firebaseTrades, finalUserPlan, isSuperAdmin, referralCount]);
 
   // 4. Cálculos Automáticos
   const stats = useMemo(() => {
@@ -258,5 +294,5 @@ export const useTrades = (manualTrades: any[] = []) => {
     };
   }, [allTrades, limitReached]);
 
-  return { allTrades, stats, loading, uniqueAccounts, limitReached, userPlan: finalUserPlan, isExpired, globalSettings };
+  return { allTrades, stats, loading, uniqueAccounts, limitReached, userPlan: finalUserPlan, isExpired, isPro: isPro || isSuperAdmin, referralCount, globalSettings };
 };

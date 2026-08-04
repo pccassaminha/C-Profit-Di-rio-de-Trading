@@ -187,15 +187,15 @@ export default function UserAffiliate() {
     if (count >= 50) {
       return {
         level: 5,
-        name: 'Nível 5 (Maestro Elite)',
+        name: 'Nível 5 (Maestro Elite • Plano Premium Desbloqueado!)',
         commission: 30,
-        payoutType: 'Dinheiro Real (Payout IBAN Directo)',
+        payoutType: 'Plano Premium Grátis + Comissões em Dinheiro Real (30%)',
         color: 'text-[#00f5a0]',
         bgColor: 'border-[#00f5a0]/40 bg-[#00f5a0]/5',
         badge: '👑 N5',
         gradient: 'from-[#00f5a0]/20 to-[#00f5a0]/5',
         nextTarget: null,
-        description: 'Parabéns! Payout bancário real de 30% em dinheiro líquido para a primeira assinatura paga de convidados ativos!'
+        description: 'Parabéns! Ao convidar 50 pessoas você desbloqueou o PLANO PREMIUM GRATUITO (Panorama Global, Comunidade VIP, Contas Ilimitadas) + Payout bancário real de 30% em dinheiro líquido!'
       };
     } else if (count >= 40) {
       return {
