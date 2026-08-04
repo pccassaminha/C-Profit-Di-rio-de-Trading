@@ -20,7 +20,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
     if (!hasSeen) {
       const timer = setTimeout(() => {
         setShowPromoPopup(true);
-      }, 1500);
+      }, 120000); // 2 minutos (120.000 ms) para permitir exploração prévia
       return () => clearTimeout(timer);
     }
   }, []);
