@@ -6,9 +6,12 @@ interface AdBannerProps {
   globalSettings?: any;
   className?: string;
   slotId?: string;
+  adKey?: string;
+  width?: number;
+  height?: number;
 }
 
-export default function AdBanner({ isPro = false, globalSettings, className = '', slotId }: AdBannerProps) {
+export default function AdBanner({ isPro = false, globalSettings, className = '', slotId, adKey, width, height }: AdBannerProps) {
   // If user is Premium/Pro, never display ads
   if (isPro) return null;
 
@@ -16,12 +19,15 @@ export default function AdBanner({ isPro = false, globalSettings, className = ''
   
   const adProvider = globalSettings?.adProvider || (globalSettings?.adsterraKey || globalSettings?.adsterraScriptCode ? 'adsterra' : (globalSettings?.adsenseClientId ? 'adsense' : 'auto'));
 
-  const adsterraKey = globalSettings?.adsterraKey || localStorage.getItem('adsterra_key') || '8e59cc5ff459e7164b9ffa94d698ca18';
+  const adsterraKey = adKey || globalSettings?.adsterraKey || localStorage.getItem('adsterra_key') || '8e59cc5ff459e7164b9ffa94d698ca18';
   const adsterraScriptCode = globalSettings?.adsterraScriptCode || localStorage.getItem('adsterra_script_code') || '';
   const adsterraIframeUrl = globalSettings?.adsterraIframeUrl || localStorage.getItem('adsterra_iframe_url') || '';
 
   const adsenseClientId = globalSettings?.adsenseClientId || localStorage.getItem('adsense_client_id');
   const adsenseSlotId = slotId || globalSettings?.adsenseSlotId || localStorage.getItem('adsense_slot_id');
+
+  const bannerWidth = width || (adKey === '5cba24c0ad586b33f4097be71bbaadb0' ? 468 : 728);
+  const bannerHeight = height || (adKey === '5cba24c0ad586b33f4097be71bbaadb0' ? 60 : 90);
 
   useEffect(() => {
     if (enableAdsForFree && (adProvider === 'adsense' || adProvider === 'auto') && adsenseClientId && adsenseSlotId) {
@@ -72,18 +78,18 @@ export default function AdBanner({ isPro = false, globalSettings, className = ''
     atOptions = {
       'key': '${adsterraKey.trim()}',
       'format': 'iframe',
-      'height': 90,
-      'width': 728,
+      'height': ${bannerHeight},
+      'width': ${bannerWidth},
       'params': {}
     };
   </script>
-  <script type="text/javascript" src="//www.highperformanceformat.com/${adsterraKey.trim()}/invoke.js"></script>
+  <script type="text/javascript" src="https://www.highperformanceformat.com/${adsterraKey.trim()}/invoke.js"></script>
 </body>
 </html>`;
     }
 
     return null;
-  }, [enableAdsForFree, adsterraScriptCode, adsterraKey, adsterraIframeUrl]);
+  }, [enableAdsForFree, adsterraScriptCode, adsterraKey, adsterraIframeUrl, bannerWidth, bannerHeight]);
 
   const hasAdsterra = enableAdsForFree && (adsterraIframeUrl || adsterraHtml);
   const hasAdsense = enableAdsForFree && adsenseClientId && adsenseSlotId;
@@ -108,29 +114,31 @@ export default function AdBanner({ isPro = false, globalSettings, className = ''
 
         {/* Adsterra Display */}
         {hasAdsterra ? (
-          <div className="w-full overflow-hidden flex justify-center items-center min-h-[90px]">
+          <div className="w-full overflow-hidden flex justify-center items-center" style={{ minHeight: `${bannerHeight}px` }}>
             {adsterraIframeUrl ? (
               <iframe
                 src={adsterraIframeUrl}
                 title="Anúncio Patrocinado"
-                className="w-full max-w-[728px] h-[90px] border-0"
+                className="w-full border-0"
+                style={{ maxWidth: `${bannerWidth}px`, height: `${bannerHeight}px` }}
                 scrolling="no"
               />
             ) : (
               <iframe
                 srcDoc={adsterraHtml!}
                 title="Anúncio Patrocinado"
-                className="w-full max-w-[728px] h-[90px] border-0 overflow-hidden"
+                className="w-full border-0 overflow-hidden"
+                style={{ maxWidth: `${bannerWidth}px`, height: `${bannerHeight}px` }}
                 scrolling="no"
               />
             )}
           </div>
         ) : hasAdsense ? (
           /* AdSense Display */
-          <div className="w-full overflow-hidden flex justify-center items-center min-h-[90px]">
+          <div className="w-full overflow-hidden flex justify-center items-center" style={{ minHeight: `${bannerHeight}px` }}>
             <ins
               className="adsbygoogle"
-              style={{ display: 'block', width: '100%', height: '90px' }}
+              style={{ display: 'block', width: '100%', height: `${bannerHeight}px` }}
               data-ad-client={adsenseClientId}
               data-ad-slot={adsenseSlotId}
               data-ad-format="auto"
