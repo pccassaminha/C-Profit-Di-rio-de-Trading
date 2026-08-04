@@ -321,9 +321,9 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       price: '0',
       period: 'sempre grátis',
       days: 365,
-      limits: '2 Contas de Trading',
-      totalLimit: 2,
-      features: ['Diário de Trades Gratuito', 'Gestão de 2 Contas de Trading', 'Estatísticas de Desempenho & Win Rate', 'Histórico Completo de Ordens', 'Suporte Técnico Integrado'],
+      limits: '4 Contas de Trading',
+      totalLimit: 4,
+      features: ['Diário de Trades Gratuito', 'Gestão de 4 Contas de Trading', 'Estatísticas de Desempenho & Win Rate', 'Histórico Completo de Ordens', 'Suporte Técnico Integrado'],
       current: userPlan?.plan_type === 'Iniciante' || !userPlan?.plan_type || userPlan?.plan_type === 'trial_30' || userPlan?.plan_type === 'trial_15'
     },
     {
@@ -337,7 +337,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 30,
       limits: '6 Contas Forex + 6 Contas OB',
       totalLimit: 12,
-      features: ['Acesso ao Panorama Global', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade'],
+      features: ['Acesso ao Panorama Global', 'Resumo Semanal Macroeconômico', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade'],
       current: userPlan?.plan_type === 'mensal_6' || userPlan?.plan_type === 'mensal_2'
     },
     {
@@ -351,7 +351,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 90,
       limits: '6 Contas Forex + 6 Contas OB',
       totalLimit: 12,
-      features: ['Acesso ao Panorama Global', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade VIP'],
+      features: ['Acesso ao Panorama Global', 'Resumo Semanal Macroeconômico', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade VIP'],
       current: userPlan?.plan_type === 'trimestral_6'
     },
     {
@@ -365,7 +365,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 180,
       limits: '8 Contas Forex + 8 Contas OB',
       totalLimit: 16,
-      features: ['Acesso ao Panorama Global', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Resumos Macroeconômicos', 'Acesso à Comunidade VIP', 'Suporte Prioritário via WhatsApp'],
+      features: ['Acesso ao Panorama Global', 'Resumo Semanal Macroeconômico', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade VIP', 'Suporte Prioritário via WhatsApp'],
       featured: true,
       current: userPlan?.plan_type === 'semestral_8' || userPlan?.plan_type === 'semestral_6'
     },
@@ -380,7 +380,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
       days: 365,
       limits: '16 Contas Forex + 16 Contas OB',
       totalLimit: 32,
-      features: ['Acesso ao Panorama Global', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Resumos Macroeconômicos', 'Acesso à Comunidade VIP', 'Suporte Prioritário via WhatsApp', 'Personalização de Interface', 'Acesso Antecipado a Beta'],
+      features: ['Acesso ao Panorama Global', 'Resumo Semanal Macroeconômico', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade VIP', 'Suporte Prioritário via WhatsApp', 'Personalização de Interface', 'Acesso Antecipado a Beta'],
       current: userPlan?.plan_type === 'anual_16'
     }
   ];
@@ -764,12 +764,13 @@ Fico no aguardo, obrigado!`;
                   {plan.features.map((feature, idx) => {
                      const isPrioritySupport = feature === 'Suporte Prioritário via WhatsApp';
                      const isPanorama = feature === 'Acesso ao Panorama Global';
+                     const isMacro = feature.includes('Macroeconômico') || feature.includes('Macroeconómico');
                      return (
                     <li key={idx} className="flex items-center gap-[8px] text-[13px] text-on-surface-variant leading-snug">
                       <div className={`w-[16px] h-[16px] rounded-full flex items-center justify-center shrink-0 border ${
-                        isPrioritySupport || isPanorama ? 'bg-[#00f5a0]/25 border-[#00f5a0]/50' : 'bg-[#00f5a0]/10 border-[#00f5a0]/30'
+                        isPrioritySupport || isPanorama || isMacro ? 'bg-[#00f5a0]/25 border-[#00f5a0]/50' : 'bg-[#00f5a0]/10 border-[#00f5a0]/30'
                       }`}>
-                        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke={isPrioritySupport || isPanorama ? "var(--color-primary)" : "currentColor"} strokeWidth={isPrioritySupport || isPanorama ? "2.5" : "2"} className={isPrioritySupport || isPanorama ? "" : "text-[#00f5a0]"}>
+                        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke={isPrioritySupport || isPanorama || isMacro ? "var(--color-primary)" : "currentColor"} strokeWidth={isPrioritySupport || isPanorama || isMacro ? "2.5" : "2"} className={isPrioritySupport || isPanorama || isMacro ? "" : "text-[#00f5a0]"}>
                           <polyline points="2 6 5 9 10 3"/>
                         </svg>
                       </div>
@@ -777,6 +778,8 @@ Fico no aguardo, obrigado!`;
                         <span className="text-[#00f5a0] font-semibold">{feature}</span>
                       ) : isPanorama ? (
                         <span className="text-[#00f5a0] font-black uppercase text-[11px] tracking-wider">🌍 {feature}</span>
+                      ) : isMacro ? (
+                        <span className="text-cyan-400 font-bold text-[12px] tracking-wide">📊 {feature}</span>
                       ) : (
                         feature
                       )}
@@ -814,49 +817,96 @@ Fico no aguardo, obrigado!`;
 
 
 
-      {/* FAQ Section */}
-      <div className="bg-surface border border-outline-variant/10 rounded-[32px] p-8 md:p-10 shadow-2xl mb-12">
-        <h3 className="text-2xl font-black text-on-surface uppercase tracking-tighter mb-8 text-center">
-          Dúvidas Frequentes
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/5">
-            <h4 className="font-bold text-on-surface mb-2 flex items-center gap-2">
-              <span className="text-primary">•</span> Como funcionam as restrições de contas?
-            </h4>
-            <p className="text-sm text-on-surface-variant leading-relaxed">
-              As restrições (ex: 6 Contas Forex + 6 Contas OB) referem-se ao número máximo de contas de trading que você pode integrar simultaneamente no terminal. Você pode excluir uma conta antiga para adicionar uma nova a qualquer momento, desde que não ultrapasse o limite ativo do seu plano.
+      {/* FAQ Section - Exibido apenas na Home Page para visitantes não-logados */}
+      {(!auth.currentUser || !!onAuthRequired) && (
+        <div className="bg-surface border border-outline-variant/10 rounded-[32px] p-8 md:p-10 shadow-2xl mb-12 space-y-8">
+          <div className="text-center space-y-2">
+            <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 font-black px-3.5 py-1.5 rounded-full uppercase tracking-widest inline-block">
+              ❓ Questões &amp; Respostas Frequentes
+            </span>
+            <h3 className="text-2xl md:text-3xl font-black text-on-surface uppercase tracking-tighter">
+              Dúvidas Frequentes sobre a Plataforma
+            </h3>
+            <p className="text-xs text-on-surface-variant max-w-xl mx-auto">
+              Tudo o que precisa de saber sobre o funcionamento do C Profit Terminal num único lugar.
             </p>
           </div>
-          
-          <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/5">
-            <h4 className="font-bold text-on-surface mb-2 flex items-center gap-2">
-              <span className="text-primary">•</span> Posso fazer upgrade de plano?
-            </h4>
-            <p className="text-sm text-on-surface-variant leading-relaxed">
-              Sim! Ao realizar o upgrade para um plano superior (ex: Mensal para Semestral), os dias restantes do seu plano atual são mantidos, e as novas vantagens são ativadas imediatamente após a aprovação do comprovante.
-            </p>
-          </div>
-        </div>
-      </div>
 
-      {/* Link para Faturamentos */}
-      <div className="bg-surface-container-low border border-outline-variant/10 rounded-[32px] p-8 md:p-10 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center">
-            <History size={24} />
-          </div>
-          <div>
-            <h3 className="text-2xl font-black text-on-surface uppercase tracking-tighter">Histórico de Pagamentos</h3>
-            <p className="text-sm text-on-surface-variant tracking-wide">Visualize e baixe suas faturas e recibos anteriores.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/10 hover:border-primary/30 transition-all space-y-2">
+              <h4 className="font-bold text-on-surface text-sm flex items-center gap-2">
+                <span className="text-primary text-base">🌐</span> Que mercados o terminal suporta?
+              </h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Atende com precisão a traders de <strong className="text-white">Forex</strong>, <strong className="text-white">Índices Globais</strong> e <strong className="text-white">Opções Binárias</strong>, adaptando dinamicamente o cálculo de pips, pontos, lotes e percentuais de payout.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/10 hover:border-primary/30 transition-all space-y-2">
+              <h4 className="font-bold text-on-surface text-sm flex items-center gap-2">
+                <span className="text-primary text-base">🏦</span> Posso registar mais de uma conta de trading?
+              </h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Sim! O terminal permite registar e gerir <strong className="text-white">múltiplas contas</strong> (reais e demonstrativas) de Forex e Opções Binárias no mesmo painel sem misturar estatísticas.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/10 hover:border-primary/30 transition-all space-y-2">
+              <h4 className="font-bold text-on-surface text-sm flex items-center gap-2">
+                <span className="text-primary text-base">🎯</span> Como funcionam os Planos de Trading?
+              </h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Pode estruturar <strong className="text-white">Planos de Trading personalizados</strong> com definição de metas diárias de lucro, limites rígidos de drawdown e checklists de disciplina pré-operação.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/10 hover:border-primary/30 transition-all space-y-2">
+              <h4 className="font-bold text-on-surface text-sm flex items-center gap-2">
+                <span className="text-primary text-base">👥</span> Como posso partilhar as minhas análises na Comunidade?
+              </h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Na <strong className="text-white">Comunidade VIP</strong> integrada, pode publicar as suas análises técnicas, capturas de ecra dos seus gráficos e trocar previsões diretamente com outros traders.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/10 hover:border-primary/30 transition-all space-y-2">
+              <h4 className="font-bold text-on-surface text-sm flex items-center gap-2">
+                <span className="text-primary text-base">📓</span> O que inclui o Diário de Trades e os Gráficos?
+              </h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Oferece registo fotográfico e analítico de cada ordem, acompanhado de <strong className="text-white">gráficos interativos</strong> de Winrate acumulado, curva de capital e mapeamento psicológico.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/10 hover:border-primary/30 transition-all space-y-2">
+              <h4 className="font-bold text-on-surface text-sm flex items-center gap-2">
+                <span className="text-primary text-base">🏆</span> Como é feita a análise dos Melhores Pares (Best Pairs)?
+              </h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                O sistema calcula automaticamente em quais pares ou ativos (ex: <strong className="text-white">EUR/USD, GBP/USD, XAU/USD</strong>) tem maior taxa de acerto e rentabilidade, otimizando o seu foco.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/10 hover:border-primary/30 transition-all space-y-2">
+              <h4 className="font-bold text-on-surface text-sm flex items-center gap-2">
+                <span className="text-primary text-base">⚙️</span> Como funcionam os limites de contas por plano?
+              </h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Os limites (ex: 6 Contas Forex + 6 Contas OB) referem-se ao número máximo de contas integradas em simultâneo. Pode trocar ou atualizar as contas sempre que necessário.
+              </p>
+            </div>
+
+            <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/10 hover:border-primary/30 transition-all space-y-2">
+              <h4 className="font-bold text-on-surface text-sm flex items-center gap-2">
+                <span className="text-primary text-base">💎</span> Posso fazer upgrade do meu plano a qualquer momento?
+              </h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Sim! Ao realizar o upgrade para um plano superior, os dias restantes do seu plano atual são acumulados e as novas vantagens (como Resumos Macroeconômicos) são ativadas de imediato.
+              </p>
+            </div>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2 text-on-surface-variant text-sm font-bold opacity-60">
-          <FileText size={20} />
-          Acesse no menu lateral
-        </div>
-      </div>
+      )}
 
       {/* Modal de Pagamento */}
       {showPaymentModal && (

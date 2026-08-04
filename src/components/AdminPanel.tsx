@@ -117,7 +117,7 @@ export default function AdminPanel() {
     }
   }, [activeTab]);
 
-  const [activePaymentTab, setActivePaymentTab] = useState<'iban' | 'usdt' | 'express' | 'kwik'>('iban');
+  const [activePaymentTab, setActivePaymentTab] = useState<'iban' | 'usdt' | 'express' | 'kwik' | 'ads'>('iban');
 
   const [loading, setLoading] = useState(true);
 
@@ -1511,6 +1511,21 @@ export default function AdminPanel() {
                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00f5a0] rounded-full" />
                   )}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePaymentTab('ads')}
+                  className={`pb-3 px-4 text-xs font-black uppercase tracking-widest transition-all relative flex items-center gap-1.5 whitespace-nowrap ${
+                    activePaymentTab === 'ads'
+                      ? 'text-[#00f5a0]'
+                      : 'text-on-surface-variant hover:text-white'
+                  }`}
+                >
+                  <span>📢</span>
+                  <span>Anúncios (Adsterra)</span>
+                  {activePaymentTab === 'ads' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00f5a0] rounded-full" />
+                  )}
+                </button>
               </div>
 
               {/* Painéis das Abas */}
@@ -1774,6 +1789,128 @@ export default function AdminPanel() {
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {activePaymentTab === 'ads' && (
+                  <div className="space-y-5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl border border-outline-variant/15">
+                      <div>
+                        <p className="font-bold text-on-surface text-xs">Exibir Anúncios no Plano Gratuito</p>
+                        <p className="text-[10px] text-on-surface-variant">Monetize utilizadores no plano Iniciante (Free) com Adsterra ou AdSense</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setSettings({ ...settings, enableAdsForFree: settings.enableAdsForFree !== false ? false : true })}
+                        className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${settings.enableAdsForFree !== false ? 'bg-[#00f5a0]' : 'bg-surface-container-high border border-outline-variant/30'}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${settings.enableAdsForFree !== false ? 'right-0.5 bg-background' : 'left-0.5 bg-on-surface-variant'}`}></div>
+                      </button>
+                    </div>
+
+                    <div className="space-y-4 bg-surface-container-low/40 p-4 rounded-2xl border border-outline-variant/10">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">Provedor de Anúncios Ativo</label>
+                        <select
+                          value={settings.adProvider || 'adsterra'}
+                          onChange={(e) => setSettings({ ...settings, adProvider: e.target.value })}
+                          className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-medium text-sm text-white"
+                        >
+                          <option value="adsterra">⚡ Adsterra Network (Recomendado)</option>
+                          <option value="adsense">Google AdSense</option>
+                        </select>
+                      </div>
+
+                      {/* Configuração Adsterra */}
+                      {(settings.adProvider || 'adsterra') === 'adsterra' && (
+                        <div className="space-y-4 pt-2 border-t border-outline-variant/10">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1 font-mono flex items-center gap-1.5">
+                              <span>🔑</span> Chave do Anúncio Adsterra (Ad Key)
+                            </label>
+                            <input 
+                              type="text" 
+                              value={settings.adsterraKey || ''}
+                              onChange={(e) => setSettings({ ...settings, adsterraKey: e.target.value, adsterraScriptCode: e.target.value ? '' : settings.adsterraScriptCode })}
+                              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-mono text-sm text-white"
+                              placeholder="Ex: a1b2c3d4e5f67890 (Chave do seu Banner no Adsterra)"
+                            />
+                            <p className="text-[10px] text-on-surface-variant pl-1">
+                              Cole a <strong>Key</strong> do seu bloco de anúncio Adsterra (Banner 728x90, 468x60 ou Native Banner).
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono flex items-center gap-1.5">
+                              <span>📜</span> Código do Script Completo Adsterra (Opção Alternativa)
+                            </label>
+                            <textarea 
+                              rows={3}
+                              value={settings.adsterraScriptCode || ''}
+                              onChange={(e) => setSettings({ ...settings, adsterraScriptCode: e.target.value })}
+                              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-mono text-xs text-white"
+                              placeholder='Ex: <script type="text/javascript">atOptions = {...};</script><script src="//www.highperformanceformat.com/..."></script>'
+                            />
+                            <p className="text-[10px] text-on-surface-variant pl-1">
+                              Se preferir, cole o código HTML/JS completo copiado do painel do Adsterra.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-cyan-400 uppercase tracking-widest pl-1 font-mono flex items-center gap-1.5">
+                              <span>🔗</span> URL do Iframe Direto (Opcional)
+                            </label>
+                            <input 
+                              type="text" 
+                              value={settings.adsterraIframeUrl || ''}
+                              onChange={(e) => setSettings({ ...settings, adsterraIframeUrl: e.target.value })}
+                              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-mono text-sm text-white"
+                              placeholder="Ex: https://www.topcreativeformat.com/..."
+                            />
+                          </div>
+
+                          {/* Instructions tutorial card */}
+                          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-xs space-y-2">
+                            <p className="font-bold text-amber-300 flex items-center gap-2">
+                              <span>🚀</span> Como configurar o Adsterra em 3 passos simples:
+                            </p>
+                            <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-on-surface-variant leading-relaxed">
+                              <li>Aceda ao site <strong className="text-white">adsterra.com</strong> e crie uma conta gratuita de Publisher.</li>
+                              <li>Adicione o seu site ou app e crie um bloco de anúncio (recomendado: <strong className="text-white">Banner 728x90</strong> ou <strong className="text-white">Native Banner</strong>).</li>
+                              <li>Copie a <strong className="text-white">Key</strong> ou o <strong className="text-white">Script Code</strong> gerado, cole num dos campos acima e clique em <strong className="text-[#00f5a0]">Salvar Alterações</strong>!</li>
+                            </ol>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Configuração Google AdSense */}
+                      {settings.adProvider === 'adsense' && (
+                        <div className="space-y-4 pt-2 border-t border-outline-variant/10">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">AdSense Client ID</label>
+                              <input 
+                                type="text" 
+                                value={settings.adsenseClientId || ''}
+                                onChange={(e) => setSettings({ ...settings, adsenseClientId: e.target.value })}
+                                className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-mono text-sm text-white"
+                                placeholder="ca-pub-XXXXXXXXXXXXXXXX"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black text-[#00f5a0] uppercase tracking-widest pl-1 font-mono">AdSense Slot ID</label>
+                              <input 
+                                type="text" 
+                                value={settings.adsenseSlotId || ''}
+                                onChange={(e) => setSettings({ ...settings, adsenseSlotId: e.target.value })}
+                                className="w-full bg-surface-container-low border border-outline-variant/20 rounded-2xl px-5 py-3 text-on-surface focus:outline-none focus:border-[#00f5a0] transition-all font-mono text-sm text-white"
+                                placeholder="1234567890"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

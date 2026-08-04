@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LineChart, ShieldCheck, Zap, TrendingUp, Wallet, ArrowRight, CheckCircle2, Globe, BarChart3, Lock, X } from 'lucide-react';
 import Plans from './Plans';
+import AdBanner from './AdBanner';
+import { useTrades } from '../hooks/useTrades';
 
 interface LandingProps {
   onLoginClick: () => void;
@@ -10,6 +12,7 @@ interface LandingProps {
 }
 
 export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: LandingProps) {
+  const { globalSettings } = useTrades();
   const [activePreviewTab, setActivePreviewTab] = useState<'dashboard' | 'diario' | 'psicologia' | 'planeador'>('dashboard');
   const [couponCopied, setCouponCopied] = useState(false);
   const [showPromoPopup, setShowPromoPopup] = useState(false);
@@ -823,6 +826,11 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
         </div>
 
         <Plans hideHeader onAuthRequired={onRegisterClick} />
+
+        {/* Adsterra / Banner de Anúncios na Home Page */}
+        <div className="max-w-4xl mx-auto mt-12">
+          <AdBanner globalSettings={globalSettings} />
+        </div>
       </section>
 
       {/* Footer */}

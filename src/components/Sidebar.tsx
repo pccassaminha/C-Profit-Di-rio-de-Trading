@@ -22,7 +22,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
       'trial_15': 'Trial 15 Dias',
       'trial_30': 'Teste 30 Dias',
       'Unlimited Elite': 'Unlimited Elite',
-      'Iniciante': 'Gratuito (2 Contas)'
+      'Iniciante': 'Gratuito (4 Contas)'
     };
     return maps[type] || type;
   };

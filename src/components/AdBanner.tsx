@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Zap, Crown, ArrowRight } from 'lucide-react';
 
 interface AdBannerProps {
@@ -12,11 +12,19 @@ export default function AdBanner({ isPro = false, globalSettings, className = ''
   // If user is Premium/Pro, never display ads
   if (isPro) return null;
 
+  const enableAdsForFree = globalSettings?.enableAdsForFree !== false;
+  
+  const adProvider = globalSettings?.adProvider || (globalSettings?.adsterraKey || globalSettings?.adsterraScriptCode ? 'adsterra' : (globalSettings?.adsenseClientId ? 'adsense' : 'auto'));
+
+  const adsterraKey = globalSettings?.adsterraKey || localStorage.getItem('adsterra_key') || '8e59cc5ff459e7164b9ffa94d698ca18';
+  const adsterraScriptCode = globalSettings?.adsterraScriptCode || localStorage.getItem('adsterra_script_code') || '';
+  const adsterraIframeUrl = globalSettings?.adsterraIframeUrl || localStorage.getItem('adsterra_iframe_url') || '';
+
   const adsenseClientId = globalSettings?.adsenseClientId || localStorage.getItem('adsense_client_id');
   const adsenseSlotId = slotId || globalSettings?.adsenseSlotId || localStorage.getItem('adsense_slot_id');
 
   useEffect(() => {
-    if (adsenseClientId && adsenseSlotId) {
+    if (enableAdsForFree && (adProvider === 'adsense' || adProvider === 'auto') && adsenseClientId && adsenseSlotId) {
       try {
         // @ts-ignore
         (window.adsbygoogle = window.adsbygoogle || []).push({});
@@ -24,12 +32,61 @@ export default function AdBanner({ isPro = false, globalSettings, className = ''
         console.warn("[AdSense] Initialization skipped or blocked:", err);
       }
     }
-  }, [adsenseClientId, adsenseSlotId]);
+  }, [enableAdsForFree, adProvider, adsenseClientId, adsenseSlotId]);
 
   const handleUpgradeClick = () => {
     const customEvent = new CustomEvent('navigateToTab', { detail: 'plans' });
     window.dispatchEvent(customEvent);
   };
+
+  const adsterraHtml = useMemo(() => {
+    if (!enableAdsForFree) return null;
+    if (adsterraIframeUrl) return null;
+
+    if (adsterraScriptCode) {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <style>
+    body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; background: transparent; overflow: hidden; height: 100vh; }
+  </style>
+</head>
+<body>
+  ${adsterraScriptCode}
+</body>
+</html>`;
+    }
+
+    if (adsterraKey) {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <style>
+    body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; background: transparent; overflow: hidden; height: 100vh; }
+  </style>
+</head>
+<body>
+  <script type="text/javascript">
+    atOptions = {
+      'key': '${adsterraKey.trim()}',
+      'format': 'iframe',
+      'height': 90,
+      'width': 728,
+      'params': {}
+    };
+  </script>
+  <script type="text/javascript" src="//www.highperformanceformat.com/${adsterraKey.trim()}/invoke.js"></script>
+</body>
+</html>`;
+    }
+
+    return null;
+  }, [enableAdsForFree, adsterraScriptCode, adsterraKey, adsterraIframeUrl]);
+
+  const hasAdsterra = enableAdsForFree && (adsterraIframeUrl || adsterraHtml);
+  const hasAdsense = enableAdsForFree && adsenseClientId && adsenseSlotId;
 
   return (
     <div className={`w-full my-4 ${className}`}>
@@ -49,7 +106,27 @@ export default function AdBanner({ isPro = false, globalSettings, className = ''
           </button>
         </div>
 
-        {adsenseClientId && adsenseSlotId ? (
+        {/* Adsterra Display */}
+        {hasAdsterra ? (
+          <div className="w-full overflow-hidden flex justify-center items-center min-h-[90px]">
+            {adsterraIframeUrl ? (
+              <iframe
+                src={adsterraIframeUrl}
+                title="Anúncio Patrocinado"
+                className="w-full max-w-[728px] h-[90px] border-0"
+                scrolling="no"
+              />
+            ) : (
+              <iframe
+                srcDoc={adsterraHtml!}
+                title="Anúncio Patrocinado"
+                className="w-full max-w-[728px] h-[90px] border-0 overflow-hidden"
+                scrolling="no"
+              />
+            )}
+          </div>
+        ) : hasAdsense ? (
+          /* AdSense Display */
           <div className="w-full overflow-hidden flex justify-center items-center min-h-[90px]">
             <ins
               className="adsbygoogle"
@@ -61,6 +138,7 @@ export default function AdBanner({ isPro = false, globalSettings, className = ''
             />
           </div>
         ) : (
+          /* Internal Premium Promotion Fallback */
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-1">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
@@ -88,3 +166,4 @@ export default function AdBanner({ isPro = false, globalSettings, className = ''
     </div>
   );
 }
+

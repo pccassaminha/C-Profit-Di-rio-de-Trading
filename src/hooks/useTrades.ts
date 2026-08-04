@@ -24,7 +24,7 @@ export const useTrades = (manualTrades: any[] = []) => {
     const uid = auth.currentUser.uid;
     const defaultPlan = { 
       plan_type: 'Iniciante', 
-      account_limit: 2,
+      account_limit: 4,
       role: auth.currentUser?.email === 'exportacoes.extras@gmail.com' ? 'admin' : 'user'
     };
     
@@ -49,8 +49,8 @@ export const useTrades = (manualTrades: any[] = []) => {
     const unsubUser = onSnapshot(doc(db, 'usuarios', uid), (userDoc) => {
       if (userDoc.exists()) {
         const data = userDoc.data();
-        let limit = data.account_limit || 2;
-        if (data.plan_type === 'Iniciante' || !data.plan_type) limit = 2; // Strict 2 accounts limit for Free
+        let limit = data.account_limit || 4;
+        if (data.plan_type === 'Iniciante' || !data.plan_type) limit = 4; // Strict 4 accounts limit for Free
         if (data.plan_type === 'mensal_6' || data.plan_type === 'mensal_2') limit = 12; // 6 OB + 6 Forex
         if (data.plan_type === 'trimestral_6') limit = 12; // 6 OB + 6 Forex
         if (data.plan_type === 'semestral_8' || data.plan_type === 'semestral_6') limit = 16; // 8 OB + 8 Forex
@@ -76,8 +76,8 @@ export const useTrades = (manualTrades: any[] = []) => {
         const unsubOldUser = onSnapshot(doc(db, 'users', uid), (oldUserDoc) => {
           if (oldUserDoc.exists()) {
             const data = oldUserDoc.data();
-            let limit = data.account_limit || 2;
-            if (data.plan_type === 'Iniciante' || !data.plan_type) limit = 2;
+            let limit = data.account_limit || 4;
+            if (data.plan_type === 'Iniciante' || !data.plan_type) limit = 4;
             if (data.plan_type === 'mensal_6' || data.plan_type === 'mensal_2') limit = 12;
             if (data.plan_type === 'trimestral_6') limit = 12;
             if (data.plan_type === 'semestral_8' || data.plan_type === 'semestral_6') limit = 16;
