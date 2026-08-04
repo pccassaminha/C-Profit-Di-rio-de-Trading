@@ -84,11 +84,6 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
           O Terminal Definitivo
         </div>
 
-        {/* Top Banner de Anúncios na Home Page */}
-        <div className="w-full max-w-2xl mx-auto mb-6">
-          <AdBanner globalSettings={globalSettings} adKey="5cba24c0ad586b33f4097be71bbaadb0" width={468} height={60} />
-        </div>
-
         <h1 className="font-headline text-[clamp(48px,7vw,96px)] font-extrabold leading-[0.95] tracking-[-0.03em] text-on-surface mb-[28px] relative animate-in slide-in-from-bottom-6 duration-700 delay-100 fill-mode-both">
           Domine o
           <span className="block text-primary">mercado</span>
