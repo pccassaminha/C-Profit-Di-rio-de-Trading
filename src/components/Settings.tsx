@@ -8,6 +8,8 @@ import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDoc
 import { motion, AnimatePresence } from 'motion/react';
 
 import { Layers, Copy, Monitor, Lock, Check, Download, CreditCard, ShieldCheck, Zap, Landmark, Smartphone, Mail, User, ChevronDown, AlertTriangle, Plus, Edit2, Trash2, Wallet, FileText, Flag, X, Save, RefreshCw, Eye, EyeOff, Eraser, Undo, MoreVertical, CandlestickChart } from 'lucide-react';
+import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 import { findObjectiveForAccount, findExistingObjectiveForTarget, deduplicateObjectives } from '../utils/objectiveUtils';
 
 
@@ -56,6 +58,7 @@ export interface Objective {
 }
 
 export default function Settings() {
+  const { isPro, globalSettings } = useTrades();
   const { currency, setCurrency } = useCurrency();
   const [isLoaded, setIsLoaded] = useState(false);
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
@@ -1208,6 +1211,7 @@ export default function Settings() {
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8">
+      <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-4" />
       <div>
         <div className="flex items-center gap-3 flex-wrap">
           <h2 className="text-on-surface font-bold text-2xl font-headline mb-2">Configurações</h2>

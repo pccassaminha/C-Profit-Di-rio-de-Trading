@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 import { MessageSquare, Phone, Mail, Clock, ShieldCheck, User, HelpCircle, Send } from 'lucide-react';
 
 const getFormattedPhone = (phone: string | undefined): string => {
@@ -12,7 +13,7 @@ const getFormattedPhone = (phone: string | undefined): string => {
 };
 
 export default function Support() {
-  const { globalSettings } = useTrades();
+  const { globalSettings, isPro } = useTrades();
   const phone = getFormattedPhone(globalSettings?.whatsappNumber);
   const whatsappUrl = `https://wa.me/${phone}`;
 
@@ -36,6 +37,7 @@ export default function Support() {
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto w-full space-y-8 animate-in fade-in duration-500">
+      <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-4" />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h2 className="text-3xl font-black text-on-surface font-headline uppercase italic tracking-tighter">Central de <span className="text-primary italic">Ajuda</span></h2>

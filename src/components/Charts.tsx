@@ -16,12 +16,13 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 import { db, auth } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
 export default function Charts() {
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
-  const { allTrades, loading: loadingTrades } = useTrades();
+  const { allTrades, loading: loadingTrades, isPro, globalSettings } = useTrades();
   
   // States for linking prints
   const [pastedUrl, setPastedUrl] = useState<string>('');
@@ -166,6 +167,8 @@ export default function Charts() {
   return (
     <div className={`flex flex-col space-y-6 w-full ${isFullScreen ? 'fixed inset-0 z-[110] bg-[#0c0c0f] p-4 md:p-6 space-y-4 overflow-hidden h-screen' : 'px-4 md:px-8 py-6'}`}>
       
+      {!isFullScreen && <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-2" />}
+
       {/* Header Compacto */}
       <div className="flex flex-row items-center justify-between gap-4 bg-surface-container border border-outline-variant/10 rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-md transition-all">
         

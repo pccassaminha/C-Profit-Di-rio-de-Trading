@@ -5,6 +5,7 @@ import { db, auth, storage } from '../firebase';
 import Papa from 'papaparse';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 import Modal from './Modal';
 import { DatePicker } from './DatePicker';
 import { importTradeFile, detectSession } from '../utils/tradeParsers';
@@ -47,7 +48,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
   const [lastImportBatchId, setLastImportBatchId] = useState<string | null>(() => localStorage.getItem('app_last_import_batch_id'));
   
   // Usando o novo hook para gerenciar os trades (sincronização + deduplicação)
-  const { allTrades: trades, loading: loadingTrades } = useTrades(importedTradesToReview);
+  const { allTrades: trades, loading: loadingTrades, isPro, globalSettings } = useTrades(importedTradesToReview);
   
   const [selectedTrade, setSelectedTrade] = useState<any>(null);
   const [editingTradeId, setEditingTradeId] = useState<string | null>(null);
@@ -870,6 +871,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     return (
       <>
         <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8">
+        <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-4" />
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
           <div className="flex-1">
             <span className="text-xs font-label uppercase tracking-[0.2em] text-primary-fixed-dim">Diário de Trades</span>

@@ -9,6 +9,8 @@ import { DateRangePicker } from './DateRangePicker';
 import Modal from './Modal';
 import { DateRange } from 'react-day-picker';
 import { parseAndFormatTables } from '../utils/tableFormatter';
+import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 
 interface PlanningEntry {
   id: string;
@@ -22,6 +24,7 @@ interface PlanningEntry {
 }
 
 export default function Planner() {
+  const { isPro, globalSettings } = useTrades();
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('');
   const [sentiment, setSentiment] = useState<'risk-on' | 'risk-off' | 'neutral'>('neutral');
@@ -280,6 +283,7 @@ export default function Planner() {
       {/* Conteúdo Principal */}
       <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
         <div className="max-w-[1500px] mx-auto space-y-12">
+          <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-6" />
           {/* Cabeçalho e Filtros Centralizados */}
           <div className="flex flex-col items-center gap-10">
             <div className="text-center">

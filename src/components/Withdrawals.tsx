@@ -3,6 +3,7 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp, orderBy,
 import { db, auth } from '../firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 import { DateRangePicker } from './DateRangePicker';
 import { DatePicker } from './DatePicker';
 import { DateRange } from 'react-day-picker';
@@ -12,7 +13,7 @@ import { Plus, X } from 'lucide-react';
 export default function Withdrawals() {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
-  const { allTrades: trades, loading: loadingTrades } = useTrades();
+  const { allTrades: trades, loading: loadingTrades, isPro, globalSettings } = useTrades();
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -138,6 +139,7 @@ export default function Withdrawals() {
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+      <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-4" />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
         <div>
           <span className="text-xs font-label uppercase tracking-[0.2em] text-primary-fixed-dim">Gestão Financeira</span>

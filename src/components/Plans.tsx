@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 import { db, auth } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, getDocs, getDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { CreditCard, Check, ShieldCheck, Zap, Star, LayoutGrid, Smartphone, MessageSquare, History, Upload, Landmark, X, FileText } from 'lucide-react';
@@ -63,7 +64,7 @@ const parsePhoneNumberInput = (phoneVal: string) => {
 };
 
 export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { forcedExpired?: boolean, hideHeader?: boolean, onAuthRequired?: (planId?: string, couponCode?: string) => void }) {
-  const { userPlan, globalSettings } = useTrades();
+  const { userPlan, globalSettings, isPro } = useTrades();
   const [payments, setPayments] = useState<any[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState<any>(null);
   const [paymentSubmitted, setPaymentSubmitted] = useState(false);
@@ -593,6 +594,7 @@ Fico no aguardo, obrigado!`;
 
   return (
     <div className={`p-4 md:p-8 max-w-[1440px] mx-auto min-h-screen animate-in fade-in duration-500 space-y-8 md:space-y-12 ${hideHeader ? 'min-h-fit py-0' : ''}`}>
+      <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-4" />
       {forcedExpired && (
         <div className="bg-error/10 border border-error/50 p-6 rounded-3xl flex items-center gap-6 animate-in slide-in-from-top duration-500">
           <div className="w-14 h-14 bg-error/20 rounded-2xl flex items-center justify-center text-error shadow-lg shadow-error/10">

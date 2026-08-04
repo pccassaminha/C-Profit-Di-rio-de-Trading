@@ -1,10 +1,14 @@
 import React from 'react';
 import { ArrowLeft, Mail, MessageSquare, BookOpen, AlertCircle } from 'lucide-react';
+import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 
 export default function Ajuda({ onBack }: { onBack: () => void }) {
+  const { isPro, globalSettings } = useTrades();
   return (
     <div className="min-h-screen bg-background text-on-surface p-8 md:p-12 overflow-y-auto">
       <div className="max-w-4xl mx-auto">
+        <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-6" />
         <button 
           onClick={onBack}
           className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors mb-8 cursor-pointer bg-transparent border-none outline-none"

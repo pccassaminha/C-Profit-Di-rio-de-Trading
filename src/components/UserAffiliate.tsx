@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 import { Copy, Check, Users, DollarSign, Gift, ArrowRight, TrendingUp, Wallet, Clock, AlertCircle, HelpCircle, Award, LayoutDashboard, Network, CheckCircle } from 'lucide-react';
 
 interface ReferralRecord {
@@ -27,6 +29,7 @@ interface UserProfile {
 }
 
 export default function UserAffiliate() {
+  const { isPro, globalSettings: tradesGlobalSettings } = useTrades();
   const currentUser = auth.currentUser;
   const [activeTab, setActiveTab] = useState<'overview' | 'network' | 'payouts'>('overview');
   const [networkSearch, setNetworkSearch] = useState('');
@@ -269,6 +272,7 @@ export default function UserAffiliate() {
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+      <AdBanner isPro={isPro} globalSettings={globalSettings || tradesGlobalSettings} className="mb-4" />
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-surface-container-low border border-outline-variant/10 p-6 rounded-[24px] shadow-sm">
         <div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { useTrades } from '../hooks/useTrades';
+import AdBanner from './AdBanner';
 import { CreditCard, History, Download, FileText, CheckCircle2, XCircle, Clock, Printer, Landmark, Smartphone, Zap, ShieldCheck } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -16,7 +17,7 @@ const getFormattedPhone = (phone: string | undefined): string => {
 };
 
 export default function Payments() {
-  const { userPlan, globalSettings } = useTrades();
+  const { userPlan, globalSettings, isPro } = useTrades();
   const [payments, setPayments] = useState<any[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const printRef = useRef<HTMLDivElement>(null);
@@ -103,6 +104,7 @@ export default function Payments() {
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+      <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-4" />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-black text-on-surface font-headline uppercase italic tracking-tighter">
