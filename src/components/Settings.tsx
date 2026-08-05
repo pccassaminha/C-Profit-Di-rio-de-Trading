@@ -652,13 +652,14 @@ export default function Settings() {
     setIsSaving(true);
     if (auth.currentUser) {
       try {
+        const normalizedPartnerEmail = partnerEmail.trim().toLowerCase();
         await updateDoc(doc(db, 'usuarios', auth.currentUser.uid), {
-          partnerEmail: partnerEmail.trim(),
+          partnerEmail: normalizedPartnerEmail,
           partnerPassword: partnerPassword.trim()
         });
 
-        if (partnerEmail.trim() && partnerPassword.trim()) {
-          await registerPartnerAuth(partnerEmail.trim(), partnerPassword.trim());
+        if (normalizedPartnerEmail && partnerPassword.trim()) {
+          await registerPartnerAuth(normalizedPartnerEmail, partnerPassword.trim());
         }
       } catch (error) {
         console.error("Error saving partner settings:", error);

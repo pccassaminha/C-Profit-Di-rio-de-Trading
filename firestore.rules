@@ -95,7 +95,7 @@ service cloud.firestore {
 
     // Settings
     match /settings/global {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -122,7 +122,7 @@ service cloud.firestore {
 
     // Community
     match /community_posts/{postId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || 
@@ -132,7 +132,7 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
 
       match /comments/{commentId} {
-        allow read: if isAuthenticated();
+        allow read: if true;
         allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
         allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
         allow delete: if isAuthenticated() && (
@@ -143,14 +143,14 @@ service cloud.firestore {
       }
 
       match /likes/{userId} {
-        allow read: if isAuthenticated();
+        allow read: if true;
         allow write: if isAuthenticated() && request.auth.uid == userId;
       }
     }
 
     // Broadcasts
     match /broadcasts/{broadcastId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -170,7 +170,7 @@ service cloud.firestore {
     }
 
     match /usuarios/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isOwner(userId) || isAdmin() || isPartner(userId);
       allow delete: if isAdmin();
@@ -219,7 +219,7 @@ service cloud.firestore {
 
     // Coupons
     match /coupons/{couponId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
 

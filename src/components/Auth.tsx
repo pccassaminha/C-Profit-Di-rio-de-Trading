@@ -170,11 +170,10 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
       const loggedInEmail = result.user.email?.trim().toLowerCase();
       let partnerDetected = false;
       if (loggedInEmail) {
-        const qPartner = query(
-          collection(db, 'usuarios'),
-          where('partnerEmail', '==', loggedInEmail)
-        );
-        const partnerSnap = await getDocs(qPartner);
+        let partnerSnap = await getDocs(query(collection(db, 'usuarios'), where('partnerEmail', '==', loggedInEmail)));
+        if (partnerSnap.empty && result.user.email) {
+          partnerSnap = await getDocs(query(collection(db, 'usuarios'), where('partnerEmail', '==', result.user.email.trim())));
+        }
         if (!partnerSnap.empty) {
           partnerDetected = true;
           const parentDoc = partnerSnap.docs[0];
@@ -400,18 +399,54 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
       let solvedReferredUid: string | null = null;
 
       if (isLogin) {
+        const cleanEmail = email.trim().toLowerCase();
+        let loggedInUser = null;
+
         try {
-          await signInWithEmailAndPassword(auth, email, password);
+          const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
+          loggedInUser = userCred.user;
         } catch (loginErr: any) {
-          throw loginErr;
+          // If standard login fails, check if this is a partner credential configured by a main user in Firestore
+          try {
+            let partnerSnap = await getDocs(query(collection(db, 'usuarios'), where('partnerEmail', '==', cleanEmail)));
+            if (partnerSnap.empty) {
+              partnerSnap = await getDocs(query(collection(db, 'usuarios'), where('partnerEmail', '==', email.trim())));
+            }
+
+            if (!partnerSnap.empty) {
+              const parentDoc = partnerSnap.docs[0];
+              const parentData = parentDoc.data();
+              
+              if (parentData.partnerPassword && parentData.partnerPassword.trim() === password.trim()) {
+                // Partner password matches parent user settings! Try to create or sign in Firebase Auth user for partner
+                try {
+                  const newPartnerCred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+                  loggedInUser = newPartnerCred.user;
+                } catch (createPartnerErr: any) {
+                  if (createPartnerErr.code === 'auth/email-already-in-use') {
+                    const reSignIn = await signInWithEmailAndPassword(auth, cleanEmail, password);
+                    loggedInUser = reSignIn.user;
+                  } else {
+                    throw loginErr;
+                  }
+                }
+              } else {
+                throw loginErr;
+              }
+            } else {
+              throw loginErr;
+            }
+          } catch {
+            throw loginErr;
+          }
         }
 
         try {
-          const qPartner = query(
-            collection(db, 'usuarios'),
-            where('partnerEmail', '==', email.trim().toLowerCase())
-          );
-          const partnerSnap = await getDocs(qPartner);
+          let partnerSnap = await getDocs(query(collection(db, 'usuarios'), where('partnerEmail', '==', cleanEmail)));
+          if (partnerSnap.empty) {
+            partnerSnap = await getDocs(query(collection(db, 'usuarios'), where('partnerEmail', '==', email.trim())));
+          }
+
           if (!partnerSnap.empty) {
             const parentDoc = partnerSnap.docs[0];
             const parentUid = parentDoc.id;
