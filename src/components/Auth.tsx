@@ -50,10 +50,12 @@ const getFriendlyErrorMessage = (err: any) => {
   if (!err) return 'Erro desconhecido.';
   const code = err.code || '';
   if (code === 'auth/email-already-in-use') return 'Este e-mail já está em uso. Por favor, faça login ou use outro e-mail.';
-  if (code === 'auth/invalid-email') return 'E-mail inválido.';
-  if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') return 'Credenciais incorretas (usuário ou senha).';
-  if (code === 'auth/network-request-failed') return 'Falha na conexão de rede. Verifique sua internet ou tente novamente mais tarde.';
-  if (code === 'auth/too-many-requests') return 'Muitas tentativas falhas. Tente novamente mais tarde.';
+  if (code === 'auth/invalid-email') return 'E-mail inválido. Por favor, verifique se digitou o e-mail corretamente.';
+  if (code === 'auth/user-not-found') return 'E-mail não cadastrado. Verifique o e-mail ou crie uma conta nova.';
+  if (code === 'auth/wrong-password') return 'Senha incorreta. Se esqueceu a sua senha, use a opção "Esqueci a Senha".';
+  if (code === 'auth/invalid-credential') return 'E-mail ou senha incorretos. Verifique suas credenciais, crie uma conta se for seu primeiro acesso, ou redefina sua senha.';
+  if (code === 'auth/network-request-failed') return 'Falha na conexão de rede. Verifique sua internet e tente novamente.';
+  if (code === 'auth/too-many-requests') return 'Muitas tentativas incorretas. Aguarde um instante ou solicite a recuperação de senha.';
   return err.message || 'Erro durante a autenticação.';
 };
 
@@ -399,45 +401,51 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
       let solvedReferredUid: string | null = null;
 
       if (isLogin) {
-        const cleanEmail = email.trim().toLowerCase();
+        const rawEmail = email.trim();
+        const cleanEmail = rawEmail.toLowerCase();
         let loggedInUser = null;
 
         try {
-          const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
+          const userCred = await signInWithEmailAndPassword(auth, rawEmail, password);
           loggedInUser = userCred.user;
         } catch (loginErr: any) {
-          // If standard login fails, check if this is a partner credential configured by a main user in Firestore
           try {
-            let partnerSnap = await getDocs(query(collection(db, 'usuarios'), where('partnerEmail', '==', cleanEmail)));
-            if (partnerSnap.empty) {
-              partnerSnap = await getDocs(query(collection(db, 'usuarios'), where('partnerEmail', '==', email.trim())));
-            }
+            const userCred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+            loggedInUser = userCred.user;
+          } catch {
+            // If standard login fails, check if this is a partner credential configured by a main user in Firestore
+            try {
+              let partnerSnap = await getDocs(query(collection(db, 'usuarios'), where('partnerEmail', '==', cleanEmail)));
+              if (partnerSnap.empty) {
+                partnerSnap = await getDocs(query(collection(db, 'usuarios'), where('partnerEmail', '==', rawEmail)));
+              }
 
-            if (!partnerSnap.empty) {
-              const parentDoc = partnerSnap.docs[0];
-              const parentData = parentDoc.data();
-              
-              if (parentData.partnerPassword && parentData.partnerPassword.trim() === password.trim()) {
-                // Partner password matches parent user settings! Try to create or sign in Firebase Auth user for partner
-                try {
-                  const newPartnerCred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-                  loggedInUser = newPartnerCred.user;
-                } catch (createPartnerErr: any) {
-                  if (createPartnerErr.code === 'auth/email-already-in-use') {
-                    const reSignIn = await signInWithEmailAndPassword(auth, cleanEmail, password);
-                    loggedInUser = reSignIn.user;
-                  } else {
-                    throw loginErr;
+              if (!partnerSnap.empty) {
+                const parentDoc = partnerSnap.docs[0];
+                const parentData = parentDoc.data();
+                
+                if (parentData.partnerPassword && parentData.partnerPassword.trim() === password.trim()) {
+                  // Partner password matches parent user settings! Try to create or sign in Firebase Auth user for partner
+                  try {
+                    const newPartnerCred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+                    loggedInUser = newPartnerCred.user;
+                  } catch (createPartnerErr: any) {
+                    if (createPartnerErr.code === 'auth/email-already-in-use') {
+                      const reSignIn = await signInWithEmailAndPassword(auth, cleanEmail, password);
+                      loggedInUser = reSignIn.user;
+                    } else {
+                      throw loginErr;
+                    }
                   }
+                } else {
+                  throw loginErr;
                 }
               } else {
                 throw loginErr;
               }
-            } else {
+            } catch {
               throw loginErr;
             }
-          } catch {
-            throw loginErr;
           }
         }
 

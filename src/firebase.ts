@@ -2,27 +2,26 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { initializeFirestore, getFirestore, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import appletConfig from '../firebase-applet-config.json';
 
 const firebaseConfig = {
-  apiKey: appletConfig?.apiKey || "AIzaSyDBEOdBHS3mxxE1Vhw2pSh0BjGaK6M8GBw",
-  authDomain: appletConfig?.authDomain || "c-trade-diario.firebaseapp.com",
-  databaseURL: (appletConfig as any)?.databaseURL || "https://c-trade-diario-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: appletConfig?.projectId || "c-trade-diario",
-  storageBucket: appletConfig?.storageBucket || "c-trade-diario.firebasestorage.app",
-  messagingSenderId: appletConfig?.messagingSenderId || "699030568101",
-  appId: appletConfig?.appId || "1:699030568101:web:8e4871564f410eb466a14c",
-  measurementId: appletConfig?.measurementId || "G-L1YGRSF0GE"
+  apiKey: "AIzaSyDBEOdBHS3mxxE1Vhw2pSh0BjGaK6M8GBw",
+  authDomain: "c-trade-diario.firebaseapp.com",
+  databaseURL: "https://c-trade-diario-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "c-trade-diario",
+  storageBucket: "c-trade-diario.firebasestorage.app",
+  messagingSenderId: "699030568101",
+  appId: "1:699030568101:web:8e4871564f410eb466a14c",
+  measurementId: "G-L1YGRSF0GE"
 };
 
 export const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
 
-const databaseId = appletConfig?.firestoreDatabaseId || undefined;
+const databaseId = undefined;
 
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   }, databaseId);
 } catch {
   try {
