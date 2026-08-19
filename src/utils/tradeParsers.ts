@@ -537,6 +537,18 @@ function parseOBCsv(csvText: string, accountId: string) {
       if (y && m && d) formattedDate = `${d}/${m}/${y}`;
     }
 
+    let timeframe = 'M1';
+    if (!isNaN(openDate.getTime()) && !isNaN(closeDate.getTime())) {
+      const diffSecs = Math.abs(Math.round((closeDate.getTime() - openDate.getTime()) / 1000));
+      if (diffSecs <= 90) timeframe = 'M1';
+      else if (diffSecs <= 360) timeframe = 'M5';
+      else if (diffSecs <= 1000) timeframe = 'M15';
+      else if (diffSecs <= 2000) timeframe = 'M30';
+      else if (diffSecs <= 4000) timeframe = 'H1';
+      else if (diffSecs <= 15000) timeframe = 'H4';
+      else timeframe = 'D1+';
+    }
+
     trades.push({
       ticket: cols[idIdx] || Math.random().toString(36).substring(7),
       symbol: cols[infoIdx].toUpperCase(),
@@ -550,6 +562,7 @@ function parseOBCsv(csvText: string, accountId: string) {
       tp: 0,
       date: formattedDate,
       entryTime: timePart || '',
+      timeframe,
       swap: 0,
       commission: 0,
       pnl: profit,

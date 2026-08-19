@@ -15,6 +15,7 @@ export default function Withdrawals() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const { allTrades: trades, loading: loadingTrades, isPro, globalSettings } = useTrades();
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [tradeTypeFilter, setTradeTypeFilter] = useState<'all' | 'forex' | 'ob'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { formatCurrency } = useCurrency();
@@ -125,16 +126,30 @@ export default function Withdrawals() {
     });
   }, [withdrawals, dateRange]);
 
-  const activeAccounts = accounts.filter(a => a.status !== 'inactive' && !a.isHidden);
+  const activeAccounts = accounts.filter(a => {
+    if (a.status === 'inactive' || a.isHidden) return false;
+    if (tradeTypeFilter === 'all') return true;
+    return (a.tradeType || 'forex') === tradeTypeFilter;
+  });
   const activeAccountIds = new Set(activeAccounts.map(a => a.id));
   const activeTrades = trades.filter(t => t.accountId ? activeAccountIds.has(t.accountId) : true);
 
-  const totalWithdrawn = filteredWithdrawals.reduce((sum, w) => sum + (w.amount || 0), 0);
+  const filteredWithdrawalsByAccount = filteredWithdrawals.filter(w => {
+    if (tradeTypeFilter === 'all') return true;
+    const account = accounts.find(a => a.id === w.accountId);
+    return account && (account.tradeType || 'forex') === tradeTypeFilter;
+  });
+
+  const totalWithdrawn = filteredWithdrawalsByAccount.reduce((sum, w) => sum + (parseFloat(w.amount) || 0), 0);
   
-  const totalInitialBalance = activeAccounts.reduce((sum, a) => sum + (a.initialBalance || 0), 0);
-  const totalPnL = activeTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+  const totalInitialBalance = activeAccounts.reduce((sum, a) => sum + (parseFloat(a.initialBalance) || 0), 0);
+  const totalPnL = activeTrades.reduce((sum, t) => sum + (parseFloat(t.pnl) || 0), 0);
   // Optional: only subtract withdrawals from active accounts if withdrawals are linked to accounts? Currently withdrawals are global.
-  const totalWithdrawnAllTime = withdrawals.reduce((sum, w) => sum + (w.amount || 0), 0);
+  const totalWithdrawnAllTime = withdrawals.filter(w => {
+    if (tradeTypeFilter === 'all') return true;
+    const account = accounts.find(a => a.id === w.accountId);
+    return account && (account.tradeType || 'forex') === tradeTypeFilter;
+  }).reduce((sum, w) => sum + (parseFloat(w.amount) || 0), 0);
   const remainingBalance = totalInitialBalance + totalPnL - totalWithdrawnAllTime;
 
   return (
@@ -146,6 +161,28 @@ export default function Withdrawals() {
           <h2 className="text-4xl font-bold font-headline mt-2 text-on-surface">Levantamentos</h2>
         </div>
         <div className="flex gap-3 items-center w-full md:w-auto">
+          {/* Mercado Filter */}
+          <div className="flex bg-surface-container rounded-lg p-1 border border-outline-variant/10">
+            <button 
+              onClick={() => setTradeTypeFilter('all')}
+              className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${tradeTypeFilter === 'all' ? 'bg-outline-variant text-on-surface shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+            >
+              Geral
+            </button>
+            <button 
+              onClick={() => setTradeTypeFilter('forex')}
+              className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${tradeTypeFilter === 'forex' ? 'bg-primary text-on-primary shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+            >
+              Forex / Índices
+            </button>
+            <button 
+              onClick={() => setTradeTypeFilter('ob')}
+              className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${tradeTypeFilter === 'ob' ? 'bg-secondary text-on-secondary shadow' : 'text-on-surface-variant hover:text-on-surface'}`}
+            >
+              Opções Binárias
+            </button>
+          </div>
+
           <DateRangePicker 
             dateRange={dateRange}
             onDateRangeChange={setDateRange}
@@ -194,9 +231,9 @@ export default function Withdrawals() {
                   const accountTradesUpToDate = trades.filter(t => t.accountId === w.accountId && new Date(t.date) <= wDate);
                   const accountWithdrawalsUpToDate = withdrawals.filter(otherW => otherW.accountId === w.accountId && new Date(otherW.date) <= wDate);
                   
-                  const pnlUpToDate = accountTradesUpToDate.reduce((sum, t) => sum + (t.pnl || 0), 0);
-                  const withdrawalsUpToDate = accountWithdrawalsUpToDate.reduce((sum, otherW) => sum + (otherW.amount || 0), 0);
-                  const balanceAfterWithdrawal = (account?.initialBalance || 0) + pnlUpToDate - withdrawalsUpToDate;
+                  const pnlUpToDate = accountTradesUpToDate.reduce((sum, t) => sum + (parseFloat(t.pnl) || 0), 0);
+                  const withdrawalsUpToDate = accountWithdrawalsUpToDate.reduce((sum, otherW) => sum + (parseFloat(otherW.amount) || 0), 0);
+                  const balanceAfterWithdrawal = (parseFloat(account?.initialBalance) || 0) + pnlUpToDate - withdrawalsUpToDate;
 
                   return (
                     <tr key={w.id} className="hover:bg-surface-container-highest transition-colors">
@@ -263,8 +300,8 @@ export default function Withdrawals() {
                     <span className="font-bold text-on-surface">
                       {formatCurrency(
                         (accounts.find(a => a.id === newWithdrawal.accountId)?.initialBalance || 0) +
-                        trades.filter(t => t.accountId === newWithdrawal.accountId).reduce((sum, t) => sum + (t.pnl || 0), 0) -
-                        withdrawals.filter(w => w.accountId === newWithdrawal.accountId).reduce((sum, w) => sum + (w.amount || 0), 0)
+                        trades.filter(t => t.accountId === newWithdrawal.accountId).reduce((sum, t) => sum + (parseFloat(t.pnl) || 0), 0) -
+                        withdrawals.filter(w => w.accountId === newWithdrawal.accountId).reduce((sum, w) => sum + (parseFloat(w.amount) || 0), 0)
                       )}
                     </span>
                   </div>
@@ -274,8 +311,8 @@ export default function Withdrawals() {
                       <span className="font-bold text-secondary">
                         {formatCurrency(
                           (accounts.find(a => a.id === newWithdrawal.accountId)?.initialBalance || 0) +
-                          trades.filter(t => t.accountId === newWithdrawal.accountId).reduce((sum, t) => sum + (t.pnl || 0), 0) -
-                          withdrawals.filter(w => w.accountId === newWithdrawal.accountId).reduce((sum, w) => sum + (w.amount || 0), 0) -
+                          trades.filter(t => t.accountId === newWithdrawal.accountId).reduce((sum, t) => sum + (parseFloat(t.pnl) || 0), 0) -
+                          withdrawals.filter(w => w.accountId === newWithdrawal.accountId).reduce((sum, w) => sum + (parseFloat(w.amount) || 0), 0) -
                           parseFloat(newWithdrawal.amount)
                         )}
                       </span>
