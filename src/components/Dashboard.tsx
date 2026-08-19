@@ -1694,31 +1694,6 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-
-          {/* Best Timeframes */}
-          {tradeTypeFilter === 'ob' && (
-            <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
-              <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline flex items-center gap-2">
-                <Clock className="text-primary" />
-                Melhores Timeframes
-              </h4>
-              <div className="space-y-4">
-                {data.bestTimeframes.length > 0 ? data.bestTimeframes.map((tf, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-4 bg-surface-container rounded-xl">
-                    <div>
-                      <p className="font-bold text-on-surface">{tf.name}</p>
-                      <p className="text-xs text-on-surface-variant">Win Rate: {tf.winRate.toFixed(1)}% ({tf.wins}/{tf.total})</p>
-                    </div>
-                    <p className={`font-bold ${tf.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
-                      {tf.pnl >= 0 ? '+' : ''}{formatCurrency(tf.pnl)}
-                    </p>
-                  </div>
-                )) : (
-                  <p className="text-on-surface-variant text-sm">Nenhum timeframe registrado ainda.</p>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -2440,12 +2415,10 @@ export default function Dashboard() {
                     <th className="font-normal pb-4">Action</th>
                     <th className="font-normal pb-4">Profit/Loss</th>
                     {tradeTypeFilter !== 'ob' && <th className="font-normal pb-4">Commission</th>}
-                    {/* R:R hidden as per user request to avoid layout deformation */}
-                    {/* {tradeTypeFilter !== 'ob' && <th className="font-normal pb-4">R:R</th>} */}
                     {tradeTypeFilter !== 'ob' && <th className="font-normal pb-4">Swap</th>}
                     <th className="font-normal pb-4">Symbol</th>
                     <th className="font-normal pb-4">Price</th>
-                    <th className="font-normal pb-4">Volume</th>
+                    <th className="font-normal pb-4">{tradeTypeFilter === 'ob' ? 'Investimento' : 'Volume'}</th>
                     <th className="font-normal pb-4">Date</th>
                     <th className="font-normal pb-4">Entry</th>
                     {tradeTypeFilter === 'ob' && <th className="font-normal pb-4">Timeframe</th>}
@@ -2473,17 +2446,15 @@ export default function Dashboard() {
                     return paginatedTrades.map((trade: any, i: number) => (
                   <tr key={i} className="bg-surface-container hover:bg-surface-container-highest transition-colors">
                     <td className="py-5 px-4 rounded-l-2xl text-on-surface-variant whitespace-nowrap">{trade.ticket}</td>
-                    <td className={`py-5 px-4 whitespace-nowrap ${trade.action === 'Buy' ? 'text-secondary' : 'text-error'}`}>{trade.action}</td>
+                    <td className={`py-5 px-4 whitespace-nowrap ${trade.action === 'Buy' ? 'text-secondary' : 'text-error'}`}>{tradeTypeFilter === 'ob' ? (trade.action === 'Buy' ? 'Call' : 'Put') : trade.action}</td>
                     <td className={`py-5 px-4 whitespace-nowrap ${trade.pnl >= 0 ? 'text-secondary' : 'text-error'}`}>
                       {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl)}
                     </td>
                     {tradeTypeFilter !== 'ob' && <td className="py-5 px-4 text-on-surface-variant whitespace-nowrap">{trade.commission?.toFixed(1) || '0.0'}</td>}
-                    {/* R:R hidden as per user request to avoid layout deformation */}
-                    {/* {tradeTypeFilter !== 'ob' && <td className="py-5 px-4 text-on-surface-variant whitespace-nowrap text-primary font-bold">{trade.rr ? `1:${trade.rr}` : '-'}</td>} */}
                     {tradeTypeFilter !== 'ob' && <td className="py-5 px-4 text-on-surface-variant whitespace-nowrap">{trade.swap?.toFixed(1) || '0.0'}</td>}
                     <td className="py-5 px-4 text-on-surface whitespace-nowrap">{trade.symbol}</td>
                     <td className="py-5 px-4 text-on-surface whitespace-nowrap">${trade.openPrice?.toFixed(2)}</td>
-                    <td className="py-5 px-4 text-on-surface whitespace-nowrap">{trade.size}</td>
+                    <td className="py-5 px-4 text-on-surface whitespace-nowrap">{tradeTypeFilter === 'ob' ? formatCurrency(trade.size) : trade.size}</td>
                     <td className="py-5 px-4 text-on-surface-variant whitespace-nowrap">
                       {trade.date ? trade.date : trade.closeTime?.toDate ? trade.closeTime.toDate().toLocaleDateString('pt-BR') : trade.closeTime ? new Date(trade.closeTime).toLocaleDateString('pt-BR') : ''}
                     </td>

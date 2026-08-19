@@ -480,6 +480,104 @@ async function parseMT5HTML(file: File, accountId: string) {
 
 
 // ============================================================
+// SECÇÃO OB — PARSER CSV (Opções Binárias)
+// ============================================================
+function parseOBCsv(csvText: string, accountId: string) {
+  const lines = csvText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length < 2) throw new Error('Ficheiro CSV vazio ou sem trades.');
+
+  const headerLine = lines[0];
+  const headers = headerLine.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.replace(/^"|"$/g, '').trim());
+
+  const infoIdx = headers.findIndex(h => h === 'Informações');
+  const openTimeIdx = headers.findIndex(h => h === 'Hora de abertura');
+  const openPriceIdx = headers.findIndex(h => h === 'Preço de abertura');
+  const closeTimeIdx = headers.findIndex(h => h === 'Hora de fechamento');
+  const closePriceIdx = headers.findIndex(h => h === 'Preço de fechamento');
+  const valueIdx = headers.findIndex(h => h === 'Valor');
+  const returnIdx = headers.findIndex(h => h === 'Renda');
+  const actionIdx = headers.findIndex(h => h === 'Modelo');
+  const idIdx = headers.findIndex(h => h === 'ID');
+
+  if (infoIdx === -1 || valueIdx === -1 || returnIdx === -1) {
+    throw new Error('Formato de colunas inválido para Opções Binárias.');
+  }
+
+  const dataLines = lines.slice(1);
+  const trades = [];
+
+  for (const line of dataLines) {
+    if (line.toLowerCase().startsWith('total')) continue;
+
+    const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"|"$/g, ''));
+    if (cols.length < headers.length) continue;
+
+    const size = toFloat(cols[valueIdx]);
+    const renda = toFloat(cols[returnIdx]);
+    
+    // Se renda == 0 -> perdeu (profit = -size)
+    // Se renda > 0 -> ganhou (profit = renda - size)
+    const profit = +(renda === 0 ? -size : (renda - size)).toFixed(2);
+    
+    const openTimeStr = cols[openTimeIdx] || '';
+    const closeTimeStr = cols[closeTimeIdx] || '';
+    
+    let openDate = new Date(openTimeStr.replace(/-/g, '/'));
+    let closeDate = new Date(closeTimeStr.replace(/-/g, '/'));
+    
+    if (isNaN(openDate.getTime())) openDate = new Date();
+    if (isNaN(closeDate.getTime())) closeDate = new Date();
+
+    const [datePart, timePart] = openTimeStr.split(' ');
+    
+    let formattedDate = datePart;
+    if (datePart && datePart.includes('-')) {
+      // YYYY-MM-DD -> DD/MM/YYYY for consistency
+      const [y, m, d] = datePart.split('-');
+      if (y && m && d) formattedDate = `${d}/${m}/${y}`;
+    }
+
+    trades.push({
+      ticket: cols[idIdx] || Math.random().toString(36).substring(7),
+      symbol: cols[infoIdx].toUpperCase(),
+      openTime: openDate,
+      closeTime: closeDate,
+      size,
+      action: cols[actionIdx]?.toLowerCase().includes('baixo') ? 'Sell' : 'Buy',
+      openPrice: toFloat(cols[openPriceIdx]),
+      closePrice: toFloat(cols[closePriceIdx]),
+      sl: 0,
+      tp: 0,
+      date: formattedDate,
+      entryTime: timePart || '',
+      swap: 0,
+      commission: 0,
+      pnl: profit,
+      profit: profit,
+      rr: 0,
+      netResult: profit,
+      reason: profit > 0 ? 'Win' : 'Loss',
+      isWin: profit > 0,
+      isLoss: profit < 0,
+      source: 'OB_CSV',
+      accountId,
+      type: 'ob',
+      session: detectSession(timePart || '', true),
+      notes: '',
+      psychology: ''
+    });
+  }
+
+  const summary = calcSummary(trades);
+  const fileSummary = { swap: 0, commission: 0, profit: summary.netProfit };
+  const verificacao = verificarIntegridade(summary, fileSummary);
+
+  console.log(`[OB CSV Parser] ${verificacao.message}`);
+
+  return { trades, summary, fileSummary, verificacao };
+}
+
+// ============================================================
 // SECÇÃO 5 — DETECÇÃO AUTOMÁTICA DO TIPO DE FICHEIRO
 // ============================================================
 
@@ -495,7 +593,7 @@ function detectAccountNumber(text: string): string | null {
   return null;
 }
 
-export async function importTradeFile(file: File, accountId: string) {
+export async function importTradeFile(file: File, accountId: string, accountType: 'forex' | 'ob' = 'forex') {
   if (!file) throw new Error('Nenhum ficheiro seleccionado.');
 
   const fileName = file.name.toLowerCase();
@@ -505,7 +603,17 @@ export async function importTradeFile(file: File, accountId: string) {
   if (ext === 'csv') {
     const text   = await readFileAsText(file, 'UTF-8');
     detectedAccountId = detectAccountNumber(text);
-    return { ...parseMatchTradesCSV(text, accountId), source: 'MATCHTRADES_CSV', detectedAccountId };
+
+    // Detecção OB vs Forex
+    const isOBFile = text.includes('Renda') || text.includes('Informações') || text.includes('Preço de abertura');
+
+    if (accountType === 'ob') {
+      if (!isOBFile) throw new Error('O ficheiro selecionado não parece ser um histórico de Opções Binárias. Verifique se selecionou o arquivo correto.');
+      return { ...parseOBCsv(text, accountId), source: 'OB_CSV', detectedAccountId };
+    } else {
+      if (isOBFile) throw new Error('O ficheiro selecionado parece ser de Opções Binárias, mas a conta atual é de Forex/Índices. Troque a conta ou selecione outro arquivo.');
+      return { ...parseMatchTradesCSV(text, accountId), source: 'MATCHTRADES_CSV', detectedAccountId };
+    }
   }
 
   if (ext === 'html' || ext === 'htm') {
@@ -518,6 +626,11 @@ export async function importTradeFile(file: File, accountId: string) {
     }
 
     detectedAccountId = detectAccountNumber(previewText);
+
+    // HTMLs geralmente são de Forex (MT5, MatchTrades). Se o usuário está numa conta OB, impedir.
+    if (accountType === 'ob') {
+      throw new Error('A conta atual é de Opções Binárias, mas você está importando um arquivo HTML (Forex). Por favor, importe o CSV de OB correto.');
+    }
 
     const isMT5 =
       previewText.includes('Trade History Report') ||

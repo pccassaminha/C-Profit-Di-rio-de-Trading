@@ -637,11 +637,15 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
     setIsImporting(true);
     
     try {
-      const result = await importTradeFile(file, tradeData.accountId || accounts[0]?.id || '');
+      const selectedAccId = tradeData.accountId || accounts[0]?.id || '';
+      const targetAcc = accounts.find(a => a.id === selectedAccId) || accounts[0];
+      const accType = targetAcc?.tradeType || 'forex';
+      
+      const result = await importTradeFile(file, selectedAccId, accType);
       
       if (result.trades && result.trades.length > 0) {
         // Auto-detect account
-        let targetAccountId = tradeData.accountId;
+        let targetAccountId = selectedAccId;
         if (result.detectedAccountId) {
           const matchedAcc = accounts.find(a => String(a.accountNumber) === String(result.detectedAccountId));
           if (matchedAcc) {
@@ -1642,25 +1646,21 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
             Descartar Rascunho
           </button>
           
-          {tradeType === 'forex' && (
-            <>
-              <input 
-                type="file" 
-                accept=".csv, .html, .htm" 
-                onChange={handleFileUpload} 
-                ref={fileInputRef}
-                className="hidden" 
-                id="file-upload"
-              />
-              <label 
-                htmlFor="file-upload"
-                className={`px-6 py-2.5 rounded-lg border border-primary/50 text-primary font-bold hover:bg-primary/10 transition-all cursor-pointer flex items-center gap-2 ${isSaving ? 'opacity-50 pointer-events-none' : ''}`}
-              >
-                <UploadCloud className="text-sm" />
-                Importar CSV/HTML
-              </label>
-            </>
-          )}
+          <input 
+            type="file" 
+            accept=".csv, .html, .htm" 
+            onChange={handleFileUpload} 
+            ref={fileInputRef}
+            className="hidden" 
+            id="file-upload"
+          />
+          <label 
+            htmlFor="file-upload"
+            className={`px-6 py-2.5 rounded-lg border border-primary/50 text-primary font-bold hover:bg-primary/10 transition-all cursor-pointer flex items-center gap-2 ${isSaving ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            <UploadCloud className="text-sm" />
+            {tradeType === 'ob' ? 'Importar CSV OB' : 'Importar CSV/HTML'}
+          </label>
         </div>
       </div>
       <div className="grid grid-cols-12 gap-8">
