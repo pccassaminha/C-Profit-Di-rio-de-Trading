@@ -949,9 +949,20 @@ export default function Dashboard() {
 
     let totalWithdrawnFromActive = 0;
     withdrawals.forEach(w => {
-      // Assuming withdrawals apply to all active capital globally
-      // (or you could filter by date if needed, but totalBalance is usually all-time)
-      totalWithdrawnFromActive += (w.amount || 0);
+      // Find the account this withdrawal belongs to
+      const account = accounts.find(a => a.id === w.accountId);
+      let includeWithdrawal = true;
+
+      if (selectedAccount !== 'all') {
+        if (w.accountId !== selectedAccount) includeWithdrawal = false;
+      } else if (tradeTypeFilter !== 'all') {
+        const accTradeType = account ? (account.tradeType || 'forex') : 'forex';
+        if (accTradeType !== tradeTypeFilter) includeWithdrawal = false;
+      }
+
+      if (includeWithdrawal) {
+        totalWithdrawnFromActive += (Number(w.amount) || 0);
+      }
     });
 
     const totalBalance = totalSize + totalPnl - totalWithdrawnFromActive;

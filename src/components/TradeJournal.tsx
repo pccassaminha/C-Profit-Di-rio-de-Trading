@@ -1761,6 +1761,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
                     <>
                       <option className="bg-[#0f1b30] text-[#f0f4ff]" value="Dia">Dia</option>
                       <option className="bg-[#0f1b30] text-[#f0f4ff]" value="Noite">Noite</option>
+                      <option className="bg-[#0f1b30] text-[#f0f4ff]" value="Meia-noite">Meia-noite</option>
                     </>
                   ) : sessionType === 'simple' ? (
                     <>

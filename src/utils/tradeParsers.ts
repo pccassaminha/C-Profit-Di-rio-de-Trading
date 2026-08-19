@@ -688,8 +688,10 @@ export function detectSession(entryTime: string, isOB = false): string {
   const tVal = hour * 60 + min;
 
   if (isOB) {
-    // Opções Binárias: "Dia" ou "Noite" (Dia: 06:00 às 18:00)
-    if (hour >= 6 && hour < 18) {
+    // Opções Binárias: Meia-noite (00:00 - 04:59), Dia (06:00 às 18:00), Noite (o resto)
+    if (hour >= 0 && hour < 5) {
+      return "Meia-noite";
+    } else if (hour >= 6 && hour < 18) {
       return "Dia";
     } else {
       return "Noite";
