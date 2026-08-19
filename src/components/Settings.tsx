@@ -51,9 +51,10 @@ export interface Objective {
   type: 'account' | 'market';
   targetId: string;
   profitTarget: string;
+  profitTargetPeriod?: 'Dia' | 'Semana' | 'Mês' | 'Geral';
   maxLoss: string;
+  maxLossPeriod?: 'Dia' | 'Semana' | 'Mês' | 'Geral';
   dailyLoss: string;
-  maxLossPeriod?: 'Semana' | 'Mês' | 'Geral';
   hidden?: boolean;
 }
 
@@ -84,6 +85,7 @@ export default function Settings() {
     type: 'market',
     targetId: 'forex',
     profitTarget: '',
+    profitTargetPeriod: 'Mês',
     maxLoss: '',
     dailyLoss: '',
     maxLossPeriod: 'Mês',
@@ -395,6 +397,7 @@ export default function Settings() {
         type: doc.data().type as 'account' | 'market',
         targetId: doc.data().targetId,
         profitTarget: doc.data().profitTarget,
+        profitTargetPeriod: doc.data().profitTargetPeriod || 'Mês',
         maxLoss: doc.data().maxLoss,
         dailyLoss: doc.data().dailyLoss,
         maxLossPeriod: doc.data().maxLossPeriod || 'Mês',
@@ -1564,6 +1567,7 @@ export default function Settings() {
                           type: 'market',
                           targetId: 'forex',
                           profitTarget: '',
+                          profitTargetPeriod: 'Mês',
                           maxLoss: '',
                           dailyLoss: '',
                           maxLossPeriod: 'Mês'
@@ -1658,11 +1662,11 @@ export default function Settings() {
                               
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
-                                  <span className="text-on-surface-variant">Meta de Lucro:</span>
+                                  <span className="text-on-surface-variant">Meta de Lucro {obj.profitTargetPeriod ? `(Por ${obj.profitTargetPeriod === 'Geral' ? 'Geral' : obj.profitTargetPeriod})` : '(Por Mês)'}:</span>
                                   <span className="text-on-surface font-bold text-secondary font-mono">${obj.profitTarget || '0'}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="text-on-surface-variant">Perda Máxima {obj.maxLossPeriod ? `(${obj.maxLossPeriod})` : '(Mês)'}:</span>
+                                  <span className="text-on-surface-variant">Perda Máxima {obj.maxLossPeriod ? `(Por ${obj.maxLossPeriod === 'Geral' ? 'Geral' : obj.maxLossPeriod})` : '(Por Mês)'}:</span>
                                   <span className="text-on-surface font-bold text-error font-mono">${obj.maxLoss || '0'}</span>
                                 </div>
                                 <div className="flex justify-between">
@@ -2327,15 +2331,30 @@ export default function Settings() {
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Meta de Lucro</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">$</span>
-                  <input 
-                    type="number" 
-                    value={editingObjective.profitTarget}
-                    onChange={(e) => setEditingObjective({...editingObjective, profitTarget: e.target.value})}
-                    className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-8 pr-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
-                    placeholder="1000" 
-                  />
+                <div className="flex gap-4">
+                  <div className="relative flex-1">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">$</span>
+                    <input 
+                      type="number" 
+                      value={editingObjective.profitTarget}
+                      onChange={(e) => setEditingObjective({...editingObjective, profitTarget: e.target.value})}
+                      className="w-full bg-surface-container border border-outline-variant/20 rounded-xl pl-8 pr-4 py-3 text-on-surface outline-none focus:border-primary transition-colors" 
+                      placeholder="1000" 
+                    />
+                  </div>
+                  <div className="relative w-1/3">
+                    <select 
+                      value={editingObjective.profitTargetPeriod || 'Mês'}
+                      onChange={(e) => setEditingObjective({...editingObjective, profitTargetPeriod: e.target.value as 'Dia' | 'Semana' | 'Mês' | 'Geral'})}
+                      className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors appearance-none"
+                    >
+                      <option value="Dia">Por Dia</option>
+                      <option value="Semana">Por Semana</option>
+                      <option value="Mês">Por Mês</option>
+                      <option value="Geral">Geral</option>
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant" />
+                  </div>
                 </div>
               </div>
 
@@ -2355,11 +2374,12 @@ export default function Settings() {
                   <div className="relative w-1/3">
                     <select 
                       value={editingObjective.maxLossPeriod || 'Mês'}
-                      onChange={(e) => setEditingObjective({...editingObjective, maxLossPeriod: e.target.value as 'Semana' | 'Mês' | 'Geral'})}
+                      onChange={(e) => setEditingObjective({...editingObjective, maxLossPeriod: e.target.value as 'Dia' | 'Semana' | 'Mês' | 'Geral'})}
                       className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface outline-none focus:border-primary transition-colors appearance-none"
                     >
-                      <option value="Mês">Por Mês</option>
+                      <option value="Dia">Por Dia</option>
                       <option value="Semana">Por Semana</option>
+                      <option value="Mês">Por Mês</option>
                       <option value="Geral">Geral</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant" />
@@ -2427,6 +2447,7 @@ export default function Settings() {
                                 type: editingObjective.type,
                                 targetId: editingObjective.targetId,
                                 profitTarget: editingObjective.profitTarget,
+                                profitTargetPeriod: editingObjective.profitTargetPeriod || 'Mês',
                                 maxLoss: editingObjective.maxLoss,
                                 dailyLoss: editingObjective.dailyLoss,
                                 maxLossPeriod: editingObjective.maxLossPeriod || 'Mês',
@@ -2448,6 +2469,7 @@ export default function Settings() {
                                 type: editingObjective.type,
                                 targetId: editingObjective.targetId,
                                 profitTarget: editingObjective.profitTarget,
+                                profitTargetPeriod: editingObjective.profitTargetPeriod || 'Mês',
                                 maxLoss: editingObjective.maxLoss,
                                 dailyLoss: editingObjective.dailyLoss,
                                 maxLossPeriod: editingObjective.maxLossPeriod || 'Mês',

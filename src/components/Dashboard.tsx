@@ -383,9 +383,10 @@ export default function Dashboard() {
         type: doc.data().type as 'account' | 'market',
         targetId: doc.data().targetId,
         profitTarget: doc.data().profitTarget,
+        profitTargetPeriod: (doc.data().profitTargetPeriod || 'Mês') as 'Dia' | 'Semana' | 'Mês' | 'Geral',
         maxLoss: doc.data().maxLoss,
         dailyLoss: doc.data().dailyLoss,
-        maxLossPeriod: doc.data().maxLossPeriod || 'Mês',
+        maxLossPeriod: (doc.data().maxLossPeriod || 'Mês') as 'Dia' | 'Semana' | 'Mês' | 'Geral',
         hidden: !!doc.data().hidden
       }));
       const { cleanObjectives, duplicateIds } = deduplicateObjectives(dbObjectives, accounts);
@@ -615,12 +616,13 @@ export default function Dashboard() {
 
     let totalSize = 0;
     let totalProfitTarget = 0;
+    let profitTargetPeriod: 'Dia' | 'Semana' | 'Mês' | 'Geral' = 'Mês';
     let totalMaxLoss = 0;
+    let maxLossPeriod: 'Dia' | 'Semana' | 'Mês' | 'Geral' = 'Mês';
     let totalDailyLoss = 0;
     let hasProfitTarget = false;
     let hasMaxLoss = false;
     let hasDailyLoss = false;
-    let maxLossPeriod = 'Mês';
     
     // Calculate total size from accounts
     accountsToProcess.forEach(acc => {
@@ -642,9 +644,10 @@ export default function Dashboard() {
         if (marketObj && (Number(marketObj.profitTarget) > 0 || Number(marketObj.maxLoss) > 0 || Number(marketObj.dailyLoss) > 0)) {
           // Use Market-level objective for this type
           if (marketObj.profitTarget) totalProfitTarget += Number(marketObj.profitTarget) || 0;
+          if (marketObj.profitTargetPeriod) profitTargetPeriod = marketObj.profitTargetPeriod;
           if (marketObj.maxLoss) totalMaxLoss += Number(marketObj.maxLoss) || 0;
-          if (marketObj.dailyLoss) totalDailyLoss += Number(marketObj.dailyLoss) || 0;
           if (marketObj.maxLossPeriod) maxLossPeriod = marketObj.maxLossPeriod;
+          if (marketObj.dailyLoss) totalDailyLoss += Number(marketObj.dailyLoss) || 0;
         } else {
           // Fallback: Sum account-level objectives for this market type
           accountsToProcess.forEach(acc => {
@@ -653,9 +656,10 @@ export default function Dashboard() {
               const accObj = findObjectiveForAccount(objectives, acc, accounts);
               if (accObj && !accObj.hidden) {
                 if (accObj.profitTarget) totalProfitTarget += Number(accObj.profitTarget) || 0;
+                if (accObj.profitTargetPeriod) profitTargetPeriod = accObj.profitTargetPeriod;
                 if (accObj.maxLoss) totalMaxLoss += Number(accObj.maxLoss) || 0;
-                if (accObj.dailyLoss) totalDailyLoss += Number(accObj.dailyLoss) || 0;
                 if (accObj.maxLossPeriod) maxLossPeriod = accObj.maxLossPeriod;
+                if (accObj.dailyLoss) totalDailyLoss += Number(accObj.dailyLoss) || 0;
               }
             }
           });
@@ -667,6 +671,7 @@ export default function Dashboard() {
       const accountObjective = findObjectiveForAccount(objectives, targetAcc || { id: selectedAccount }, accounts);
       if (accountObjective && !accountObjective.hidden) {
         totalProfitTarget = Number(accountObjective.profitTarget) || 0;
+        if (accountObjective.profitTargetPeriod) profitTargetPeriod = accountObjective.profitTargetPeriod;
         totalMaxLoss = Number(accountObjective.maxLoss) || 0;
         if (accountObjective.maxLossPeriod) maxLossPeriod = accountObjective.maxLossPeriod;
         totalDailyLoss = Number(accountObjective.dailyLoss) || 0;
@@ -909,6 +914,11 @@ export default function Dashboard() {
       }
     });
 
+    let currentWeekPnl = 0;
+    let currentWeekTrades = 0;
+    const startOfNextWeek = new Date(startOfThisWeek);
+    startOfNextWeek.setDate(startOfThisWeek.getDate() + 7);
+
     // 3. Process Bottom Trades (tradesToProcess)
     tradesToProcess.forEach(trade => {
       let tradeDate;
@@ -935,6 +945,11 @@ export default function Dashboard() {
       const tYear = tradeDate.getFullYear();
       const dateStr = `${tradeDate.getFullYear()}-${(tradeDate.getMonth() + 1).toString().padStart(2, '0')}-${tradeDate.getDate().toString().padStart(2, '0')}`;
 
+      if (tradeDate >= startOfThisWeek && tradeDate < startOfNextWeek) {
+        currentWeekPnl += trade.pnl;
+        currentWeekTrades += 1;
+      }
+
       if (tMonth === currentMonth && tYear === currentYear) {
         currentMonthPnl += trade.pnl;
         currentMonthTrades += 1;
@@ -945,7 +960,24 @@ export default function Dashboard() {
       }
     });
 
+    const currentWeekLosses = currentWeekPnl < 0 ? Math.abs(currentWeekPnl) : 0;
     const currentMonthLosses = currentMonthPnl < 0 ? Math.abs(currentMonthPnl) : 0;
+
+    const todayDate = new Date();
+    const todayStr = `${todayDate.getFullYear()}-${(todayDate.getMonth() + 1).toString().padStart(2, '0')}-${todayDate.getDate().toString().padStart(2, '0')}`;
+    const todayPnl = historyMap[todayStr]?.pnl || 0;
+
+    let relevantProfitForTarget = totalPnl;
+    if (profitTargetPeriod === 'Dia') relevantProfitForTarget = todayPnl;
+    else if (profitTargetPeriod === 'Semana') relevantProfitForTarget = currentWeekPnl;
+    else if (profitTargetPeriod === 'Mês') relevantProfitForTarget = currentMonthPnl;
+    else if (profitTargetPeriod === 'Geral') relevantProfitForTarget = totalPnl;
+
+    let relevantLossForMaxLoss = totalPnl < 0 ? Math.abs(totalPnl) : 0;
+    if (maxLossPeriod === 'Dia') relevantLossForMaxLoss = todayPnl < 0 ? Math.abs(todayPnl) : 0;
+    else if (maxLossPeriod === 'Semana') relevantLossForMaxLoss = currentWeekLosses;
+    else if (maxLossPeriod === 'Mês') relevantLossForMaxLoss = currentMonthLosses;
+    else if (maxLossPeriod === 'Geral') relevantLossForMaxLoss = totalPnl < 0 ? Math.abs(totalPnl) : 0;
 
     let totalWithdrawnFromActive = 0;
     withdrawals.forEach(w => {
@@ -1038,23 +1070,24 @@ export default function Dashboard() {
       .map(([name, stats]) => ({ name, ...stats, winRate: (stats.wins / stats.total) * 100 }))
       .sort((a, b) => b.pnl - a.pnl);
 
-    const todayDate = new Date();
-    const todayStr = `${todayDate.getFullYear()}-${(todayDate.getMonth() + 1).toString().padStart(2, '0')}-${todayDate.getDate().toString().padStart(2, '0')}`;
-    const todayPnl = historyMap[todayStr]?.pnl || 0;
-
     return {
       totalSize, 
       totalProfitTarget,
+      profitTargetPeriod,
       totalMaxLoss,
+      maxLossPeriod,
       totalDailyLoss,
       hasProfitTarget,
       hasMaxLoss,
       hasDailyLoss,
-      maxLossPeriod,
+      relevantProfitForTarget,
+      relevantLossForMaxLoss,
       totalBalance, 
       totalPnl,
       totalLossSum, // NEW
       todayPnl,
+      currentWeekPnl,
+      currentWeekLosses,
       totalTrades, 
       winRate, 
       averageRr,
@@ -1413,29 +1446,35 @@ export default function Dashboard() {
           <div className="flex flex-col gap-6 md:gap-8">
               {/* Lucro (Full Width) */}
               <div className="bg-surface-container-low border border-secondary/30 rounded-2xl p-6 md:p-8">
-                <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Lucro</h4>
+                <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">
+                  Lucro {data.profitTargetPeriod ? `(${data.profitTargetPeriod === 'Geral' ? 'Geral' : `Por ${data.profitTargetPeriod}`})` : '(Por Mês)'}
+                </h4>
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
                   <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Atual</p>
-                    <p className={`${data.totalPnl >= 0 ? 'text-secondary' : 'text-error'} font-bold text-base md:text-xl`}>
-                      {data.totalPnl >= 0 ? '+' : ''}{formatCurrency(data.totalPnl)}
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">
+                      Lucro Atual {data.profitTargetPeriod ? `(${data.profitTargetPeriod === 'Geral' ? 'Geral' : `Por ${data.profitTargetPeriod}`})` : ''}
+                    </p>
+                    <p className={`${data.relevantProfitForTarget >= 0 ? 'text-secondary' : 'text-error'} font-bold text-base md:text-xl`}>
+                      {data.relevantProfitForTarget >= 0 ? '+' : ''}{formatCurrency(data.relevantProfitForTarget)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Meta De Lucro</p>
+                    <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">
+                      Meta De Lucro {data.profitTargetPeriod ? `(${data.profitTargetPeriod === 'Geral' ? 'Geral' : `Por ${data.profitTargetPeriod}`})` : ''}
+                    </p>
                     <p className="text-on-surface font-bold text-base md:text-xl">{data.hasProfitTarget ? formatCurrency(data.totalProfitTarget) : 'Não definida'}</p>
                   </div>
                   <div>
                     <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Lucro Remanescente</p>
                     <p className="text-on-surface font-bold text-base md:text-xl">
-                      {data.hasProfitTarget ? formatCurrency(Math.max(0, data.totalProfitTarget - data.totalPnl)) : '-'}
+                      {data.hasProfitTarget ? formatCurrency(Math.max(0, data.totalProfitTarget - data.relevantProfitForTarget)) : '-'}
                     </p>
                   </div>
                 </div>
                 {data.hasProfitTarget && (
                   <>
                     <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
-                      <div className="absolute left-0 top-0 h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, (data.totalPnl / data.totalProfitTarget) * 100))}%` }}></div>
+                      <div className="absolute left-0 top-0 h-full bg-secondary rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, (data.relevantProfitForTarget / data.totalProfitTarget) * 100))}%` }}></div>
                     </div>
                     <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
                       <span>$0.00</span>
@@ -1448,29 +1487,35 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                 {/* Perda Máxima */}
                 <div className="bg-surface-container-low border border-error/30 rounded-2xl p-6 md:p-8">
-                  <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Máxima</h4>
+                  <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">
+                    Perda Máxima {data.maxLossPeriod ? `(${data.maxLossPeriod === 'Geral' ? 'Geral' : `Por ${data.maxLossPeriod}`})` : '(Por Mês)'}
+                  </h4>
                   <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
                     <div>
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">
+                        Perda Atual {data.maxLossPeriod ? `(${data.maxLossPeriod === 'Geral' ? 'Geral' : `Por ${data.maxLossPeriod}`})` : ''}
+                      </p>
                       <p className="text-error font-bold text-base md:text-xl">
-                        {formatCurrency(data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0)}
+                        {formatCurrency(data.relevantLossForMaxLoss)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Limite Máximo De Perda</p>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">
+                        Limite Máximo {data.maxLossPeriod ? `(${data.maxLossPeriod === 'Geral' ? 'Geral' : `Por ${data.maxLossPeriod}`})` : ''}
+                      </p>
                       <p className="text-on-surface font-bold text-base md:text-xl">{data.hasMaxLoss ? formatCurrency(data.totalMaxLoss) : 'Não definida'}</p>
                     </div>
                     <div>
                       <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Máxima Restante</p>
                       <p className="text-on-surface font-bold text-base md:text-xl">
-                        {data.hasMaxLoss ? formatCurrency(Math.max(0, data.totalMaxLoss - (data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0))) : '-'}
+                        {data.hasMaxLoss ? formatCurrency(Math.max(0, data.totalMaxLoss - data.relevantLossForMaxLoss)) : '-'}
                       </p>
                     </div>
                   </div>
                   {data.hasMaxLoss && (
                     <>
                       <div className="relative w-full h-2 md:h-3 bg-surface-container-highest rounded-full mt-8 md:mt-12">
-                        <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((data.totalPnl < 0 ? Math.abs(data.totalPnl) : 0) / data.totalMaxLoss) * 100)}%` }}></div>
+                        <div className="absolute left-0 top-0 h-full bg-error rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (data.relevantLossForMaxLoss / data.totalMaxLoss) * 100)}%` }}></div>
                       </div>
                       <div className="flex justify-between text-xs md:text-sm text-on-surface-variant mt-3 md:mt-4">
                         <span>$0.00</span>
@@ -1485,7 +1530,7 @@ export default function Dashboard() {
                   <h4 className="text-on-surface font-bold text-base md:text-lg mb-6 md:mb-8 font-headline">Perda Diária</h4>
                   <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 md:mb-10">
                     <div>
-                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual</p>
+                      <p className="text-on-surface-variant text-xs md:text-sm mb-1 md:mb-2">Perda Atual (Hoje)</p>
                       <p className="text-error font-bold text-base md:text-xl">
                         {formatCurrency(data.todayPnl < 0 ? Math.abs(data.todayPnl) : 0)}
                       </p>
@@ -1514,8 +1559,8 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-            </div>
-          ) : !hideObjectives ? (
+          </div>
+        ) : !hideObjectives ? (
             <div className="bg-surface-container-low border border-outline-variant/15 rounded-3xl p-8 text-center space-y-4 max-w-2xl mx-auto relative">
               <button 
                 onClick={handleDismissObjectives} 
