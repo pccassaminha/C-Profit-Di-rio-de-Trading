@@ -191,6 +191,8 @@ export default function Payments() {
         </div>
       </div>
 
+      <AdBanner isPro={isPro} globalSettings={globalSettings} variant="card" className="mt-8" />
+
       {/* Modal de Fatura Detalhada */}
       {selectedInvoice && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/90 backdrop-blur-md animate-in fade-in duration-300">

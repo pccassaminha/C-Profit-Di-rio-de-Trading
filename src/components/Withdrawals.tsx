@@ -267,6 +267,8 @@ export default function Withdrawals() {
         </div>
       </div>
 
+      <AdBanner isPro={isPro} globalSettings={globalSettings} variant="card" className="mt-8" />
+
       {/* Modal Registrar Levantamento */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">

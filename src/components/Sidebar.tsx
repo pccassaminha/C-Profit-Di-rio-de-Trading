@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTrades } from '../hooks/useTrades';
-import { LayoutDashboard, FileText, Calendar, CreditCard, Wallet, Globe, Users, Handshake, Crown, Settings, HelpCircle, LogOut, Lock } from 'lucide-react';
+import { LayoutDashboard, FileText, Calendar, CreditCard, Wallet, Globe, Users, Handshake, Crown, Settings, HelpCircle, LogOut, Lock, Zap } from 'lucide-react';
 import { auth } from '../firebase';
 
 export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab: string, setActiveTab: (tab: string) => void, isOpen: boolean }) {
@@ -34,7 +34,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
     { id: 'payments', icon: CreditCard, label: 'Pagamentos', isLocked: false },
     { id: 'withdrawals', icon: Wallet, label: 'Levantamentos', isLocked: false },
     { id: 'panorama', icon: Globe, label: 'Panorama Global', isLocked: !isPro },
-    { id: 'community', icon: Users, label: 'Comunidade', isLocked: !isPro },
+    { id: 'community', icon: Users, label: 'Comunidade', isLocked: false },
     { id: 'affiliates_user', icon: Handshake, label: 'Área de Afiliado', isLocked: false },
   ];
 
@@ -79,6 +79,28 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
           </button>
         ))}
       </nav>
+
+      {/* Free Account Sponsored / Upgrade Callout in Sidebar */}
+      {!isPro && isOpen && (
+        <div className="mx-4 mb-3 p-3.5 rounded-2xl bg-gradient-to-br from-primary/10 via-surface-container to-surface-container-high border border-primary/25 text-center space-y-2">
+          <div className="flex items-center justify-between text-[9px] font-black uppercase text-amber-400">
+            <span className="flex items-center gap-1">
+              <Zap className="w-3 h-3 text-amber-400" /> Patrocinado
+            </span>
+            <span className="text-[8px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-black">Free</span>
+          </div>
+          <p className="text-[11px] font-black text-white leading-tight">Remova Todos os Anúncios</p>
+          <p className="text-[9px] text-on-surface-variant leading-tight">Assine a partir de 7.500 Kz (Trimestral)</p>
+          <button 
+            onClick={() => setActiveTab('plans')}
+            className="w-full bg-primary text-black font-black text-[10px] py-2 rounded-xl uppercase tracking-wider hover:brightness-110 transition-all flex items-center justify-center gap-1 cursor-pointer shadow-md"
+          >
+            <Crown className="w-3 h-3" />
+            <span>Assinar Premium</span>
+          </button>
+        </div>
+      )}
+
       <div className={`p-6 mt-auto border-t border-outline-variant/20 ${isOpen ? '' : 'flex flex-col items-center px-2'}`}>
         <div className={`flex flex-col ${isOpen ? 'gap-2' : 'gap-4 items-center'}`}>
           <button 

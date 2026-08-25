@@ -3276,11 +3276,11 @@ export default function AdminPanel() {
                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm"
                      defaultValue={editingUser.plan_type || 'Iniciante'}
                    >
-                     <option value="Iniciante">Iniciante (Sem Acesso)</option>
-                     <option value="mensal_6">Mensal (6 Contas)</option>
-                     <option value="trimestral_6">Trimestral (6 Contas)</option>
-                     <option value="semestral_8">Semestral (8 Contas)</option>
-                     <option value="anual_16">Anual (16 Contas)</option>
+                     <option value="Iniciante">Iniciante (Plano Gratuito • Para Sempre)</option>
+                     <option value="trimestral_6">Trimestral (6 Contas FX + 6 OB)</option>
+                     <option value="semestral_8">Semestral (8 Contas FX + 8 OB)</option>
+                     <option value="anual_16">Anual (16 Contas FX + 16 OB)</option>
+                     <option value="mensal_6">Mensal (Legado)</option>
                      <option value="ilimitado">Maestro (Ilimitado & Sem Expiração)</option>
                    </select>
                  </div>

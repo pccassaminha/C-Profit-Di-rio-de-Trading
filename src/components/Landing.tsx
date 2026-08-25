@@ -23,7 +23,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
     if (!hasSeen) {
       const timer = setTimeout(() => {
         setShowPromoPopup(true);
-      }, 120000); // 2 minutos (120.000 ms) para permitir exploração prévia
+      }, 45000); // 45 segundos para aparecer de forma inteligente no cantinho
       return () => clearTimeout(timer);
     }
   }, []);
@@ -898,111 +898,89 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
         </div>
       </footer>
 
-      {/* Modern, high-conversion floating discount promotion modal */}
+      {/* Modern, high-conversion floating corner promotion widget */}
       <AnimatePresence>
         {showPromoPopup && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
-            {/* Backdrop */}
+          <div className="fixed bottom-5 right-5 z-[100] max-w-[380px] w-[calc(100vw-40px)] pointer-events-auto">
+            {/* Corner Card */}
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closePromoPopup}
-              className="absolute inset-0 bg-black/85 backdrop-blur-[12px]"
-            />
-
-            {/* Centered Modal Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-              className="relative w-full max-w-lg bg-gradient-to-br from-surface-container-high via-surface-container-lowest to-background border border-[#00f5a0]/30 rounded-[32px] p-8 md:p-10 shadow-[0_20px_50px_rgba(0,245,160,0.15)] overflow-hidden z-10"
+              initial={{ opacity: 0, scale: 0.85, y: 40, x: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 30 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+              className="relative w-full bg-surface-container-high/95 backdrop-blur-xl border-2 border-[#00f5a0]/40 rounded-3xl p-5 shadow-[0_15px_40px_rgba(0,0,0,0.6)] overflow-hidden"
             >
               {/* Subtle visual glow accent block */}
-              <div className="absolute -top-[120px] -right-[120px] w-[240px] h-[240px] bg-[#00f5a0]/10 rounded-full blur-[60px] pointer-events-none"></div>
+              <div className="absolute -top-12 -right-12 w-32 h-32 bg-[#00f5a0]/15 rounded-full blur-2xl pointer-events-none"></div>
 
               {/* Close Button UI */}
               <button
                 onClick={closePromoPopup}
-                className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/5 text-on-surface-variant hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/10"
+                className="absolute top-3.5 right-3.5 p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-on-surface-variant hover:text-white transition-all cursor-pointer border border-white/5 hover:border-white/15 z-20"
                 aria-label="Fechar"
               >
-                <X size={18} />
+                <X size={15} />
               </button>
 
-              {/* Header Content */}
-              <div className="text-center md:text-left">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#00f5a0]/30 bg-[#00f5a0]/10 text-[10px] font-black uppercase tracking-wider text-[#00f5a0] mb-5">
+              {/* Badge & Title */}
+              <div className="pr-6">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-[#00f5a0]/30 bg-[#00f5a0]/10 text-[9px] font-black uppercase tracking-wider text-[#00f5a0] mb-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#00f5a0] animate-pulse"></span>
-                  🎁 DESCONTO DE BOAS-VINDAS
+                  🎁 OFERTA ESPECIAL
                 </div>
                 
-                <h3 className="font-headline text-[28px] md:text-[34px] font-black leading-tight tracking-tight text-white">
-                  Obtenha <span className="text-[#00f5a0]">83% OFF</span> na Primeira Subscrição!
-                </h3>
+                <h4 className="font-headline text-base font-black leading-tight text-white">
+                  Pronto para transformar os seus <span className="text-[#00f5a0]">Resultados</span>?
+                </h4>
                 
-                <p className="text-sm text-on-surface-variant leading-relaxed mt-4 max-w-md">
-                  Aproveite este bónus exclusivo na sua primeira subscrição mensal para desbloquear todas as ferramentas premium do terminal e elevar a sua consistência operacional.
+                <p className="text-[11px] text-on-surface-variant leading-relaxed mt-1.5">
+                  Comece agora com o plano gratuito para testar ou assine o Premium para ter até 16 contas e 0 anúncios!
                 </p>
               </div>
 
-              {/* Coupon Copier Container */}
-              <div className="mt-8 p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col sm:flex-row items-center gap-3">
-                <div className="flex-1 flex items-center justify-between w-full px-4 py-3 bg-black/60 border border-outline-variant/10 rounded-xl font-mono text-sm font-black text-white selection:bg-[#00f5a0]/30 select-all">
-                  <span className="text-[#00f5a0]">CPROFIT83%OFF</span>
-                  <span className="text-[10px] text-white/30 uppercase tracking-widest ml-2 font-normal">CUPÃO</span>
+              {/* Mini Coupon Box */}
+              <div className="mt-3 p-2 bg-black/50 border border-white/10 rounded-xl flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 pl-1 font-mono text-xs font-black text-[#00f5a0]">
+                  <span>CPROFIT83%OFF</span>
+                  <span className="text-[8px] text-white/40 uppercase font-normal">(-83%)</span>
                 </div>
                 
                 <button
                   onClick={copyPopupCoupon}
-                  className={`w-full sm:w-auto px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 transform active:scale-95 cursor-pointer flex items-center justify-center gap-2 ${
+                  className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
                     popupCopied 
-                      ? 'bg-[#00f5a0] text-background shadow-[0_0_20px_rgba(0,245,160,0.4)]' 
-                      : 'bg-white text-background hover:bg-neutral-200'
+                      ? 'bg-[#00f5a0] text-black' 
+                      : 'bg-white/10 text-white hover:bg-white/20'
                   }`}
                 >
-                  {popupCopied ? '✓ COPIADO!' : '📋 COPIAR'}
+                  {popupCopied ? '✓ Copiado' : 'Copiar Cupão'}
                 </button>
               </div>
 
-              {/* Action buttons footer */}
-              <div className="mt-8 flex flex-col sm:flex-row items-center gap-4">
-                <button
-                  onClick={() => {
-                    closePromoPopup();
-                    onRegisterClick('mensal_6', 'CPROFIT83%OFF');
-                  }}
-                  className="w-full py-4 rounded-xl bg-[#00f5a0] text-background text-xs font-black uppercase tracking-wider hover:opacity-95 transition-all text-center cursor-pointer shadow-[0_10px_30px_rgba(0,245,160,0.25)] flex items-center justify-center gap-2"
-                >
-                  <Wallet size={14} /> ASSINATURA (83% OFF)
-                </button>
+              {/* Action Buttons: Seja Premium & Criar Conta Grátis */}
+              <div className="mt-3.5 grid grid-cols-2 gap-2">
                 <button
                   onClick={() => {
                     closePromoPopup();
                     onRegisterClick('iniciante');
                   }}
-                  className="w-full py-4 rounded-xl bg-transparent hover:bg-cyan-500/10 border border-cyan-500/60 text-cyan-400 hover:text-white hover:border-cyan-500 text-xs font-black uppercase tracking-wider transition-all text-center cursor-pointer flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(6,182,212,0.15)]"
+                  className="py-2.5 px-2 rounded-xl bg-surface-container-highest hover:bg-white/10 border border-white/15 text-white text-[11px] font-black uppercase tracking-wider transition-all text-center cursor-pointer flex items-center justify-center gap-1"
                 >
-                  <Zap size={14} className="text-cyan-400 animate-pulse" /> INICIAR GRÁTIS
+                  <Zap size={13} className="text-[#00f5a0]" />
+                  <span>Conta Grátis</span>
                 </button>
-              </div>
 
-              <div className="mt-4 text-center">
                 <button
-                  onClick={closePromoPopup}
-                  className="text-on-surface-variant/50 hover:text-white text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer bg-transparent border-none"
+                  onClick={() => {
+                    closePromoPopup();
+                    onRegisterClick('trimestral_6', 'CPROFIT83%OFF');
+                  }}
+                  className="py-2.5 px-2 rounded-xl bg-gradient-to-r from-[#00f5a0] to-emerald-400 text-black text-[11px] font-black uppercase tracking-wider hover:brightness-110 transition-all text-center cursor-pointer shadow-[0_4px_15px_rgba(0,245,160,0.3)] flex items-center justify-center gap-1"
                 >
-                  Talvez mais tarde
+                  <Wallet size={13} />
+                  <span>Seja Premium</span>
                 </button>
               </div>
-
-              {/* Prompt notification indicator */}
-              {popupCopied && (
-                <p className="text-[11px] text-[#00f5a0] text-center font-bold tracking-wider mt-4 animate-pulse">
-                  ✨ Copiado com sucesso! Insira-o no campo de cupão ao assinar.
-                </p>
-              )}
             </motion.div>
           </div>
         )}

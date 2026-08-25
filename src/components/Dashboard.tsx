@@ -1786,6 +1786,7 @@ export default function Dashboard() {
         </div>
 
       {/* Financial Performance Chart */}
+      <AdBanner isPro={isPro} globalSettings={globalSettings} variant="card" className="my-6" />
       <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 md:p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 md:mb-10">
           <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Evolução do Saldo</h3>
@@ -1847,11 +1848,13 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+          <AdBanner isPro={isPro} globalSettings={globalSettings} className="mt-8" />
         </>
       )}
 
       {activeDashboardTab === 'analysis' && (
         <div className="space-y-8">
+          <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-2" />
           <div className="flex justify-between items-center">
             <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Análises Detalhadas</h3>
             <DateRangePicker
@@ -2444,6 +2447,7 @@ export default function Dashboard() {
 
       {activeDashboardTab === 'history' && (
         <div className="space-y-8">
+          <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-2" />
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <h3 className="text-on-surface font-bold text-xl md:text-2xl font-headline">Histórico de Trades</h3>
             <div className="flex gap-4 items-center">

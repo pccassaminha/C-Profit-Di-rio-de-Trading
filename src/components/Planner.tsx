@@ -582,6 +582,8 @@ export default function Planner() {
               </div>
             )}
           </div>
+
+          <AdBanner isPro={isPro} globalSettings={globalSettings} variant="card" className="mt-8" />
         </div>
       </main>
 

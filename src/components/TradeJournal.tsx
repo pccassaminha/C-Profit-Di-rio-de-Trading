@@ -1070,6 +1070,8 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
             )}
           </div>
         )}
+
+        <AdBanner isPro={isPro} globalSettings={globalSettings} variant="card" className="mt-8" />
       </div>
 
       {/* Trade Type Selection Modal */}
@@ -1269,6 +1271,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
   if (view === 'detail' && selectedTrade) {
     return (
       <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full space-y-8">
+        <AdBanner isPro={isPro} globalSettings={globalSettings} variant="compact" className="mb-2" />
         <div className="flex justify-between items-center mb-6">
           <button 
             onClick={() => {
@@ -1562,6 +1565,7 @@ export default function TradeJournal({ currentView = 'list', onViewChange }: { c
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+      <AdBanner isPro={isPro} globalSettings={globalSettings} className="mb-6" />
       <div className="flex justify-between items-end mb-10">
         <div>
           <span className="text-xs font-label uppercase tracking-[0.2em] text-primary-fixed-dim">Entrada no Diário</span>

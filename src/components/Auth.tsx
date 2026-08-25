@@ -106,11 +106,9 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
   }, [initialCoupon]);
 
   const BASE_PLANS = [
-    { id: 'iniciante', name: 'Testar Grátis o Seu Diário de Trades', rawPrice: 0, defaultTag: '100% Grátis', defaultPrice: 'Grátis', oldPrice: 0 },
-    { id: 'mensal_6', name: 'Plano Mensal', rawPrice: 8824, defaultTag: 'Básico', defaultPrice: '8.824 Kz', oldPrice: 13236 },
-    { id: 'trimestral_6', name: 'Trimestral', rawPrice: 26472, defaultTag: '-33% OFF', defaultPrice: '26.472 Kz', oldPrice: 39708 },
-    { id: 'semestral_8', name: 'Semestral', rawPrice: 52944, defaultTag: 'Best Choice', defaultPrice: '52.944 Kz', oldPrice: 79416 },
-    { id: 'anual_16', name: 'Anual', rawPrice: 105882, defaultTag: 'Premium', defaultPrice: '105.882 Kz', oldPrice: 158823 }
+    { id: 'iniciante', name: 'Plano Gratuito • Para Sempre', rawPrice: 0, defaultTag: '100% Grátis', defaultPrice: 'Grátis', oldPrice: 0 },
+    { id: 'trimestral_6', name: 'Plano Trimestral (3 Meses)', rawPrice: 7500, defaultTag: '-33% OFF', defaultPrice: '7.500 Kz', oldPrice: 11250 },
+    { id: 'semestral_8', name: 'Plano Semestral (6 Meses)', rawPrice: 14000, defaultTag: '-38% OFF', defaultPrice: '14.000 Kz', oldPrice: 22500 }
   ];
 
   const REGISTRATION_PLANS = BASE_PLANS.map(plan => {
@@ -139,13 +137,22 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
       }
     }
 
+    const hasBaseDiscount = plan.oldPrice > 0;
+    const currentPriceStr = finalPriceNum === plan.rawPrice ? plan.defaultPrice : `${finalPriceNum.toLocaleString('pt-BR')} Kz`;
+    const originalStrikethrough = hasCouponApplied 
+      ? `${plan.oldPrice.toLocaleString('pt-BR')} Kz` 
+      : (hasBaseDiscount ? `${plan.oldPrice.toLocaleString('pt-BR')} Kz` : undefined);
+    const savingsCalculated = hasCouponApplied 
+      ? (plan.oldPrice - finalPriceNum) 
+      : (hasBaseDiscount ? (plan.oldPrice - plan.rawPrice) : undefined);
+
     return {
       ...plan,
-      price: finalPriceNum === plan.rawPrice ? plan.defaultPrice : `${finalPriceNum.toLocaleString('pt-BR')} Kz`,
+      price: currentPriceStr,
       tag,
-      hasDiscount: hasCouponApplied,
-      originalStr: hasCouponApplied ? `${plan.oldPrice.toLocaleString('pt-BR')} Kz` : plan.defaultPrice,
-      savings: hasCouponApplied ? (plan.oldPrice - finalPriceNum) : undefined
+      hasDiscount: hasCouponApplied || hasBaseDiscount,
+      originalStr: originalStrikethrough,
+      savings: savingsCalculated
     };
   });
 
@@ -840,7 +847,7 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
                     className="space-y-3 overflow-hidden pb-2 pt-2"
                   >
                     <label className="text-xs font-black uppercase tracking-widest text-on-surface-variant ml-1 font-mono opacity-50 block">Escolha o seu Plano</label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                        {REGISTRATION_PLANS.map(plan => (
                          <button
                            key={plan.id}

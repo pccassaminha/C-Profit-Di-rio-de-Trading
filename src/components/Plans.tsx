@@ -3,7 +3,7 @@ import { useTrades } from '../hooks/useTrades';
 import AdBanner from './AdBanner';
 import { db, auth } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, getDocs, getDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { CreditCard, Check, ShieldCheck, Zap, Star, LayoutGrid, Smartphone, MessageSquare, History, Upload, Landmark, X, FileText } from 'lucide-react';
+import { CreditCard, Check, ShieldCheck, Zap, Star, LayoutGrid, Smartphone, MessageSquare, History, Upload, Landmark, X, FileText, Award, ArrowRight } from 'lucide-react';
 import Modal from './Modal';
 import CountryDropdown from './CountryDropdown';
 
@@ -315,74 +315,70 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
   const plans = [
     {
       id: 'iniciante',
-      name: 'Testar Grátis o Seu Diário de Trades',
+      name: 'Plano Gratuito • Para Sempre',
       oldPrice: '0',
       discount: '100% GRÁTIS',
-      savingsText: 'Acesso Gratuito ao Diário de Trades',
+      savingsText: 'Acesso Para Sempre Gratuito',
       price: '0',
-      period: 'sempre grátis',
-      days: 365,
-      limits: '4 Contas de Trading',
+      period: 'para sempre',
+      days: 3650,
+      limits: '4 Contas de Trading (Forex & OB)',
       totalLimit: 4,
-      features: ['Diário de Trades Gratuito', 'Gestão de 4 Contas de Trading', 'Estatísticas de Desempenho & Win Rate', 'Histórico Completo de Ordens', 'Suporte Técnico Integrado'],
+      features: [
+        'Diário de Trades Gratuito Para Sempre',
+        'Gestão de 4 Contas de Trading',
+        'Acesso Completo à Comunidade de Traders',
+        'Estatísticas de Desempenho & Win Rate',
+        'Histórico Completo de Ordens',
+        'Exibição de Anúncios Patrocinados'
+      ],
       current: userPlan?.plan_type === 'Iniciante' || !userPlan?.plan_type || userPlan?.plan_type === 'trial_30' || userPlan?.plan_type === 'trial_15'
     },
     {
-      id: 'mensal_6',
-      name: 'Plano Mensal',
-      oldPrice: '13.236',
-      discount: '-33% OFF',
-      savingsText: 'Poupa Kz 4.412 / mês',
-      price: '8.824',
-      period: 'por mês',
-      days: 30,
-      limits: '6 Contas Forex + 6 Contas OB',
-      totalLimit: 12,
-      features: ['Acesso ao Panorama Global', 'Resumo Semanal Macroeconômico', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade'],
-      current: userPlan?.plan_type === 'mensal_6' || userPlan?.plan_type === 'mensal_2'
-    },
-    {
       id: 'trimestral_6',
-      name: 'Plano Trimestral',
-      oldPrice: '39.708',
+      name: 'Plano Trimestral (3 Meses)',
+      oldPrice: '11.250',
       discount: '-33% OFF',
-      savingsText: 'Poupa Kz 13.236 no trimestre',
-      price: '26.472',
+      savingsText: 'Poupa Kz 3.750 no trimestre',
+      price: '7.500',
       period: 'a cada 3 meses',
       days: 90,
       limits: '6 Contas Forex + 6 Contas OB',
       totalLimit: 12,
-      features: ['Acesso ao Panorama Global', 'Resumo Semanal Macroeconômico', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade VIP'],
+      features: [
+        'Sem Anúncios (Experiência Limpa)',
+        '6 Contas Forex + 6 Contas OB (12 Contas)',
+        'Acesso ao Panorama Global',
+        'Resumo Semanal Macroeconômico',
+        'Importação e Exportação de Trades',
+        'Diário de Trades Ilimitado',
+        'Acesso à Comunidade VIP'
+      ],
       current: userPlan?.plan_type === 'trimestral_6'
     },
     {
       id: 'semestral_8',
-      name: 'Plano Semestral',
-      oldPrice: '79.416',
-      discount: '-33% OFF',
-      savingsText: 'Poupa Kz 26.472 no semestre',
-      price: '52.944',
+      name: 'Plano Semestral (6 Meses)',
+      oldPrice: '22.500',
+      discount: '-38% OFF',
+      savingsText: 'Poupa Kz 8.500 no semestre',
+      price: '14.000',
       period: 'a cada 6 meses',
       days: 180,
       limits: '8 Contas Forex + 8 Contas OB',
       totalLimit: 16,
-      features: ['Acesso ao Panorama Global', 'Resumo Semanal Macroeconômico', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade VIP', 'Suporte Prioritário via WhatsApp'],
+      features: [
+        'Sem Anúncios (Experiência Limpa)',
+        '8 Contas Forex + 8 Contas OB (16 Contas)',
+        'Acesso ao Panorama Global',
+        'Resumo Semanal Macroeconômico',
+        'Importação e Exportação de Trades',
+        'Diário de Trades Ilimitado',
+        'Acesso à Comunidade VIP',
+        'Suporte Prioritário via WhatsApp'
+      ],
       featured: true,
       current: userPlan?.plan_type === 'semestral_8' || userPlan?.plan_type === 'semestral_6'
-    },
-    {
-      id: 'anual_16',
-      name: 'Plano Anual',
-      oldPrice: '158.823',
-      discount: '-33% OFF',
-      savingsText: 'Poupa Kz 52.941 no ano',
-      price: '105.882',
-      period: 'por ano',
-      days: 365,
-      limits: '16 Contas Forex + 16 Contas OB',
-      totalLimit: 32,
-      features: ['Acesso ao Panorama Global', 'Resumo Semanal Macroeconômico', 'Importação de Trades', 'Diário de Trades Ilimitado', 'Acesso à Comunidade VIP', 'Suporte Prioritário via WhatsApp', 'Personalização de Interface', 'Acesso Antecipado a Beta'],
-      current: userPlan?.plan_type === 'anual_16'
     }
   ];
 
@@ -434,7 +430,7 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
               if (hasCoupon || hasTrialConversion) {
                   return `-83% SUPERCUPOM`;
               }
-              return `-33% OFF`;
+              return plan.id === 'semestral_8' ? `-38% OFF` : `-33% OFF`;
           }
       }
       return plan.discount;
@@ -697,93 +693,112 @@ Fico no aguardo, obrigado!`;
         </div>
       </div>
 
-      <div className="plans-ticker-container select-none">
-        <div className="plans-ticker-track">
-          {[...finalPlans, ...finalPlans].map((plan, idx) => {
-            const isTrialBlocked = false;
+      {/* Affiliate Callout Banner */}
+      <div className="bg-gradient-to-r from-cyan-500/10 via-primary/10 to-emerald-500/10 border border-primary/25 rounded-[28px] p-6 max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary shrink-0 shadow-lg">
+            <Award className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-black text-on-surface uppercase tracking-tight flex items-center gap-2">
+              <span>Ganhe Acesso Premium 100% Grátis</span>
+              <span className="text-[10px] bg-primary text-black font-black px-2 py-0.5 rounded-full uppercase tracking-wider">Afiliados</span>
+            </h3>
+            <p className="text-xs text-on-surface-variant font-medium mt-1 leading-relaxed">
+              Sabia que pode ativar a sua Conta Premium sem pagar nada? A cada <strong className="text-white">10 amigos convidados</strong> pelo seu link de afiliado, você ganha <strong className="text-[#00f5a0]">1 Mês de Conta Premium Gratuita</strong>!
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            const event = new CustomEvent('navigateToTab', { detail: 'affiliates_user' });
+            window.dispatchEvent(event);
+          }}
+          className="shrink-0 bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-primary hover:text-white px-5 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2"
+        >
+          <span>Área de Afiliados</span>
+          <ArrowRight size={14} />
+        </button>
+      </div>
 
+      {/* Plans Cards Grid */}
+      <div className="max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+          {finalPlans.map((plan, idx) => {
             return (
               <div 
                 key={`${plan.id}-${idx}`}
-                className={`relative p-[32px_24px] rounded-[32px] border transition-all flex flex-col hover:-translate-y-[6px] hover:z-20 hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] w-[340px] shrink-0 ${
+                className={`relative p-7 md:p-8 rounded-[32px] border transition-all flex flex-col hover:-translate-y-[4px] hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] ${
                   plan.featured 
-                    ? 'bg-surface-container-high border-primary/40 shadow-[0_0_30px_rgba(0,245,160,0.06)] z-10' 
-                    : 'bg-surface-container border-outline hover:border-outline-variant shadow-lg z-0'
+                    ? 'bg-surface-container-high border-primary/50 shadow-[0_0_35px_rgba(0,245,160,0.1)] ring-1 ring-primary/30 z-10' 
+                    : 'bg-surface-container border-outline-variant/30 hover:border-outline-variant shadow-lg z-0'
                 }`}
               >
-                {/* Visual blocking overlay for used trial */}
-                {isTrialBlocked && (
-                  <div className="absolute inset-0 bg-[#080e1a]/85 rounded-[24px] z-[60] flex flex-col items-center justify-center p-6 text-center select-none backdrop-blur-[2px] transition-all">
-                    <Lock className="text-rose-500 text-3xl mb-3 animate-pulse" />
-                    <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Teste Já Utilizado</h4>
-                    <p className="text-[10px] text-on-surface-variant font-medium leading-relaxed max-w-[200px]">
-                      O plano de 30 dias por 500 Kz é de uso único. Selecione uma opção a partir de 5.000 Kz.
-                    </p>
-                  </div>
-                )}
-
                 {plan.featured && (
                   <div className="absolute -top-[12px] left-1/2 -translate-x-1/2 bg-primary text-background text-[9px] font-black py-[4px] px-[16px] rounded-[100px] uppercase tracking-[0.15em] border border-primary/20 shadow-lg shadow-primary/20 z-20">
-                    Best Choice
+                    Best Choice • Mais Popular
                   </div>
                 )}
 
                 <div className="mb-4">
-                  <h3 className="text-[9px] font-bold tracking-[0.15em] uppercase text-on-surface-variant/70 mb-[12px]">{plan.name}</h3>
-                  <div className="flex items-center gap-[6px] text-[11px] text-on-surface-variant/60 line-through mb-[2px]">
-                    {plan.oldPrice}
-                    {plan.discount && (
-                      <span className="inline-block bg-[#ff4b6e]/15 border border-[#ff4b6e]/30 text-[#ff4b6e] text-[8px] font-black tracking-[0.08em] uppercase px-[5px] py-[1px] rounded-[4px] no-underline">
-                        {plan.discount}
-                      </span>
-                    )}
-                  </div>
+                  <h3 className="text-[10px] font-black tracking-[0.15em] uppercase text-on-surface-variant/80 mb-2">{plan.name}</h3>
+                  {plan.oldPrice !== '0' && (
+                    <div className="flex items-center gap-[6px] text-[11px] text-on-surface-variant/60 line-through mb-[2px]">
+                      {plan.oldPrice} Kz
+                      {plan.discount && (
+                        <span className="inline-block bg-[#ff4b6e]/15 border border-[#ff4b6e]/30 text-[#ff4b6e] text-[8px] font-black tracking-[0.08em] uppercase px-[5px] py-[1px] rounded-[4px] no-underline">
+                          {plan.discount}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-baseline gap-1 mb-[4px] overflow-visible">
-                    <span className="text-[20px] xl:text-[24px] font-black font-headline tracking-tighter leading-none text-primary flex items-baseline drop-shadow-[0_4px_12px_rgba(0,245,160,0.15)]">
-                      {plan.price}
-                      <span className="text-[10px] font-black tracking-widest ml-1 opacity-50 text-on-surface uppercase align-baseline">Kz</span>
+                    <span className="text-[26px] xl:text-[30px] font-black font-headline tracking-tighter leading-none text-primary flex items-baseline drop-shadow-[0_4px_12px_rgba(0,245,160,0.15)]">
+                      {plan.price === '0' ? 'GRÁTIS' : plan.price}
+                      {plan.price !== '0' && <span className="text-[11px] font-black tracking-widest ml-1 opacity-50 text-on-surface uppercase align-baseline">Kz</span>}
                     </span>
-                    {(appliedCoupon && (appliedCoupon.targetPlan === 'all' || appliedCoupon?.targetPlan === plan.id)) ? (
-                       <span className="text-[9px] text-on-surface-variant font-bold ml-1 line-through opacity-25 whitespace-nowrap">{plan.originalPriceStr}</span>
+                    {(appliedCoupon && (appliedCoupon.targetPlan === 'all' || appliedCoupon?.targetPlan === plan.id) && plan.price !== '0') ? (
+                       <span className="text-[10px] text-on-surface-variant font-bold ml-1 line-through opacity-25 whitespace-nowrap">{plan.originalPriceStr}</span>
                     ) : null}
                   </div>
-                  <div className="text-[11px] font-medium text-on-surface-variant/60 mb-[18px] uppercase tracking-widest">
+                  <div className="text-[11px] font-medium text-on-surface-variant/70 mb-3 uppercase tracking-widest">
                     {plan.period}
                   </div>
-                  <div className="inline-flex items-center gap-[4px] bg-[#00f5a0]/10 border border-[#00f5a0]/20 text-[#00f5a0] text-[10px] font-bold px-[8px] py-[3px] rounded-[5px] mb-[12px]">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  <div className="inline-flex items-center gap-[4px] bg-[#00f5a0]/10 border border-[#00f5a0]/20 text-[#00f5a0] text-[10px] font-bold px-[8px] py-[3px] rounded-[6px] mb-3">
+                    <Check size={12} className="text-[#00f5a0]" />
                     {plan.savingsText}
                   </div>
-                  <div className="flex items-center gap-[6px] text-[12px] text-on-surface-variant bg-[#00f5a0]/10 border border-[#00f5a0]/15 rounded-[8px] px-[12px] py-[8px] mb-[20px]">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#00f5a0] shrink-0"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                    <span className="text-on-surface-variant leading-tight">{plan.limits}</span>
+                  <div className="flex items-center gap-[6px] text-[12px] text-on-surface bg-surface-container-highest/50 border border-outline-variant/15 rounded-[10px] px-3 py-2 mb-4 font-semibold">
+                    <LayoutGrid size={14} className="text-[#00f5a0] shrink-0" />
+                    <span className="leading-tight">{plan.limits}</span>
                   </div>
                 </div>
 
-                <hr className="border-t border-outline/30 my-[20px]" />
+                <hr className="border-t border-outline-variant/20 my-4" />
 
-                <ul className="flex flex-col gap-[10px] mb-[30px] flex-1 list-none">
-                  {plan.features.map((feature, idx) => {
+                <ul className="flex flex-col gap-2.5 mb-6 flex-1 list-none">
+                  {plan.features.map((feature, fIdx) => {
                      const isPrioritySupport = feature === 'Suporte Prioritário via WhatsApp';
                      const isPanorama = feature === 'Acesso ao Panorama Global';
                      const isMacro = feature.includes('Macroeconômico') || feature.includes('Macroeconómico');
+                     const isAdFree = feature.includes('Sem Anúncios');
                      return (
-                    <li key={idx} className="flex items-center gap-[8px] text-[13px] text-on-surface-variant leading-snug">
-                      <div className={`w-[16px] h-[16px] rounded-full flex items-center justify-center shrink-0 border ${
-                        isPrioritySupport || isPanorama || isMacro ? 'bg-[#00f5a0]/25 border-[#00f5a0]/50' : 'bg-[#00f5a0]/10 border-[#00f5a0]/30'
+                    <li key={fIdx} className="flex items-start gap-2.5 text-[12px] text-on-surface-variant leading-snug">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 border ${
+                        isPrioritySupport || isPanorama || isMacro || isAdFree ? 'bg-[#00f5a0]/25 border-[#00f5a0]/50' : 'bg-[#00f5a0]/10 border-[#00f5a0]/30'
                       }`}>
-                        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke={isPrioritySupport || isPanorama || isMacro ? "var(--color-primary)" : "currentColor"} strokeWidth={isPrioritySupport || isPanorama || isMacro ? "2.5" : "2"} className={isPrioritySupport || isPanorama || isMacro ? "" : "text-[#00f5a0]"}>
-                          <polyline points="2 6 5 9 10 3"/>
-                        </svg>
+                        <Check size={10} className={isPrioritySupport || isPanorama || isMacro || isAdFree ? "text-primary" : "text-[#00f5a0]"} />
                       </div>
                       {isPrioritySupport ? (
-                        <span className="text-[#00f5a0] font-semibold">{feature}</span>
+                        <span className="text-[#00f5a0] font-bold">{feature}</span>
                       ) : isPanorama ? (
                         <span className="text-[#00f5a0] font-black uppercase text-[11px] tracking-wider">🌍 {feature}</span>
                       ) : isMacro ? (
-                        <span className="text-cyan-400 font-bold text-[12px] tracking-wide">📊 {feature}</span>
+                        <span className="text-cyan-400 font-bold text-[11px] tracking-wide">📊 {feature}</span>
+                      ) : isAdFree ? (
+                        <span className="text-emerald-400 font-bold">{feature}</span>
                       ) : (
-                        feature
+                        <span>{feature}</span>
                       )}
                     </li>
                   )})}
@@ -801,15 +816,15 @@ Fico no aguardo, obrigado!`;
                     }
                   }}
                   disabled={plan.current}
-                  className={`w-full py-[12px] rounded-[8px] font-headline text-[12px] font-bold tracking-[0.08em] uppercase transition-all flex items-center justify-center border ${
+                  className={`w-full py-3.5 rounded-xl font-headline text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center border ${
                     plan.current
                       ? 'bg-[#00f5a0]/10 text-[#00f5a0] border-[#00f5a0]/20 cursor-default'
                       : plan.featured
                         ? 'bg-primary text-background border-transparent hover:bg-primary-fixed-dim shadow-[0_8px_20px_rgba(0,245,160,0.25)]'
-                        : 'bg-transparent text-on-surface border-outline-variant hover:bg-white/5'
+                        : 'bg-surface-container-high text-on-surface border-outline-variant/40 hover:bg-surface-container-highest hover:text-white'
                   }`}
                 >
-                  {plan.current ? 'Plano Ativo' : plan.id === 'iniciante' ? 'Testar Grátis Agora' : 'Adquirir Plano'}
+                  {plan.current ? '✓ Plano Ativo' : plan.id === 'iniciante' ? 'Continuar Grátis' : 'Adquirir Assinatura'}
                 </button>
               </div>
             );
@@ -1317,7 +1332,7 @@ Fico no aguardo, obrigado!`;
                               <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
                                 <span>Desconto Activo:</span>
                                 <span className="text-[#00f5a0] font-black">
-                                  {is83Off ? '83% OFF' : '33% OFF'}
+                                  {is83Off ? '83% OFF' : (targetPlan.id === 'semestral_8' ? '38% OFF' : '33% OFF')}
                                 </span>
                               </div>
                               <div className="border-t border-dashed border-[#00f5a0]/20 my-1"></div>
