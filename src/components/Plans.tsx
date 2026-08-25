@@ -337,9 +337,9 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     {
       id: 'trimestral_6',
       name: 'Plano Trimestral (3 Meses)',
-      oldPrice: '11.250',
-      discount: '-33% OFF',
-      savingsText: 'Poupa Kz 3.750 no trimestre',
+      oldPrice: '44.120',
+      discount: '-83% OFF',
+      savingsText: 'Poupa Kz 36.620 no trimestre',
       price: '7.500',
       period: 'a cada 3 meses',
       days: 90,
@@ -359,9 +359,9 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
     {
       id: 'semestral_8',
       name: 'Plano Semestral (6 Meses)',
-      oldPrice: '22.500',
-      discount: '-38% OFF',
-      savingsText: 'Poupa Kz 8.500 no semestre',
+      oldPrice: '82.350',
+      discount: '-83% OFF',
+      savingsText: 'Poupa Kz 68.350 no semestre',
       price: '14.000',
       period: 'a cada 6 meses',
       days: 180,
@@ -384,10 +384,13 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
 
   // Aplicar Desconto do Cupão
   const getDiscountedPrice = (plan: any) => {
-     const priceNum = parsePriceToNumber(plan.price);
-     if (priceNum < 5000) {
-        return plan.price; // O cupão afetará apenas os planos a partir de 5.000 Kz para cima
+     if (plan.id === 'iniciante' || plan.id === 'trial_30') {
+        return plan.price;
      }
+
+     const targetFixedPrice = parsePriceToNumber(plan.price); // 7.500 Kz (trimestral) ou 14.000 Kz (semestral)
+     const originalOldPrice = plan.oldPrice ? parsePriceToNumber(plan.oldPrice) : targetFixedPrice;
+
      let discountPercentage = 0;
      let discountFixed = 0;
 
@@ -404,36 +407,25 @@ export default function Plans({ forcedExpired, hideHeader, onAuthRequired }: { f
         discountPercentage = 83;
      }
 
-     const originalPriceNum = parsePriceToNumber(plan.price);
-     let finalPriceNum = originalPriceNum;
+     // Se for o cupão oficial de 83% ou se estiver no preço base com 83% já calculado:
+     if (discountPercentage === 83 || appliedCoupon?.code === 'CPROFIT83%OFF' || (!appliedCoupon && discountPercentage === 0)) {
+        return formatPrice(targetFixedPrice);
+     }
 
+     let finalPriceNum = originalOldPrice;
      if (discountPercentage > 0) {
-        finalPriceNum = originalPriceNum - (originalPriceNum * (discountPercentage / 100));
+        finalPriceNum = Math.round(originalOldPrice - (originalOldPrice * (discountPercentage / 100)));
      } else if (discountFixed > 0) {
-        finalPriceNum = originalPriceNum - discountFixed;
+        finalPriceNum = originalOldPrice - discountFixed;
      }
 
      if (finalPriceNum < 0) finalPriceNum = 0;
-     
-     // Formatar novamente com pontos
      return formatPrice(finalPriceNum);
   };
 
-  const getFinalDiscountLabel = (plan: any, finalPriceStr: string) => {
-      const finalPriceNum = parsePriceToNumber(finalPriceStr);
-      if (plan.id === 'trial_30') return plan.discount;
-      if (plan.oldPrice) {
-          const oldPriceNum = parsePriceToNumber(plan.oldPrice);
-          if (oldPriceNum > finalPriceNum) {
-              const hasCoupon = appliedCoupon && (appliedCoupon.targetPlan === 'all' || appliedCoupon.targetPlan === plan.id);
-              const hasTrialConversion = !appliedCoupon && (userPlan?.plan_type === 'trial_15' || userPlan?.plan_type === 'trial_30');
-              if (hasCoupon || hasTrialConversion) {
-                  return `-83% SUPERCUPOM`;
-              }
-              return plan.id === 'semestral_8' ? `-38% OFF` : `-33% OFF`;
-          }
-      }
-      return plan.discount;
+  const getFinalDiscountLabel = (plan: any, _finalPriceStr: string) => {
+      if (plan.id === 'iniciante' || plan.id === 'trial_30') return plan.discount;
+      return '-83% SUPERCUPOM';
   };
 
   const finalPlans = plans.map(p => {
@@ -1332,7 +1324,7 @@ Fico no aguardo, obrigado!`;
                               <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
                                 <span>Desconto Activo:</span>
                                 <span className="text-[#00f5a0] font-black">
-                                  {is83Off ? '83% OFF' : (targetPlan.id === 'semestral_8' ? '38% OFF' : '33% OFF')}
+                                  83% OFF
                                 </span>
                               </div>
                               <div className="border-t border-dashed border-[#00f5a0]/20 my-1"></div>

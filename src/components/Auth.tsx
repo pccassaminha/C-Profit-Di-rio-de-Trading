@@ -107,8 +107,8 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
 
   const BASE_PLANS = [
     { id: 'iniciante', name: 'Plano Gratuito • Para Sempre', rawPrice: 0, defaultTag: '100% Grátis', defaultPrice: 'Grátis', oldPrice: 0 },
-    { id: 'trimestral_6', name: 'Plano Trimestral (3 Meses)', rawPrice: 7500, defaultTag: '-33% OFF', defaultPrice: '7.500 Kz', oldPrice: 11250 },
-    { id: 'semestral_8', name: 'Plano Semestral (6 Meses)', rawPrice: 14000, defaultTag: '-38% OFF', defaultPrice: '14.000 Kz', oldPrice: 22500 }
+    { id: 'trimestral_6', name: 'Plano Trimestral (3 Meses)', rawPrice: 7500, defaultTag: '-83% OFF', defaultPrice: '7.500 Kz', oldPrice: 44120 },
+    { id: 'semestral_8', name: 'Plano Semestral (6 Meses)', rawPrice: 14000, defaultTag: '-83% OFF', defaultPrice: '14.000 Kz', oldPrice: 82350 }
   ];
 
   const REGISTRATION_PLANS = BASE_PLANS.map(plan => {
@@ -119,32 +119,25 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
     if (appliedCoupon && plan.rawPrice >= 5000) {
       if (appliedCoupon.targetPlan === 'all' || appliedCoupon.targetPlan === plan.id) {
         hasCouponApplied = true;
-        if (appliedCoupon.discountType === 'percentage') {
-          finalPriceNum = plan.rawPrice - (plan.rawPrice * (appliedCoupon.discountValue / 100));
+        if (appliedCoupon.code === 'CPROFIT83%OFF' || appliedCoupon.discountValue === 83) {
+          finalPriceNum = plan.rawPrice; // Valor fixo já com 83% de desconto: 7.500 Kz ou 14.000 Kz
+          tag = '-83% SUPERCUPOM';
+        } else if (appliedCoupon.discountType === 'percentage') {
+          finalPriceNum = Math.round(plan.oldPrice - (plan.oldPrice * (appliedCoupon.discountValue / 100)));
+          tag = `-${appliedCoupon.discountValue}% OFF`;
         } else if (appliedCoupon.discountType === 'fixed') {
-          finalPriceNum = plan.rawPrice - appliedCoupon.discountValue;
+          finalPriceNum = plan.oldPrice - appliedCoupon.discountValue;
+          tag = `-${appliedCoupon.discountValue} Kz`;
         }
         
         if (finalPriceNum < 0) finalPriceNum = 0;
-        
-        if (appliedCoupon.code === 'CPROFIT83%OFF') {
-          tag = '-83% SUPERCUPOM';
-        } else if (appliedCoupon.discountType === 'percentage') {
-          tag = `-${appliedCoupon.discountValue}% OFF`;
-        } else if (appliedCoupon.discountType === 'fixed') {
-          tag = `-${appliedCoupon.discountValue} Kz`;
-        }
       }
     }
 
     const hasBaseDiscount = plan.oldPrice > 0;
     const currentPriceStr = finalPriceNum === plan.rawPrice ? plan.defaultPrice : `${finalPriceNum.toLocaleString('pt-BR')} Kz`;
-    const originalStrikethrough = hasCouponApplied 
-      ? `${plan.oldPrice.toLocaleString('pt-BR')} Kz` 
-      : (hasBaseDiscount ? `${plan.oldPrice.toLocaleString('pt-BR')} Kz` : undefined);
-    const savingsCalculated = hasCouponApplied 
-      ? (plan.oldPrice - finalPriceNum) 
-      : (hasBaseDiscount ? (plan.oldPrice - plan.rawPrice) : undefined);
+    const originalStrikethrough = hasBaseDiscount ? `${plan.oldPrice.toLocaleString('pt-BR')} Kz` : undefined;
+    const savingsCalculated = hasBaseDiscount ? (plan.oldPrice - finalPriceNum) : undefined;
 
     return {
       ...plan,

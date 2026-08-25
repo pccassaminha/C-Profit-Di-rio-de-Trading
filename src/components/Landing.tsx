@@ -891,6 +891,10 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
               <img src="https://i.postimg.cc/Prh7BMBw/Chat-GPT-Image-14-de-mai-de-2026-11-53-41.png" alt="C Gestão" className="h-[18px] w-[18px] object-contain rounded animate-pulse" />
               <span>C Gestão</span>
             </a>
+            <a href="https://www.cfa-academy.site/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[6px] hover:text-[#00f5a0] transition-colors cursor-pointer no-underline text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
+              <img src="https://i.postimg.cc/Jz2CYxYq/fvcom.png" alt="CFA Academy" className="h-[18px] w-[18px] object-contain rounded" />
+              <span>CFA Academy</span>
+            </a>
           </div>
           <p className="text-[10px] text-on-surface-variant/25 max-w-[460px] mx-auto leading-[1.6]">
             O terminal oficial para traders que buscam a maestria através dos dados. Desenvolvido por traders, para traders.
@@ -934,7 +938,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
                 </h4>
                 
                 <p className="text-[11px] text-on-surface-variant leading-relaxed mt-1.5">
-                  Comece agora com o plano gratuito para testar ou assine o Premium para ter até 16 contas e 0 anúncios!
+                  Comece agora com o plano gratuito para testar ou assine o Premium para ter até 16 contas e navegar totalmente sem anúncios!
                 </p>
               </div>
 
