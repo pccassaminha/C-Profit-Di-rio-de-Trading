@@ -1,13 +1,15 @@
 // Service Worker for C Profit PWA
-const CACHE_NAME = 'c-profit-v1';
+const CACHE_NAME = 'c-profit-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/manifest.json',
   '/c-profit.png',
   '/icon-192.png',
   '/icon-512.png',
   '/apple-touch-icon.png',
+  '/apple-touch-icon-180x180.png',
   '/favicon.png'
 ];
 
