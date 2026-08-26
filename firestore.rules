@@ -255,5 +255,29 @@ service cloud.firestore {
     match /friend_requests/{requestId} {
       allow read, write: if isAuthenticated();
     }
+
+    // Notifications System
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        resource == null || 
+        resource.data.userId == request.auth.uid || 
+        resource.data.userId == 'all' || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.userId == 'all' || 
+        isAdmin()
+      );
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+    }
+
+    // PWA & Device Installations
+    match /pwa_installations/{installId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
   }
 }

@@ -3,7 +3,15 @@ import { db, auth, registerNewMaestroAuth } from '../firebase';
 import { collection, getDocs, doc, getDoc, updateDoc, onSnapshot, query, orderBy, setDoc, addDoc, deleteDoc, where } from 'firebase/firestore';
 import { useTrades } from '../hooks/useTrades';
 import Modal from './Modal';
-import { Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, AlertTriangle, Search, Calendar, SlidersHorizontal, ArrowUpDown, Megaphone, History, Plus, Trash2, Pencil, FileText, ChevronDown, Banknote, BadgeDollarSign, Handshake, ClipboardList, Gift, Coins, Clock, Wallet, UserPlus } from 'lucide-react';
+import { 
+  Users, Settings, CreditCard, Check, X, ShieldAlert, Phone, Landmark, Ticket, 
+  AlertTriangle, Search, Calendar, SlidersHorizontal, ArrowUpDown, Megaphone, 
+  History, Plus, Trash2, Pencil, FileText, ChevronDown, Banknote, BadgeDollarSign, 
+  Handshake, ClipboardList, Gift, Coins, Clock, Wallet, UserPlus, Bell, Smartphone, 
+  Radio, CheckCircle2, Sparkles, Send, BellRing, MessageSquare, AlertCircle, Info, 
+  RefreshCw, Laptop, Eye, SmartphoneCharging
+} from 'lucide-react';
+import { triggerNativeNotification, requestPushPermission } from '../services/notificationService';
 
 const getFormattedPhone = (phone: string | undefined): string => {
   if (!phone) return '';
@@ -21,7 +29,7 @@ export default function AdminPanel() {
   // Super Admin check
   const isSuperAdmin = currentUser?.email === 'exportacoes.extras@gmail.com' || currentUser?.email === 'omilionario.extra@gmail.com' || userPlan?.role === 'admin';
 
-  const [activeTab, setActiveTab ] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast' | 'maestros' | 'affiliates'>('users');
+  const [activeTab, setActiveTab ] = useState<'users' | 'payments' | 'settings' | 'coupons' | 'broadcast' | 'maestros' | 'affiliates' | 'alerts'>('users');
   const [affiliateTab, setAffiliateTab] = useState<'overview' | 'config' | 'commissions' | 'payouts' | 'trials'>('overview');
   const [affilSearch, setAffilSearch] = useState('');
   const [editingUser, setEditingUser] = useState<any>(null);
@@ -35,6 +43,7 @@ export default function AdminPanel() {
   const [coupons, setCoupons] = useState<any[]>([]);
   const [adminReferrals, setAdminReferrals] = useState<any[]>([]);
   const [adminPayouts, setAdminPayouts] = useState<any[]>([]);
+  const [notificationsList, setNotificationsList] = useState<any[]>([]);
   const [selectedStatList, setSelectedStatList] = useState<'faturado' | 'descontos' | 'parceiros' | null>(null);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [showDangerZone, setShowDangerZone] = useState(false);
@@ -42,6 +51,19 @@ export default function AdminPanel() {
   const [newMaestroEmail, setNewMaestroEmail] = useState('');
   const [newMaestroPassword, setNewMaestroPassword] = useState('');
   const [newMaestroSubmitting, setNewMaestroSubmitting] = useState(false);
+
+  // Alerts & Notifications Management State
+  const [alertViewMode, setAlertViewMode] = useState<'overview' | 'send' | 'history' | 'triggers'>('overview');
+  const [manualTarget, setManualTarget] = useState<'all' | 'free' | 'premium' | 'specific'>('all');
+  const [manualTargetUserId, setManualTargetUserId] = useState('');
+  const [manualTargetSearch, setManualTargetSearch] = useState('');
+  const [manualAlertTitle, setManualAlertTitle] = useState('');
+  const [manualAlertBody, setManualAlertBody] = useState('');
+  const [manualAlertType, setManualAlertType] = useState<'broadcast' | 'system_alert' | 'update' | 'tip' | 'urgent'>('broadcast');
+  const [manualAlertActionTab, setManualAlertActionTab] = useState<'dashboard' | 'plans' | 'community' | 'trades' | 'affiliates_user'>('dashboard');
+  const [manualAlertSending, setManualAlertSending] = useState(false);
+  const [alertHistoryFilter, setAlertHistoryFilter] = useState<'all' | 'broadcast' | 'system_alert' | 'user_registration' | 'payment_pending' | 'community_post' | 'subscription_expiring'>('all');
+  const [alertSearchQuery, setAlertSearchQuery] = useState('');
 
   // Filter & Search states for users tab
   const [userSearch, setUserSearch] = useState('');
@@ -363,6 +385,11 @@ export default function AdminPanel() {
       setBroadcasts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => console.warn('AdminPanel broadcasts snapshot error:', err));
 
+    // Listen to notifications
+    const unsubNotifications = onSnapshot(query(collection(db, 'notifications'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setNotificationsList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => console.warn('AdminPanel notifications snapshot error:', err));
+
     // Listen to global settings to keep settings state fully active in real time
     const unsubGlobalSettings = onSnapshot(doc(db, 'settings', 'global'), (docSnap) => {
       if (docSnap.exists()) {
@@ -381,6 +408,7 @@ export default function AdminPanel() {
       unsubReferrals();
       unsubPayouts();
       unsubBroadcasts();
+      unsubNotifications();
       unsubGlobalSettings();
     };
   }, [isSuperAdmin]);
@@ -612,6 +640,101 @@ export default function AdminPanel() {
     }
   };
 
+  const handleSendManualAlert = async () => {
+    if (!manualAlertTitle.trim()) return alert('Por favor, digite um título para a notificação.');
+    if (!manualAlertBody.trim()) return alert('Por favor, digite a mensagem da notificação.');
+    if (manualTarget === 'specific' && !manualTargetUserId) return alert('Por favor, selecione o trader destinatário na lista.');
+
+    setManualAlertSending(true);
+    try {
+      let targetUserIds: string[] = [];
+      let targetLabel = 'Todos os Usuários (Global)';
+
+      if (manualTarget === 'all') {
+        targetUserIds = ['all'];
+      } else if (manualTarget === 'free') {
+        targetUserIds = users.filter(u => !u.plan_type || u.plan_type === 'gratuito' || u.plan_type === 'free').map(u => u.id);
+        targetLabel = 'Usuários Plano Free / Iniciante';
+      } else if (manualTarget === 'premium') {
+        targetUserIds = users.filter(u => u.plan_type && u.plan_type !== 'gratuito' && u.plan_type !== 'free').map(u => u.id);
+        targetLabel = 'Usuários Planos Premium';
+      } else if (manualTarget === 'specific') {
+        targetUserIds = [manualTargetUserId];
+        const found = users.find(u => u.id === manualTargetUserId);
+        targetLabel = found ? `Trader: ${found.nome || found.email}` : 'Trader Específico';
+      }
+
+      // Write to notifications collection
+      for (const targetId of targetUserIds) {
+        await addDoc(collection(db, 'notifications'), {
+          userId: targetId,
+          type: manualAlertType,
+          title: manualAlertTitle.trim(),
+          body: manualAlertBody.trim(),
+          actionTab: manualAlertActionTab,
+          targetLabel: targetLabel,
+          author: currentUser?.displayName || currentUser?.email || 'Admin Master',
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      // If global or broadcast, also add to broadcasts collection
+      if (manualTarget === 'all' || manualAlertType === 'broadcast') {
+        await addDoc(collection(db, 'broadcasts'), {
+          message: `${manualAlertTitle.trim()}: ${manualAlertBody.trim()}`,
+          createdAt: new Date().toISOString(),
+          author: currentUser?.displayName || 'Admin Master'
+        });
+      }
+
+      // Trigger instant push notification locally
+      triggerNativeNotification(
+        manualAlertTitle.trim(),
+        manualAlertBody.trim(),
+        manualAlertActionTab,
+        'https://i.postimg.cc/v8qJ6KTk/C-profit.png'
+      );
+
+      setManualAlertTitle('');
+      setManualAlertBody('');
+      setManualTargetUserId('');
+      setManualTargetSearch('');
+      alert(`✅ Notificação disparada com sucesso para ${targetLabel}!`);
+      setAlertViewMode('history');
+    } catch (e: any) {
+      console.error('Erro ao disparar notificação:', e);
+      alert('Erro ao enviar notificação: ' + (e.message || e));
+    } finally {
+      setManualAlertSending(false);
+    }
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+    if (!window.confirm('Deseja apagar este registo de notificação?')) return;
+    try {
+      await deleteDoc(doc(db, 'notifications', id));
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao apagar notificação.');
+    }
+  };
+
+  const handleTestPush = async () => {
+    const perm = await requestPushPermission();
+    if (perm === 'granted') {
+      triggerNativeNotification(
+        '🔔 Notificação Push C Profit Ativa!',
+        'O sistema de notificações Push e PWA está 100% operacional no seu dispositivo.',
+        'dashboard',
+        'https://i.postimg.cc/v8qJ6KTk/C-profit.png'
+      );
+      alert('Notificação Push de teste disparada!');
+    } else {
+      alert('A permissão de notificações não está ativa no seu navegador. Ative as notificações nas permissões do site.');
+    }
+  };
+
   const [newCoupon, setNewCoupon] = useState({
     code: '',
     discountType: 'percentage', // 'percentage' | 'fixed'
@@ -800,7 +923,7 @@ export default function AdminPanel() {
           Gestão <span className="text-primary italic">Business</span>
         </h2>
         
-        <div className="flex p-1 bg-surface-container rounded-xl">
+        <div className="flex p-1 bg-surface-container rounded-xl flex-wrap gap-1">
           <button 
             onClick={() => setActiveTab('users')}
             className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'users' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
@@ -818,6 +941,12 @@ export default function AdminPanel() {
             className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'coupons' ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
             <Ticket size={18} /> Cupons
+          </button>
+          <button 
+            onClick={() => setActiveTab('alerts')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'alerts' ? 'bg-[#00f5a0] text-black shadow-lg shadow-[#00f5a0]/20 font-black' : 'text-on-surface-variant hover:text-on-surface'}`}
+          >
+            <Megaphone size={18} /> Alertas e Comunicação
           </button>
           <button 
             onClick={() => setActiveTab('maestros')}
@@ -2523,12 +2652,11 @@ export default function AdminPanel() {
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                    <button
                       onClick={() => {
-                        setBroadcastTab('create');
-                        setShowBroadcastModal(true);
+                        setActiveTab('alerts');
                       }}
                       className="w-full sm:w-auto bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-background px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#00f5a0]/15 hover:scale-[1.02] active:scale-[0.98] transition-all"
                    >
-                      <Megaphone size={14} /> Avisos / Comunicados
+                      <Megaphone size={14} /> Alertas e Comunicações
                    </button>
                    <button
                       onClick={() => {
@@ -3258,6 +3386,743 @@ export default function AdminPanel() {
               </button>
             </div>
           </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ABA DE ALERTAS E COMUNICAÇÃO (CENTRAL DE NOTIFICAÇÕES & PWA) */}
+      {activeTab === 'alerts' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          
+          {/* Sub-Nav dos Alertas */}
+          <div className="flex flex-wrap gap-2 p-2 bg-surface-container rounded-2xl border border-outline-variant/20 sticky top-[72px] z-20 backdrop-blur-md">
+            <button 
+              onClick={() => setAlertViewMode('overview')} 
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${alertViewMode === 'overview' ? 'bg-[#00f5a0] text-black shadow-lg shadow-[#00f5a0]/20 font-black' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}
+            >
+              <Smartphone size={16} /> Painel & Instalações PWA
+            </button>
+            <button 
+              onClick={() => setAlertViewMode('send')} 
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${alertViewMode === 'send' ? 'bg-[#00f5a0] text-black shadow-lg shadow-[#00f5a0]/20 font-black' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}
+            >
+              <Send size={16} /> Disparar Alerta / Notificação
+            </button>
+            <button 
+              onClick={() => setAlertViewMode('history')} 
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${alertViewMode === 'history' ? 'bg-[#00f5a0] text-black shadow-lg shadow-[#00f5a0]/20 font-black' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}
+            >
+              <History size={16} /> Histórico & Logs <span className="bg-surface-container-highest/80 px-2 py-0.5 rounded-full text-[10px] font-bold">{notificationsList.length + broadcasts.length}</span>
+            </button>
+            <button 
+              onClick={() => setAlertViewMode('triggers')} 
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${alertViewMode === 'triggers' ? 'bg-[#00f5a0] text-black shadow-lg shadow-[#00f5a0]/20 font-black' : 'text-on-surface-variant hover:text-white hover:bg-surface-container-high'}`}
+            >
+              <BellRing size={16} /> Gatilhos Automáticos Ativos
+            </button>
+          </div>
+
+          {/* MODO 1: DASHBOARD & MÉTRICAS DE INSTALAÇÕES */}
+          {alertViewMode === 'overview' && (
+            <div className="space-y-6">
+              {/* Stat Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#00f5a0]/5 rounded-full blur-2xl group-hover:bg-[#00f5a0]/10 transition-colors"></div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-black uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+                      <Smartphone className="w-4 h-4 text-[#00f5a0]" /> App PWA Instalado
+                    </span>
+                    <span className="bg-[#00f5a0]/15 text-[#00f5a0] text-[10px] font-black px-2 py-0.5 rounded-full">
+                      Mobile Only
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black font-headline text-white">
+                      {users.filter(u => u.pwaInstalled).length}
+                    </span>
+                    <span className="text-xs text-on-surface-variant font-bold">
+                      de {users.length} traders ({users.length > 0 ? Math.round((users.filter(u => u.pwaInstalled).length / users.length) * 100) : 0}%)
+                    </span>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-outline-variant/10 flex items-center justify-between text-[11px] text-on-surface-variant font-semibold">
+                    <span>Android: {users.filter(u => u.pwaInstalled && u.pwaPlatform !== 'iOS').length}</span>
+                    <span>iPhone/iOS: {users.filter(u => u.pwaInstalled && u.pwaPlatform === 'iOS').length}</span>
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-colors"></div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-black uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+                      <BellRing className="w-4 h-4 text-cyan-400" /> Push Ativo
+                    </span>
+                    <span className="bg-cyan-500/15 text-cyan-400 text-[10px] font-black px-2 py-0.5 rounded-full">
+                      Tempo Real
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black font-headline text-white">
+                      {users.filter(u => u.pushNotificationsEnabled).length || Math.max(1, users.filter(u => u.pwaInstalled).length)}
+                    </span>
+                    <span className="text-xs text-on-surface-variant font-bold">
+                      dispositivos
+                    </span>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-outline-variant/10 text-[11px] text-on-surface-variant font-semibold">
+                    Recepção nativa no ecrã de bloqueio
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-colors"></div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-black uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+                      <Megaphone className="w-4 h-4 text-amber-400" /> Comunicados Globais
+                    </span>
+                    <span className="bg-amber-500/15 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-full">
+                      Ativos
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black font-headline text-white">
+                      {broadcasts.length}
+                    </span>
+                    <span className="text-xs text-on-surface-variant font-bold">
+                      avisos no feed
+                    </span>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-outline-variant/10 text-[11px] text-on-surface-variant font-semibold">
+                    Exibidos no topo da plataforma
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-colors"></div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-black uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+                      <History className="w-4 h-4 text-purple-400" /> Total Notificações
+                    </span>
+                    <span className="bg-purple-500/15 text-purple-400 text-[10px] font-black px-2 py-0.5 rounded-full">
+                      Registadas
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black font-headline text-white">
+                      {notificationsList.length}
+                    </span>
+                    <span className="text-xs text-on-surface-variant font-bold">
+                      disparos totais
+                    </span>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-outline-variant/10 text-[11px] text-on-surface-variant font-semibold">
+                    Logs automáticos e manuais
+                  </div>
+                </div>
+              </div>
+
+              {/* Informative Banner & Architecture Rules */}
+              <div className="bg-[#0a0f1d] border border-[#00f5a0]/30 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  <div className="space-y-2 max-w-2xl">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00f5a0]/15 text-[#00f5a0] text-xs font-black uppercase tracking-wider">
+                      <CheckCircle2 size={14} /> Sistema Inteligente PWA & Notificações Ativo
+                    </div>
+                    <h3 className="text-xl md:text-2xl font-black text-white font-headline">
+                      Regras de Instalação e Privacidade do Utilizador
+                    </h3>
+                    <p className="text-xs md:text-sm text-on-surface-variant leading-relaxed">
+                      O banner de instalação foi concebido estritamente para <strong>dispositivos móveis (Android e iPhone)</strong>. Computadores e laptops nunca visualizam popups de instalação intrusivos. Após a instalação no telemóvel ou em modo tela cheia (standalone), o sistema <strong>auto-deteta a instalação</strong> e suprime permanentemente o popup sem necessidade de intervenção do trader.
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
+                    <button
+                      onClick={() => setAlertViewMode('send')}
+                      className="bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-black px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#00f5a0]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                      <Send size={15} /> Disparar Comunicado
+                    </button>
+                    <button
+                      onClick={handleTestPush}
+                      className="bg-surface-container hover:bg-surface-container-high text-white border border-outline-variant/20 px-5 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                      <Bell size={15} /> Testar Push Agora
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions & Recent Broadcasts Preview */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-bold text-base text-white flex items-center gap-2">
+                      <Megaphone className="text-[#00f5a0]" size={18} /> Comunicados Globais no Feed ({broadcasts.length})
+                    </h4>
+                    <button
+                      onClick={() => setAlertViewMode('send')}
+                      className="text-xs text-[#00f5a0] font-black uppercase hover:underline"
+                    >
+                      + Novo
+                    </button>
+                  </div>
+
+                  {broadcasts.length === 0 ? (
+                    <div className="text-center py-10 text-on-surface-variant text-xs">
+                      Nenhum comunicado global ativo no momento.
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                      {broadcasts.map(b => (
+                        <div key={b.id} className="bg-surface-container/60 border border-outline-variant/10 rounded-2xl p-4 flex items-start justify-between gap-3">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 text-[10px] text-on-surface-variant">
+                              <span className="font-bold text-white">{b.author || 'Admin Master'}</span>
+                              <span>•</span>
+                              <span>{new Date(b.createdAt).toLocaleString('pt-AO', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                            </div>
+                            <p className="text-xs text-on-surface leading-relaxed break-words font-medium">{b.message}</p>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteBroadcast(b.id)}
+                            className="text-error/70 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors shrink-0"
+                            title="Apagar comunicado"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-bold text-base text-white flex items-center gap-2">
+                      <BellRing className="text-cyan-400" size={18} /> Últimas Notificações de Sistema ({notificationsList.slice(0, 5).length})
+                    </h4>
+                    <button
+                      onClick={() => setAlertViewMode('history')}
+                      className="text-xs text-cyan-400 font-black uppercase hover:underline"
+                    >
+                      Ver Todas
+                    </button>
+                  </div>
+
+                  {notificationsList.length === 0 ? (
+                    <div className="text-center py-10 text-on-surface-variant text-xs">
+                      Nenhuma notificação registada no sistema.
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                      {notificationsList.slice(0, 5).map(n => (
+                        <div key={n.id} className="bg-surface-container/60 border border-outline-variant/10 rounded-2xl p-3.5 flex items-start justify-between gap-3">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-white">{n.title}</span>
+                              <span className="text-[9px] bg-primary/10 text-primary font-bold px-1.5 py-0.5 rounded">
+                                {n.targetLabel || 'Global'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-on-surface-variant line-clamp-1">{n.body}</p>
+                            <span className="text-[10px] text-on-surface-variant/60 block">
+                              {new Date(n.createdAt).toLocaleString('pt-AO', { dateStyle: 'short', timeStyle: 'short' })}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteNotification(n.id)}
+                            className="text-white/40 hover:text-error p-1.5 rounded-lg hover:bg-surface-container transition-colors shrink-0"
+                            title="Apagar notificação"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODO 2: DISPARAR NOVO ALERTA / NOTIFICAÇÃO */}
+          {alertViewMode === 'send' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              
+              {/* Formulário Principal */}
+              <div className="lg:col-span-7 bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+                <div>
+                  <h3 className="text-xl font-black text-white font-headline flex items-center gap-2">
+                    <Send className="text-[#00f5a0]" size={20} /> Disparar Notificação & Comunicado Manual
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    Envie comunicações em massa, avisos urgentes ou notificações direcionadas para utilizadores específicos com redirecionamento de tela.
+                  </p>
+                </div>
+
+                {/* 1. Seleção do Público Alvo */}
+                <div className="space-y-3">
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-on-surface-variant">
+                    1. Selecione o Público-Alvo
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setManualTarget('all')}
+                      className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 ${manualTarget === 'all' ? 'bg-[#00f5a0]/15 border-[#00f5a0] text-[#00f5a0] font-black shadow-md' : 'bg-surface-container border-outline-variant/10 text-on-surface-variant hover:text-white'}`}
+                    >
+                      <Users size={18} />
+                      <span className="text-xs">Todos ({users.length})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualTarget('free')}
+                      className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 ${manualTarget === 'free' ? 'bg-[#00f5a0]/15 border-[#00f5a0] text-[#00f5a0] font-black shadow-md' : 'bg-surface-container border-outline-variant/10 text-on-surface-variant hover:text-white'}`}
+                    >
+                      <Coins size={18} />
+                      <span className="text-xs">Plano Free</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualTarget('premium')}
+                      className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 ${manualTarget === 'premium' ? 'bg-[#00f5a0]/15 border-[#00f5a0] text-[#00f5a0] font-black shadow-md' : 'bg-surface-container border-outline-variant/10 text-on-surface-variant hover:text-white'}`}
+                    >
+                      <BadgeDollarSign size={18} />
+                      <span className="text-xs">Assinantes</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualTarget('specific')}
+                      className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 ${manualTarget === 'specific' ? 'bg-[#00f5a0]/15 border-[#00f5a0] text-[#00f5a0] font-black shadow-md' : 'bg-surface-container border-outline-variant/10 text-on-surface-variant hover:text-white'}`}
+                    >
+                      <UserPlus size={18} />
+                      <span className="text-xs">Trader Único</span>
+                    </button>
+                  </div>
+
+                  {/* Seletor de Trader Específico */}
+                  {manualTarget === 'specific' && (
+                    <div className="mt-3 p-4 bg-surface-container/60 border border-outline-variant/15 rounded-2xl space-y-3 animate-in fade-in duration-200">
+                      <div className="relative">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant w-4 h-4" />
+                        <input
+                          type="text"
+                          value={manualTargetSearch}
+                          onChange={e => setManualTargetSearch(e.target.value)}
+                          placeholder="Buscar trader por nome ou email..."
+                          className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-outline-variant/20 rounded-xl text-xs text-white focus:outline-none focus:border-[#00f5a0]"
+                        />
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                        {users
+                          .filter(u => u.status !== 'deleted')
+                          .filter(u => 
+                            (u.nome || '').toLowerCase().includes(manualTargetSearch.toLowerCase()) ||
+                            (u.name || '').toLowerCase().includes(manualTargetSearch.toLowerCase()) ||
+                            (u.email || '').toLowerCase().includes(manualTargetSearch.toLowerCase())
+                          )
+                          .slice(0, 15)
+                          .map(u => (
+                            <div
+                              key={u.id}
+                              onClick={() => setManualTargetUserId(u.id)}
+                              className={`p-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all ${manualTargetUserId === u.id ? 'bg-[#00f5a0] text-black font-bold' : 'bg-surface-container hover:bg-surface-container-high text-on-surface'}`}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold truncate">{u.nome || u.name || 'Sem nome'}</p>
+                                <p className={`text-[10px] truncate ${manualTargetUserId === u.id ? 'text-black/80' : 'text-on-surface-variant'}`}>{u.email}</p>
+                              </div>
+                              <span className={`text-[9px] px-2 py-0.5 rounded-md font-black uppercase ${manualTargetUserId === u.id ? 'bg-black/20 text-black' : 'bg-surface-container-highest text-on-surface-variant'}`}>
+                                {u.plan_type || 'Iniciante'}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Categoria & Tipo do Alerta */}
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-on-surface-variant">
+                    2. Tipo / Categoria do Alerta
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'broadcast', label: '📢 Comunicado Oficial' },
+                      { id: 'urgent', label: '🚨 Alerta Urgente' },
+                      { id: 'update', label: '🚀 Nova Atualização' },
+                      { id: 'tip', label: '💡 Dica de Gestão / Mindset' },
+                      { id: 'system_alert', label: '🎁 Promoção / Cupão' },
+                    ].map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setManualAlertType(t.id as any)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${manualAlertType === t.id ? 'bg-white text-black font-black shadow-md' : 'bg-surface-container text-on-surface-variant hover:text-white'}`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Título e Mensagem */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-on-surface-variant mb-1.5">
+                      3. Título da Notificação
+                    </label>
+                    <input
+                      type="text"
+                      value={manualAlertTitle}
+                      onChange={e => setManualAlertTitle(e.target.value)}
+                      placeholder="Ex: 🚀 Atualização no Diário de Trades C Profit"
+                      maxLength={80}
+                      className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#00f5a0]"
+                    />
+                    <div className="flex justify-end text-[10px] text-on-surface-variant/60 mt-1">
+                      {manualAlertTitle.length}/80 caracteres
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-on-surface-variant mb-1.5">
+                      4. Mensagem Completa
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={manualAlertBody}
+                      onChange={e => setManualAlertBody(e.target.value)}
+                      placeholder="Escreva a mensagem clara e objetiva para os traders..."
+                      maxLength={350}
+                      className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#00f5a0] resize-none"
+                    />
+                    <div className="flex justify-end text-[10px] text-on-surface-variant/60 mt-1">
+                      {manualAlertBody.length}/350 caracteres
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-on-surface-variant mb-1.5">
+                      5. Redirecionamento ao Clicar na Notificação (Aba Alvo)
+                    </label>
+                    <select
+                      value={manualAlertActionTab}
+                      onChange={e => setManualAlertActionTab(e.target.value as any)}
+                      className="w-full bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#00f5a0]"
+                    >
+                      <option value="dashboard">🏠 Dashboard Principal</option>
+                      <option value="plans">💎 Planos & Subscrição</option>
+                      <option value="community">👥 Comunidade de Traders</option>
+                      <option value="trades">📊 Diário de Trades</option>
+                      <option value="affiliates_user">🤝 Área de Afiliados</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Botões de Ação */}
+                <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    disabled={manualAlertSending}
+                    onClick={handleSendManualAlert}
+                    className="flex-1 bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-black py-3.5 rounded-2xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#00f5a0]/20 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {manualAlertSending ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" /> Disparando Notificações...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" /> Disparar Notificação Push & Comunicado
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTestPush}
+                    className="bg-surface-container hover:bg-surface-container-high text-white px-5 py-3.5 rounded-2xl font-bold uppercase text-xs tracking-wider border border-outline-variant/20 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Bell className="w-4 h-4" /> Testar no Meu Dispositivo
+                  </button>
+                </div>
+              </div>
+
+              {/* Simulador Interativo em Tempo Real */}
+              <div className="lg:col-span-5 space-y-6">
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+                      <Eye size={16} className="text-[#00f5a0]" /> Simulação Push no Telemóvel
+                    </span>
+                    <span className="text-[10px] bg-[#00f5a0]/15 text-[#00f5a0] font-black px-2 py-0.5 rounded-full">
+                      Tempo Real
+                    </span>
+                  </div>
+
+                  {/* Smartphone Lockscreen Mockup */}
+                  <div className="w-full bg-[#0d1425] border-2 border-outline-variant/30 rounded-[32px] p-5 shadow-2xl space-y-4 relative overflow-hidden">
+                    {/* Top Status Bar */}
+                    <div className="flex justify-between items-center text-[10px] text-white/50 px-2 font-mono">
+                      <span>09:41</span>
+                      <div className="flex items-center gap-1.5">
+                        <span>5G</span>
+                        <div className="w-4 h-2 border border-white/50 rounded-sm p-0.5">
+                          <div className="w-full h-full bg-white"></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lock Screen Push Notification Widget */}
+                    <div className="bg-[#1a233a]/90 backdrop-blur-md border border-[#00f5a0]/40 rounded-2xl p-4 shadow-xl space-y-2 animate-in zoom-in-95 duration-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <img 
+                            src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" 
+                            alt="C Profit" 
+                            className="w-5 h-5 rounded-md object-cover" 
+                          />
+                          <span className="text-[11px] font-black text-white uppercase tracking-wider">C Profit App</span>
+                        </div>
+                        <span className="text-[9px] text-white/40 font-mono">Agora</span>
+                      </div>
+
+                      <div>
+                        <h5 className="text-xs font-black text-[#00f5a0] leading-tight">
+                          {manualAlertTitle || 'Título da Notificação'}
+                        </h5>
+                        <p className="text-[11px] text-white/80 mt-1 leading-snug break-words">
+                          {manualAlertBody || 'Escreva o texto do seu alerta para pré-visualizar aqui como ele será renderizado no telemóvel dos traders.'}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] text-white/40">
+                        <span>Toque para abrir a aplicação</span>
+                        <span className="text-[#00f5a0] font-bold">Ação: {manualAlertActionTab}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 text-center">
+                      <span className="text-[10px] text-white/30 font-medium">
+                        Disparado via Firebase & Push Service Worker
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Audience Target Summary */}
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-5 space-y-2 text-xs">
+                  <span className="font-black text-white uppercase tracking-wider block text-[10px] text-on-surface-variant">
+                    Resumo do Disparo
+                  </span>
+                  <div className="space-y-1 text-on-surface-variant">
+                    <p>• <strong>Destino:</strong> {manualTarget === 'all' ? 'Todos os Utilizadores da Plataforma' : manualTarget === 'free' ? 'Utilizadores no Plano Free' : manualTarget === 'premium' ? 'Utilizadores com Assinatura Ativa' : 'Trader Específico'}</p>
+                    <p>• <strong>Tipo:</strong> {manualAlertType}</p>
+                    <p>• <strong>Canais:</strong> Push Notification Nativo + Feed de Comunicados + Central de Notificações</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODO 3: HISTÓRICO & LOGS DE NOTIFICAÇÕES */}
+          {alertViewMode === 'history' && (
+            <div className="space-y-6">
+              {/* Filtros e Busca */}
+              <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-surface-container-low border border-outline-variant/20 rounded-3xl p-4 md:p-6 shadow-xl">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant w-4 h-4" />
+                  <input
+                    type="text"
+                    value={alertSearchQuery}
+                    onChange={e => setAlertSearchQuery(e.target.value)}
+                    placeholder="Filtrar histórico por título, conteúdo ou destinatário..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-surface-container border border-outline-variant/20 rounded-xl text-xs text-white focus:outline-none focus:border-[#00f5a0]"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { id: 'all', label: 'Todas' },
+                    { id: 'broadcast', label: 'Comunicados' },
+                    { id: 'system_alert', label: 'Sistema' },
+                    { id: 'user_registration', label: 'Registos' },
+                    { id: 'payment_pending', label: 'Pagamentos' },
+                    { id: 'community_post', label: 'Comunidade' },
+                    { id: 'subscription_expiring', label: 'Vencimentos' },
+                  ].map(f => (
+                    <button
+                      key={f.id}
+                      onClick={() => setAlertHistoryFilter(f.id as any)}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all ${alertHistoryFilter === f.id ? 'bg-primary text-on-primary font-black' : 'bg-surface-container text-on-surface-variant hover:text-white'}`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lista do Histórico */}
+              <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl overflow-hidden shadow-xl">
+                <div className="p-6 border-b border-outline-variant/20 flex items-center justify-between">
+                  <h4 className="font-bold text-base text-white flex items-center gap-2">
+                    <History size={18} className="text-[#00f5a0]" /> Registos de Notificações e Alertas
+                  </h4>
+                  <span className="text-xs text-on-surface-variant font-medium">
+                    Total: {notificationsList.length} registos
+                  </span>
+                </div>
+
+                {notificationsList.length === 0 ? (
+                  <div className="p-12 text-center text-on-surface-variant text-sm">
+                    Nenhum registo de notificação encontrado.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-outline-variant/10 max-h-[600px] overflow-y-auto">
+                    {notificationsList
+                      .filter(n => {
+                        if (alertHistoryFilter !== 'all' && n.type !== alertHistoryFilter) return false;
+                        if (alertSearchQuery) {
+                          const q = alertSearchQuery.toLowerCase();
+                          const t = (n.title || '').toLowerCase();
+                          const b = (n.body || '').toLowerCase();
+                          const l = (n.targetLabel || '').toLowerCase();
+                          return t.includes(q) || b.includes(q) || l.includes(q);
+                        }
+                        return true;
+                      })
+                      .map(item => (
+                        <div key={item.id} className="p-5 hover:bg-surface-container/40 transition-colors flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3.5 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-surface-container border border-outline-variant/20 flex items-center justify-center shrink-0 mt-0.5">
+                              {item.type === 'user_registration' ? (
+                                <UserPlus className="w-4 h-4 text-emerald-400" />
+                              ) : item.type === 'payment_pending' ? (
+                                <CreditCard className="w-4 h-4 text-amber-400" />
+                              ) : item.type === 'community_post' ? (
+                                <MessageSquare className="w-4 h-4 text-cyan-400" />
+                              ) : item.type === 'subscription_expiring' ? (
+                                <Clock className="w-4 h-4 text-rose-400" />
+                              ) : (
+                                <Megaphone className="w-4 h-4 text-[#00f5a0]" />
+                              )}
+                            </div>
+
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h5 className="text-xs font-black text-white">{item.title}</h5>
+                                <span className="text-[9px] bg-[#00f5a0]/10 text-[#00f5a0] font-bold px-2 py-0.5 rounded-full uppercase">
+                                  {item.targetLabel || item.userId || 'Global'}
+                                </span>
+                                <span className="text-[10px] text-on-surface-variant font-mono">
+                                  {new Date(item.createdAt).toLocaleString('pt-AO', { dateStyle: 'short', timeStyle: 'short' })}
+                                </span>
+                              </div>
+                              <p className="text-xs text-on-surface leading-relaxed break-words font-medium">{item.body}</p>
+                              {item.actionTab && (
+                                <span className="text-[10px] text-on-surface-variant/80 font-bold inline-block">
+                                  Redireciona para: #{item.actionTab}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleDeleteNotification(item.id)}
+                            className="text-on-surface-variant hover:text-error p-2 rounded-xl hover:bg-surface-container transition-colors shrink-0"
+                            title="Apagar registo"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* MODO 4: GATILHOS AUTOMÁTICOS DO SISTEMA */}
+          {alertViewMode === 'triggers' && (
+            <div className="space-y-6">
+              <div className="bg-surface-container-low border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-xl space-y-4">
+                <div>
+                  <h3 className="text-xl font-black text-white font-headline flex items-center gap-2">
+                    <BellRing className="text-[#00f5a0]" size={22} /> Monitoramento dos Gatilhos Automáticos Ativos
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    Todos os gatilhos abaixo estão pré-configurados e em execução contínua no ecossistema C Profit.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+                  {[
+                    {
+                      title: '👤 Novo Registo de Trader',
+                      desc: 'Notifica imediatamente o Admin Master (exportacoes.extras@gmail.com) quando um novo trader cria conta.',
+                      status: 'Ativo & Operacional',
+                      color: 'emerald'
+                    },
+                    {
+                      title: '💰 Nova Solicitação de Pagamento',
+                      desc: 'Avisa o Admin Master com comprovativo pendente para validação e ativação rápida de planos.',
+                      status: 'Ativo & Operacional',
+                      color: 'amber'
+                    },
+                    {
+                      title: '🤝 Indicação & Comissão de Afiliado',
+                      desc: 'Notifica o afiliado sempre que o seu link/código de parceiro é utilizado com sucesso.',
+                      status: 'Ativo & Operacional',
+                      color: 'cyan'
+                    },
+                    {
+                      title: '📢 Nova Postagem na Comunidade',
+                      desc: 'Alerta todos os traders quando uma nova análise técnica ou ideia for publicada no feed comunitário.',
+                      status: 'Ativo & Operacional',
+                      color: 'purple'
+                    },
+                    {
+                      title: '⏳ Lembretes de Vencimento de Plano',
+                      desc: 'Avisos inteligentes enviados aos assinantes com 15 dias, 5 dias, 2 dias e no dia de expiração.',
+                      status: 'Ativo & Operacional',
+                      color: 'rose'
+                    },
+                    {
+                      title: '📊 Fechamento e Balanço Semanal',
+                      desc: 'Resumo de desempenho de trading e dicas de gestão de risco e psicologia disparados nos fins de semana.',
+                      status: 'Ativo & Operacional',
+                      color: 'blue'
+                    }
+                  ].map((trig, idx) => (
+                    <div key={idx} className="bg-surface-container border border-outline-variant/15 rounded-2xl p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-white">{trig.title}</span>
+                        <span className="w-2 h-2 rounded-full bg-[#00f5a0] animate-ping"></span>
+                      </div>
+                      <p className="text-xs text-on-surface-variant leading-relaxed">{trig.desc}</p>
+                      <div className="pt-2 border-t border-outline-variant/10 flex items-center justify-between text-[10px]">
+                        <span className="text-[#00f5a0] font-black">{trig.status}</span>
+                        <span className="text-on-surface-variant font-mono">Service Worker V1</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleTestPush}
+                    className="bg-[#00f5a0] hover:bg-[#00f5a0]/90 text-black px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-md shadow-[#00f5a0]/20"
+                  >
+                    <Bell size={14} /> Testar Disparo de Push
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
         </div>

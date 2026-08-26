@@ -42,6 +42,21 @@ console.error = (...args) => {
   originalConsoleError.apply(console, args);
 };
 
+// Register PWA Service Worker
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('ServiceWorker registration skipped:', err);
+    });
+  });
+
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'NAVIGATE_TAB' && event.data.tab) {
+      window.dispatchEvent(new CustomEvent('navigateToTab', { detail: event.data.tab }));
+    }
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <CurrencyProvider>

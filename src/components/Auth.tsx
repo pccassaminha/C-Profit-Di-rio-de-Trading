@@ -11,6 +11,8 @@ import { auth, db } from '../firebase';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import CountryDropdown from './CountryDropdown';
+import PWAInstallBanner from './PWAInstallBanner';
+import { notifyMasterNewRegistration, notifyAffiliateRegistration } from '../services/notificationService';
 import { 
   TrendingUp, 
   Wallet, 
@@ -265,7 +267,20 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
             status: 'approved',
             createdAt: new Date().toISOString()
           });
+
+          if (finalReferredUid) {
+            notifyAffiliateRegistration(finalReferredUid, googleDisplayName);
+          }
         }
+
+        // Notify Master Admin of new user registration
+        notifyMasterNewRegistration({
+          name: googleDisplayName,
+          email: result.user.email || '',
+          planId: selectedPlan,
+          refCode: result.user.uid.substring(0, 6).toUpperCase()
+        });
+
         onSuccess(true); // new user
       } else {
         onSuccess(false); // existing user
@@ -608,7 +623,21 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
             status: 'approved',
             createdAt: new Date().toISOString()
           });
+
+          if (finalReferredUid) {
+            notifyAffiliateRegistration(finalReferredUid, fullName);
+          }
         }
+
+        // Notify Master Admin of new user registration
+        notifyMasterNewRegistration({
+          name: fullName,
+          email: email,
+          phoneNumber: phoneNumber,
+          planId: selectedPlan,
+          refCode: result.user.uid.substring(0, 6).toUpperCase()
+        });
+
         onSuccess(true); // new user
       }
     } catch (err: any) {
@@ -625,7 +654,8 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
   };
 
   return (
-    <div className="min-h-screen bg-[#0b1326] flex flex-col lg:flex-row overflow-hidden font-body text-white">
+    <div className="min-h-screen bg-[#0b1326] flex flex-col lg:flex-row overflow-hidden font-body text-white relative">
+      <PWAInstallBanner />
       {/* Lado Esquerdo: Ilustrações e Copy */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-primary/10 to-background p-16 flex-col justify-between overflow-hidden">
         {/* Background Decor */}

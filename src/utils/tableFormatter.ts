@@ -143,31 +143,51 @@ export function formatCommunityContent(text: string, theme: 'dark' | 'light' = '
   let formatted = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   // Formatar menções @usuario
-  formatted = formatted.replace(/@([a-zA-Z0-9_\u00C0-\u00FF\s]+?)(?=\s|$|[,.?!])/g, (match, username) => {
+  formatted = formatted.replace(/@([a-zA-Z0-9_\u00C0-\u00FF\s]+?)(?=\s|$|[,.?!])/g, (_match, username) => {
     return `<span class="font-extrabold text-primary bg-primary/10 px-1 rounded inline-flex items-center">@${username}</span>`;
   });
 
-  // Identificar cabeçalhos numerados (ex: "18. Matriz C Profit Macro") e markdown (# Cabeçalho)
+  // Estilo de subtítulos elegante e limpo em negrito (fonte moderna, alta legibilidade)
   const h3Class = theme === 'dark' 
-    ? 'text-white font-black text-xl mt-4 mb-2 font-headline border-b border-outline-variant/20 pb-2 flex items-center gap-2' 
-    : 'text-neutral-900 font-black text-xl mt-4 mb-2 font-headline border-b border-neutral-300 pb-2 flex items-center gap-2';
-  
-  formatted = formatted.replace(/^(#+)\s+(.+)$/gm, `<h3 class="${h3Class}">$2</h3>`);
-  formatted = formatted.replace(/^(\d+\.\s+[^\n]+)$/gm, `<h3 class="${h3Class}">$1</h3>`);
+    ? 'text-white font-extrabold text-lg md:text-xl mt-6 mb-3 font-sans tracking-tight border-b border-outline-variant/20 pb-2 flex items-center gap-2' 
+    : 'text-neutral-900 font-extrabold text-lg md:text-xl mt-6 mb-3 font-sans tracking-tight border-b border-neutral-300 pb-2 flex items-center gap-2';
+
+  const h4Class = theme === 'dark'
+    ? 'text-white font-bold text-base mt-4 mb-2 font-sans tracking-tight'
+    : 'text-neutral-900 font-bold text-base mt-4 mb-2 font-sans tracking-tight';
+
+  // Markdown headers (# e ## e ###)
+  formatted = formatted.replace(/^(#{1,3})\s+(.+)$/gm, `<h3 class="${h3Class}">$2</h3>`);
+  formatted = formatted.replace(/^(#{4,6})\s+(.+)$/gm, `<h4 class="${h4Class}">$2</h4>`);
+
+  // Cabeçalhos de seção numerados autônomos (ex: "1. Resumo Executivo", "20. Melhores Pares e Janela de Entrada")
+  formatted = formatted.replace(/^(\d+\.\s+[A-ZÀ-Ú][^\n.]{1,80})$/gm, `<h3 class="${h3Class}">$1</h3>`);
+
+  // Subitens com numeração e travessão (ex: "2.1 — Wall Street...")
+  formatted = formatted.replace(/^(\d+\.\d+\s*[-—]\s*[^\n.:]+[:.]?)/gm, (_match, prefix) => {
+    const colorClass = theme === 'dark' ? 'text-primary' : 'text-neutral-900';
+    return `<strong class="font-extrabold font-sans ${colorClass}">${prefix}</strong>`;
+  });
+
+  // Definições e tópicos chave (ex: "Regime de mercado:", "Cadeia causal da semana:", "Diagnóstico C Profit Macro:")
+  formatted = formatted.replace(/^([A-ZÀ-Ú][A-Za-z0-9\s/—-]+:)/gm, (_match, label) => {
+    const colorClass = theme === 'dark' ? 'text-primary' : 'text-neutral-900';
+    return `<strong class="font-extrabold font-sans ${colorClass}">${label}</strong>`;
+  });
 
   // Parse e formata tabelas/matrizes coladas
   formatted = parseAndFormatTables(formatted, theme);
 
   // Identificar negrito **texto**
-  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-extrabold text-on-surface">$1</strong>');
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, `<strong class="font-extrabold font-sans ${theme === 'dark' ? 'text-white' : 'text-neutral-900'}">$1</strong>`);
 
   // Identificar Forte/Fraco
-  formatted = formatted.replace(/\bForte\b/gi, '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-black uppercase tracking-wider">Forte</span>');
-  formatted = formatted.replace(/\bFraco\b/gi, '<span class="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-xs font-black uppercase tracking-wider">Fraco</span>');
+  formatted = formatted.replace(/\bForte\b/gi, '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-black uppercase tracking-wider font-mono">Forte</span>');
+  formatted = formatted.replace(/\bFraco\b/gi, '<span class="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-xs font-black uppercase tracking-wider font-mono">Fraco</span>');
 
   // Identificar Risk-on / Risk-off
-  formatted = formatted.replace(/\bRisk-on\b/gi, '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-black border border-emerald-500/30">RISK-ON</span>');
-  formatted = formatted.replace(/\bRisk-off\b/gi, '<span class="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-xs font-black border border-rose-500/30">RISK-OFF</span>');
+  formatted = formatted.replace(/\bRisk-on\b/gi, '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-black border border-emerald-500/30 font-mono">RISK-ON</span>');
+  formatted = formatted.replace(/\bRisk-off\b/gi, '<span class="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-xs font-black border border-rose-500/30 font-mono">RISK-OFF</span>');
 
   return formatted;
 }

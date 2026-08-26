@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { auth, db } from '../firebase';
 import { useTrades } from '../hooks/useTrades';
-import { Menu, Bell, MessageSquare, UserPlus, MessageCircle, Megaphone, ChevronDown, User, Settings, HelpCircle, Shield, LogOut } from 'lucide-react';
+import { Menu, Bell, MessageSquare, UserPlus, MessageCircle, Megaphone, ChevronDown, User, Settings, HelpCircle, Shield, LogOut, Sparkles, Smartphone } from 'lucide-react';
 import { collection, query, onSnapshot, orderBy, where, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import NotificationCenterModal from './NotificationCenterModal';
+import { checkAndNotifySubscriptionExpiry } from '../services/notificationService';
 
 export default function Topbar({ 
   toggleSidebar, 
@@ -52,10 +54,18 @@ export default function Topbar({
   const initial = userName.charAt(0).toUpperCase();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [broadcasts, setBroadcasts] = useState<any[]>([]);
   const [seenIds, setSeenIds] = useState<string[]>([]);
   const [chatUnreads, setChatUnreads] = useState<any[]>([]);
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
+
+  // Automatic subscription expiry check
+  useEffect(() => {
+    if (currentUser && userPlan) {
+      checkAndNotifySubscriptionExpiry(userPlan, currentUser.uid);
+    }
+  }, [currentUser, userPlan]);
 
   // Subscribe to real-time pending friend requests
   useEffect(() => {
@@ -398,6 +408,21 @@ export default function Topbar({
                   })
                 )}
               </div>
+
+              {/* Botão para abrir a Central Completa de Notificações, Balanço Semanal e Faturamento */}
+              <div className="p-2 border-t border-outline-variant/10 bg-surface-container">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotificationsOpen(false);
+                    setIsNotificationModalOpen(true);
+                  }}
+                  className="w-full py-2 bg-[#00f5a0]/15 hover:bg-[#00f5a0]/25 text-[#00f5a0] rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all border border-[#00f5a0]/30"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Abrir Central de Balanços & Push
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -461,6 +486,13 @@ export default function Topbar({
           )}
         </div>
       </div>
+
+      {/* Central Modal de Notificações, Balanço Semanal e Fechamento Mensal */}
+      <NotificationCenterModal 
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
+        onNavigate={onNavigate}
+      />
     </header>
   );
 }

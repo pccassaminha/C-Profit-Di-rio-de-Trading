@@ -21,17 +21,31 @@ const databaseId = undefined;
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-  }, databaseId);
+    experimentalAutoDetectLongPolling: true,
+  });
 } catch {
   try {
-    firestoreDb = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+    firestoreDb = getFirestore(app);
   } catch (err) {
+    console.warn("Firestore fallback initialization:", err);
     firestoreDb = getFirestore(app);
   }
 }
 
 export const db = firestoreDb;
+
+// Connection self-healing check
+async function testFirestoreConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error: any) {
+    // Non-blocking diagnostic check
+    if (error?.message?.includes('the client is offline') || error?.code === 'unavailable') {
+      console.warn("Firestore offline mode active. Cached and local operations remain responsive.");
+    }
+  }
+}
+testFirestoreConnection();
 
 const originalAuth = getAuth(app);
 setPersistence(originalAuth, browserLocalPersistence).catch(console.error);

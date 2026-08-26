@@ -6,6 +6,7 @@ import { collection, addDoc, query, where, onSnapshot, orderBy, getDocs, getDoc,
 import { CreditCard, Check, ShieldCheck, Zap, Star, LayoutGrid, Smartphone, MessageSquare, History, Upload, Landmark, X, FileText, Award, ArrowRight } from 'lucide-react';
 import Modal from './Modal';
 import CountryDropdown from './CountryDropdown';
+import { notifyMasterPaymentRequest } from '../services/notificationService';
 
 import { Lock, PartyPopper, Ticket, PiggyBank, AlertTriangle } from 'lucide-react';
 
@@ -543,6 +544,20 @@ Fico no aguardo, obrigado!`;
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
+
+      // Dispatch notification for Master Admin
+      notifyMasterPaymentRequest({
+        userName: payerName,
+        userEmail: auth.currentUser?.email || '',
+        planName: targetPlan.name || showPaymentModal.id,
+        amount: priceInKz,
+        paymentMethod: paymentMethod,
+        transactionCode: String(numericId),
+        expressCode: paymentMethod === 'express' ? expressCode.trim() :
+                     paymentMethod === 'iban' ? ibanCode.trim() :
+                     paymentMethod === 'kwik' ? kwikCode.trim() : undefined
+      });
+
       setPaymentSubmitted(true);
     } catch (err) {
       console.error(err);

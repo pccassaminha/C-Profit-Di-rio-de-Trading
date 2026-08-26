@@ -19,6 +19,7 @@ import Planner from './components/Planner';
 import UserAffiliate from './components/UserAffiliate';
 import GlobalChatWidget from './components/GlobalChatWidget';
 import MobileBottomNav from './components/MobileBottomNav';
+import PWAInstallBanner from './components/PWAInstallBanner';
 import { useTrades } from './hooks/useTrades';
 
 import Auth from './components/Auth';
@@ -199,6 +200,7 @@ export default function App() {
 
   return (
     <div className="bg-background text-white font-body min-h-screen flex selection:bg-primary-container selection:text-white relative">
+      <PWAInstallBanner />
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 

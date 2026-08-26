@@ -8,6 +8,7 @@ import Modal from './Modal';
 import { TradeShareCard, TradeDetails } from './TradeShareCard';
 import { renderFormattedText } from '../utils/textFormatter';
 import { formatCommunityContent } from '../utils/tableFormatter';
+import { notifyCommunityNewPost } from '../services/notificationService';
 
 import { MessageSquare, ThumbsUp as ThumbsUpIcon, Share2, Plus, Image as ImageIcon, X, Send, Filter, Globe, Hash, ShieldCheck, MoreVertical, Trash2, Smartphone, MessageCircle, UserPlus, UserMinus, Eye, EyeOff, Lock, ShieldAlert, Camera, MapPin, Briefcase, GraduationCap, Heart, Calendar, Check, Users, Award, Edit3, Heart as HeartIcon, Mail, User, Home, ArrowLeft, Megaphone, Edit2, Ban, ArrowRight, Compass, Bookmark, Crown } from 'lucide-react';
 
@@ -507,6 +508,10 @@ export default function Community() {
           commentsCount: 0,
           createdAt: serverTimestamp()
         });
+
+        // Dispatch Community push notification
+        const author = dbName || auth.currentUser.displayName || 'Trader C Profit';
+        notifyCommunityNewPost(author, newPost.legend);
       }
       setIsCreateModalOpen(false);
       setEditingPostId(null);
