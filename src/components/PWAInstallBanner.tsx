@@ -125,9 +125,9 @@ export default function PWAInstallBanner({ compact = false }: PWAInstallBannerPr
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <img 
-            src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" 
+            src="/c-profit.png" 
             alt="C Profit App" 
-            className="w-6 h-6 rounded-lg object-cover shadow-sm shrink-0 group-hover:scale-110 transition-transform" 
+            className="w-7 h-7 rounded-lg object-cover shadow-sm shrink-0 group-hover:scale-110 transition-transform" 
           />
           <div className="flex flex-col min-w-0">
             <span className="text-[11px] font-black text-white flex items-center gap-1.5 leading-tight">
@@ -173,7 +173,7 @@ export default function PWAInstallBanner({ compact = false }: PWAInstallBannerPr
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="flex items-center gap-3">
                 <img 
-                  src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" 
+                  src="/c-profit.png" 
                   alt="C Profit Logo" 
                   className="w-12 h-12 rounded-2xl object-cover border border-[#00f5a0]/40 shadow-lg shrink-0" 
                 />

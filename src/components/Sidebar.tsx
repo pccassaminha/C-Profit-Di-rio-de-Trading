@@ -44,14 +44,14 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen }: { activeTab
         {isOpen ? (
           <div className="flex flex-col items-start mt-2 mb-4">
             <button onClick={() => setActiveTab('dashboard')} className="cursor-pointer hover:scale-105 transition-transform bg-transparent border-none p-0 outline-none text-left flex items-center gap-[12px]">
-              <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[36px] drop-shadow-md rounded-[8px]" />
+              <img src="/c-profit.png" alt="C Profit Logo" className="h-[40px] w-auto drop-shadow-md rounded-[8px]" />
               <span className="font-headline text-[20px] font-extrabold text-on-surface tracking-tight uppercase">Profit</span>
             </button>
             <p className="text-[10px] uppercase tracking-[0.1em] text-primary font-bold mt-2 whitespace-nowrap ml-2">Plano: {getPlanDisplay(userPlan?.plan_type)}</p>
           </div>
         ) : (
           <button onClick={() => setActiveTab('dashboard')} className="cursor-pointer hover:scale-110 transition-transform bg-transparent border-none p-0 outline-none flex items-center justify-center mt-2 mb-4">
-            <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="w-[32px] h-[32px] object-contain drop-shadow-md rounded-[8px]" />
+            <img src="/c-profit.png" alt="C Profit Logo" className="w-[36px] h-[36px] object-contain drop-shadow-md rounded-[8px]" />
           </button>
         )}
       </div>

@@ -665,7 +665,7 @@ export default function Auth({ onSuccess, initialMode = 'login', initialPlan = '
         <div className="relative z-10">
           <div className="flex items-center gap-[16px] mb-12">
             <button onClick={() => window.location.href = '/'} className="cursor-pointer hover:opacity-90 transition-opacity bg-transparent border-none p-0 outline-none flex items-center gap-[16px]">
-              <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[44px] drop-shadow-md rounded-[8px]" />
+              <img src="/c-profit.png" alt="C Profit Logo" className="h-[48px] w-auto drop-shadow-md rounded-[8px]" />
               <span className="font-headline text-[26px] font-extrabold text-on-surface tracking-tight uppercase">Profit</span>
             </button>
           </div>

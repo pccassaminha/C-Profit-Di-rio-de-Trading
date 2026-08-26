@@ -62,7 +62,7 @@ export function triggerNativeNotification(title: string, body: string, actionTab
   if (typeof window === 'undefined' || !('Notification' in window)) return;
 
   if (Notification.permission === 'granted') {
-    const defaultIcon = 'https://i.postimg.cc/v8qJ6KTk/C-profit.png';
+    const defaultIcon = '/c-profit.png';
     
     // Tenta usar o Service Worker para mostrar a notificação (ideal no Android/Chrome)
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {

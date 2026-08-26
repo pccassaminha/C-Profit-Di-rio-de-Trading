@@ -11,16 +11,34 @@
   "categories": ["finance", "business", "productivity"],
   "icons": [
     {
-      "src": "https://i.postimg.cc/v8qJ6KTk/C-profit.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "https://i.postimg.cc/v8qJ6KTk/C-profit.png",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/c-profit.png",
+      "sizes": "800x800",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

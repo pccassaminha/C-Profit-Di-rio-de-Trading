@@ -213,7 +213,7 @@ export default function Payments() {
                 <div className="flex flex-col md:flex-row justify-between mb-12 gap-8 border-b border-slate-100 pb-12">
                   <div>
                     <div className="flex items-center gap-[12px] mb-4">
-                      <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Logo" className="h-[32px] object-contain drop-shadow-md rounded-[8px]" />
+                      <img src="/c-profit.png" alt="C Profit Logo" className="h-[36px] object-contain drop-shadow-md rounded-[8px]" />
                       <span className="font-headline text-[20px] font-extrabold text-slate-800 tracking-tight uppercase">Profit</span>
                     </div>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Terminal de Alta Performance</p>

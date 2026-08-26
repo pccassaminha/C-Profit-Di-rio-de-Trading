@@ -3,7 +3,12 @@ const CACHE_NAME = 'c-profit-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.webmanifest'
+  '/manifest.webmanifest',
+  '/c-profit.png',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/apple-touch-icon.png',
+  '/favicon.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -38,8 +43,8 @@ self.addEventListener('push', (event) => {
     const title = data.title || 'C Profit';
     const options = {
       body: data.body || 'Nova notificação do C Profit',
-      icon: data.icon || 'https://i.postimg.cc/v8qJ6KTk/C-profit.png',
-      badge: data.badge || 'https://i.postimg.cc/v8qJ6KTk/C-profit.png',
+      icon: data.icon || '/c-profit.png',
+      badge: data.badge || '/icon-192.png',
       data: data.data || { url: '/' },
       vibrate: [100, 50, 100],
       tag: data.tag || 'c-profit-notification',
@@ -55,7 +60,7 @@ self.addEventListener('push', (event) => {
     event.waitUntil(
       self.registration.showNotification('C Profit', {
         body: text,
-        icon: 'https://i.postimg.cc/v8qJ6KTk/C-profit.png'
+        icon: '/c-profit.png'
       })
     );
   }
