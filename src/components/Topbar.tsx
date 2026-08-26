@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { auth, db } from '../firebase';
 import { useTrades } from '../hooks/useTrades';
-import { Menu, Bell, MessageSquare, UserPlus, MessageCircle, Megaphone, ChevronDown, User, Settings, HelpCircle, Shield, LogOut, Sparkles, Smartphone } from 'lucide-react';
+import { Menu, Bell, MessageSquare, UserPlus, MessageCircle, Megaphone, ChevronDown, User, Settings, HelpCircle, Shield, LogOut, Sparkles, Smartphone, BellRing } from 'lucide-react';
 import { collection, query, onSnapshot, orderBy, where, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import NotificationCenterModal from './NotificationCenterModal';
-import { checkAndNotifySubscriptionExpiry } from '../services/notificationService';
+import { checkAndNotifySubscriptionExpiry, requestPushPermission } from '../services/notificationService';
 
 export default function Topbar({ 
   toggleSidebar, 
@@ -59,6 +59,51 @@ export default function Topbar({
   const [seenIds, setSeenIds] = useState<string[]>([]);
   const [chatUnreads, setChatUnreads] = useState<any[]>([]);
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPushPermission(Notification.permission);
+    }
+  }, []);
+
+  const handleEnablePush = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      const perm = await requestPushPermission();
+      setPushPermission(perm);
+      if (perm === 'granted') {
+        alert('Notificações ativadas com sucesso!');
+      } else if (perm === 'denied') {
+        alert('As notificações foram bloqueadas. Você precisa permitir nas configurações do seu navegador ou dispositivo.');
+      }
+    }
+  };
+
+  const [showPushToast, setShowPushToast] = useState(false);
+
+  useEffect(() => {
+    // Only show if we don't have permission and haven't previously dismissed
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        const dismissed = localStorage.getItem('push_prompt_dismissed');
+        if (!dismissed) {
+          // Show prompt slightly after login/load
+          const timer = setTimeout(() => setShowPushToast(true), 3000);
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, []);
+
+  const handleDismissPushToast = () => {
+    setShowPushToast(false);
+    localStorage.setItem('push_prompt_dismissed', 'true');
+  };
+
+  const handleEnablePushFromToast = async () => {
+    setShowPushToast(false);
+    await handleEnablePush();
+  };
 
   // Automatic subscription expiry check
   useEffect(() => {
@@ -242,7 +287,7 @@ export default function Topbar({
   const unreadCount = broadcasts.filter(b => !seenIds.includes(b.id)).length + totalUnreadChats + friendRequests.length + roomInvites.length;
 
   return (
-    <header className="flex justify-between items-center px-4 md:px-6 w-full h-16 md:h-20 sticky top-0 z-40 bg-background border-b border-outline-variant/20">
+    <header className="flex justify-between items-center px-4 md:px-6 w-full sticky top-0 z-40 bg-background border-b border-outline-variant/20 h-[calc(64px+env(safe-area-inset-top))] md:h-[calc(80px+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)]">
       <div className="flex items-center gap-3">
         <button 
           onClick={toggleSidebar}
@@ -288,6 +333,23 @@ export default function Topbar({
                   </span>
                 )}
               </div>
+              
+              {pushPermission !== 'granted' && pushPermission !== 'denied' && (
+                <div className="p-3 bg-secondary/10 border-b border-secondary/20 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <BellRing className="w-4 h-4 text-secondary" />
+                    <span className="text-xs font-bold text-on-surface">Ativar Notificações</span>
+                  </div>
+                  <p className="text-[11px] text-on-surface-variant leading-tight">Receba alertas em tempo real sobre mensagens e faturamento.</p>
+                  <button 
+                    onClick={handleEnablePush}
+                    className="mt-1 bg-secondary text-on-secondary text-xs font-bold py-1.5 px-3 rounded-lg hover:opacity-90 transition-opacity"
+                  >
+                    Ativar Agora
+                  </button>
+                </div>
+              )}
+              
               <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2 max-h-[350px]">
                 {chatUnreads.map(c => (
                   <div 
@@ -499,6 +561,35 @@ export default function Topbar({
         onClose={() => setIsNotificationModalOpen(false)}
         onNavigate={onNavigate}
       />
+
+      {/* Floating Push Prompt Toast */}
+      {showPushToast && (
+        <div className="fixed bottom-20 md:bottom-6 right-4 left-4 md:left-auto md:w-80 bg-surface-container-high border border-primary/30 rounded-2xl p-4 shadow-2xl z-50 animate-in slide-in-from-bottom-8 fade-in flex flex-col gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+              <BellRing className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-bold text-on-surface">Ativar Alertas</h4>
+              <p className="text-[11px] text-on-surface-variant leading-snug mt-0.5">Receba alertas em tempo real sobre trades, chat e faturamento. Não perca nada!</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <button 
+              onClick={handleDismissPushToast}
+              className="flex-1 bg-surface-container hover:bg-outline-variant/10 text-on-surface-variant text-xs font-bold py-2 rounded-xl transition-colors"
+            >
+              Agora Não
+            </button>
+            <button 
+              onClick={handleEnablePushFromToast}
+              className="flex-1 bg-primary text-on-primary text-xs font-bold py-2 rounded-xl hover:opacity-90 transition-opacity"
+            >
+              Ativar
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
