@@ -693,7 +693,7 @@ export default function AdminPanel() {
         manualAlertTitle.trim(),
         manualAlertBody.trim(),
         manualAlertActionTab,
-        '/c-profit.png'
+        'https://i.postimg.cc/v8qJ6KTk/C-profit.png'
       );
 
       setManualAlertTitle('');
@@ -727,7 +727,7 @@ export default function AdminPanel() {
         '🔔 Notificação Push C Profit Ativa!',
         'O sistema de notificações Push e PWA está 100% operacional no seu dispositivo.',
         'dashboard',
-        '/c-profit.png'
+        'https://i.postimg.cc/v8qJ6KTk/C-profit.png'
       );
       alert('Notificação Push de teste disparada!');
     } else {
@@ -3882,9 +3882,11 @@ export default function AdminPanel() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <img 
-                            src="/c-profit.png" 
+                            src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" 
                             alt="C Profit" 
                             className="w-5 h-5 rounded-md object-cover" 
+                            loading="lazy"
+                            decoding="async"
                           />
                           <span className="text-[11px] font-black text-white uppercase tracking-wider">C Profit App</span>
                         </div>

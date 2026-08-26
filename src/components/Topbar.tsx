@@ -251,7 +251,13 @@ export default function Topbar({
           <Menu className="w-4 h-4" />
         </button>
         <div className="flex md:hidden items-center gap-2 select-none">
-          <img src="/c-profit.png" alt="C Profit Logo" className="h-[28px] w-auto drop-shadow-md rounded" />
+          <img 
+            src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" 
+            alt="C Profit Logo" 
+            className="h-[28px] w-auto drop-shadow-md rounded" 
+            loading="eager"
+            decoding="async"
+          />
           <span className="text-sm font-extrabold tracking-tight text-primary font-headline uppercase">Profit</span>
         </div>
       </div>

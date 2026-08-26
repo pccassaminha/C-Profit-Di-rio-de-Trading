@@ -55,7 +55,13 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-[5%] h-[100px] bg-background/85 backdrop-blur-[20px] border-b border-outline">
         <a href="#" onClick={(e) => {e.preventDefault(); window.scrollTo(0,0)}} className="flex items-center gap-2 md:gap-[16px] text-none hover:opacity-90 transition-opacity shrink-0">
-          <img src="/c-profit.png" alt="C Profit Logo" className="h-[36px] md:h-[48px] drop-shadow-md rounded-[8px]" />
+          <img 
+            src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" 
+            alt="C Profit Logo" 
+            className="h-[36px] md:h-[48px] drop-shadow-md rounded-[8px]" 
+            loading="eager"
+            decoding="async"
+          />
           <span className="font-headline text-[18px] md:text-[22px] font-extrabold text-on-surface tracking-tight uppercase">Profit</span>
         </a>
         <ul className="hidden lg:flex items-center gap-[36px] list-none">
@@ -838,7 +844,13 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
         <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-[64px] mb-[64px]">
           <div>
             <a href="#" className="flex items-center gap-[16px] mb-[16px] hover:opacity-90 transition-opacity">
-               <img src="/c-profit.png" alt="C Profit Logo" className="h-[48px] w-auto drop-shadow-md rounded-[8px]" />
+               <img 
+                 src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" 
+                 alt="C Profit Logo" 
+                 className="h-[48px] w-auto drop-shadow-md rounded-[8px]" 
+                 loading="lazy"
+                 decoding="async"
+               />
                <span className="font-headline text-[22px] font-extrabold text-on-surface tracking-tight uppercase">Profit</span>
             </a>
             <p className="text-[14px] text-on-surface-variant/70 leading-[1.7] max-w-[320px] mt-[16px]">O terminal definitivo para traders que levam a performance a sério. Journaling, analytics e planejamento num só lugar.</p>
@@ -876,7 +888,7 @@ export default function Landing({ onLoginClick, onRegisterClick, onNavigate }: L
           </p>
           <div className="flex items-center justify-center gap-[32px] flex-wrap opacity-35 hover:opacity-75 transition-opacity duration-300">
             <a href="#" onClick={(e) => {e.preventDefault(); window.scrollTo(0,0)}} className="flex items-center gap-[6px] hover:text-[#00f5a0] transition-colors cursor-pointer no-underline text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
-              <img src="/c-profit.png" alt="C Profit" className="h-[20px] w-[20px] object-contain rounded" />
+              <img src="https://i.postimg.cc/v8qJ6KTk/C-profit.png" alt="C Profit" className="h-[20px] w-[20px] object-contain rounded" loading="lazy" decoding="async" />
               <span>Profit</span>
             </a>
             <a href="https://validac.shop/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-[6px] hover:text-[#00f5a0] transition-colors cursor-pointer no-underline text-on-surface-variant text-[11px] font-bold uppercase tracking-wider">
