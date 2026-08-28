@@ -324,174 +324,185 @@ export default function Topbar({
 
           {/* NOTIFICATION BOX DROPDOWN */}
           {notificationsOpen && (
-            <div className="absolute top-full right-0 mt-3 w-80 max-h-[450px] bg-surface-container-high border border-outline-variant/20 rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-4 duration-200 origin-top-right flex flex-col">
-              <div className="p-4 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container">
-                <p className="font-bold text-sm text-on-surface">Comunicados & Avisos</p>
-                {unreadCount > 0 && (
-                  <span className="text-[10px] bg-primary/20 text-primary font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    {unreadCount} Novo{unreadCount !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
+            <>
+              {/* Mobile backdrop for outside tap */}
+              <div 
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs md:hidden"
+                onClick={() => setNotificationsOpen(false)}
+              />
               
-              {pushPermission !== 'granted' && pushPermission !== 'denied' && (
-                <div className="p-3 bg-secondary/10 border-b border-secondary/20 flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <BellRing className="w-4 h-4 text-secondary" />
-                    <span className="text-xs font-bold text-on-surface">Ativar Notificações</span>
-                  </div>
-                  <p className="text-[11px] text-on-surface-variant leading-tight">Receba alertas em tempo real sobre mensagens e faturamento.</p>
-                  <button 
-                    onClick={handleEnablePush}
-                    className="mt-1 bg-secondary text-on-secondary text-xs font-bold py-1.5 px-3 rounded-lg hover:opacity-90 transition-opacity"
-                  >
-                    Ativar Agora
-                  </button>
+              <div className="fixed left-3 right-3 top-[calc(64px+env(safe-area-inset-top)+8px)] max-w-sm mx-auto md:max-w-none md:mx-0 md:left-auto md:right-0 md:top-full md:absolute md:mt-3 md:w-80 max-h-[calc(100vh-140px)] md:max-h-[450px] bg-surface-container-high border border-outline-variant/30 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-4 duration-200 flex flex-col">
+                <div className="p-4 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container">
+                  <p className="font-bold text-sm text-on-surface flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-primary" />
+                    <span>Comunicados & Avisos</span>
+                  </p>
+                  {unreadCount > 0 && (
+                    <span className="text-[10px] bg-primary/20 text-primary font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      {unreadCount} Novo{unreadCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
-              )}
-              
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2 max-h-[350px]">
-                {chatUnreads.map(c => (
-                  <div 
-                    key={c.id} 
-                    onClick={() => {
-                        setNotificationsOpen(false);
-                        if (onNavigate) {
-                           onNavigate('community');
-                           // small delay so it navigates then opens
-                           setTimeout(() => {
-                              window.dispatchEvent(new CustomEvent('openGlobalChat'));
-                           }, 300);
-                        }
-                    }}
-                    className="p-3.5 rounded-xl border transition-colors bg-primary/5 border-primary/20 shadow-sm cursor-pointer hover:bg-primary/10"
-                  >
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <MessageSquare className="w-[18px] h-[18px] text-primary" />
-                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
-                        Nova Mensagem
-                      </span>
+                
+                {pushPermission !== 'granted' && pushPermission !== 'denied' && (
+                  <div className="p-3 bg-secondary/10 border-b border-secondary/20 flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <BellRing className="w-4 h-4 text-secondary" />
+                      <span className="text-xs font-bold text-on-surface">Ativar Notificações</span>
                     </div>
-                    <p className="text-xs text-on-surface font-medium leading-relaxed">
-                      Você tem <strong className="font-black text-primary">{c.count}</strong> mensagem(ns) não lida(s) de <strong className="font-bold">{c.type === 'group' ? c.name : c.senderName}</strong>. Clique aqui para ir para a comunidade.
-                    </p>
+                    <p className="text-[11px] text-on-surface-variant leading-tight">Receba alertas em tempo real sobre mensagens e faturamento.</p>
+                    <button 
+                      onClick={handleEnablePush}
+                      className="mt-1 bg-secondary text-on-secondary text-xs font-bold py-1.5 px-3 rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+                    >
+                      Ativar Agora
+                    </button>
                   </div>
-                ))}
-                {friendRequests.map(fr => (
-                  <div 
-                    key={fr.id} 
-                    onClick={() => {
-                        setNotificationsOpen(false);
-                        if (onNavigate) {
-                           onNavigate('community');
-                        }
-                    }}
-                    className="p-3.5 rounded-xl border transition-colors bg-secondary/5 border-secondary/20 shadow-sm cursor-pointer hover:bg-secondary/10 flex items-center gap-2.5"
-                  >
-                    <img 
-                      src={fr.senderPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(fr.senderName)}&background=random`} 
-                      alt={fr.senderName} 
-                      className="w-9 h-9 rounded-xl object-cover shrink-0 border border-outline-variant/10" 
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <UserPlus className="w-4 h-4 text-secondary" />
-                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-secondary">
-                          Novo Pedido
+                )}
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2 max-h-[350px]">
+                  {chatUnreads.map(c => (
+                    <div 
+                      key={c.id} 
+                      onClick={() => {
+                          setNotificationsOpen(false);
+                          if (onNavigate) {
+                             onNavigate('community');
+                             // small delay so it navigates then opens
+                             setTimeout(() => {
+                                window.dispatchEvent(new CustomEvent('openGlobalChat'));
+                             }, 300);
+                          }
+                      }}
+                      className="p-3.5 rounded-xl border transition-colors bg-primary/5 border-primary/20 shadow-sm cursor-pointer hover:bg-primary/10"
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <MessageSquare className="w-[18px] h-[18px] text-primary" />
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
+                          Nova Mensagem
                         </span>
                       </div>
-                      <p className="text-[11px] text-on-surface leading-tight">
-                        <strong className="font-bold text-on-surface">{fr.senderName}</strong> enviou um pedido de amizade. Toque aqui para decidir na Comunidade!
+                      <p className="text-xs text-on-surface font-medium leading-relaxed">
+                        Você tem <strong className="font-black text-primary">{c.count}</strong> mensagem(ns) não lida(s) de <strong className="font-bold">{c.type === 'group' ? c.name : c.senderName}</strong>. Toque para ver.
                       </p>
                     </div>
-                  </div>
-                ))}
-                {roomInvites.map(invite => (
-                  <div 
-                    key={invite.id} 
-                    className="p-3.5 rounded-xl border transition-colors bg-primary/5 border-primary/25 shadow-sm space-y-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <MessageCircle className="w-[18px] h-[18px] text-primary" />
-                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
-                        Convite de Sala
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-on-surface leading-snug">
-                      O trader <strong className="text-primary font-bold">{invite.senderName}</strong> convidou-te para fazer parte de sua sala <strong className="text-primary font-bold">"{invite.roomName}"</strong>.
-                    </p>
-                    <div className="flex gap-2 justify-end">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAcceptRoomInvite(invite);
-                        }}
-                        className="px-2.5 py-1 bg-primary text-on-primary text-[9px] font-bold rounded-lg uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer"
-                      >
-                        Aceitar
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeclineRoomInvite(invite);
-                        }}
-                        className="px-2.5 py-1 bg-error/10 text-error text-[9px] font-bold rounded-lg uppercase tracking-wider hover:bg-error/20 active:scale-95 transition-all cursor-pointer"
-                      >
-                        Recusar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {broadcasts.length === 0 && chatUnreads.length === 0 && friendRequests.length === 0 && roomInvites.length === 0 ? (
-                  <div className="text-center py-8 px-4 text-on-surface-variant text-xs italic">
-                    Nenhuma notificação por enquanto.
-                  </div>
-                ) : (
-                  broadcasts.map((b) => {
-                    const isNew = !seenIds.includes(b.id);
-                    return (
-                      <div 
-                        key={b.id} 
-                        className={`p-3.5 rounded-xl border transition-colors ${
-                          isNew 
-                            ? 'bg-primary/5 border-primary/20 shadow-sm' 
-                            : 'bg-surface-container border-outline-variant/5'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <Megaphone className="w-[18px] h-[18px] text-primary" />
-                          <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
-                            {b.author || 'Admin'}
-                          </span>
-                          <span className="text-[9px] text-on-surface-variant ml-auto opacity-70">
-                            {b.createdAt ? new Date(b.createdAt.toDate ? b.createdAt.toDate() : b.createdAt).toLocaleDateString() : ''}
+                  ))}
+                  {friendRequests.map(fr => (
+                    <div 
+                      key={fr.id} 
+                      onClick={() => {
+                          setNotificationsOpen(false);
+                          if (onNavigate) {
+                             onNavigate('community');
+                          }
+                      }}
+                      className="p-3.5 rounded-xl border transition-colors bg-secondary/5 border-secondary/20 shadow-sm cursor-pointer hover:bg-secondary/10 flex items-center gap-2.5"
+                    >
+                      <img 
+                        src={fr.senderPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(fr.senderName)}&background=random`} 
+                        alt={fr.senderName} 
+                        className="w-9 h-9 rounded-xl object-cover shrink-0 border border-outline-variant/10" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <UserPlus className="w-4 h-4 text-secondary" />
+                          <span className="text-[10px] uppercase tracking-wider font-extrabold text-secondary">
+                            Novo Pedido
                           </span>
                         </div>
-                        <p className="text-xs text-on-surface font-medium leading-relaxed whitespace-pre-wrap">
-                          {b.message}
+                        <p className="text-[11px] text-on-surface leading-tight">
+                          <strong className="font-bold text-on-surface">{fr.senderName}</strong> enviou um pedido de amizade. Toque aqui para decidir na Comunidade!
                         </p>
                       </div>
-                    );
-                  })
-                )}
-              </div>
+                    </div>
+                  ))}
+                  {roomInvites.map(invite => (
+                    <div 
+                      key={invite.id} 
+                      className="p-3.5 rounded-xl border transition-colors bg-primary/5 border-primary/25 shadow-sm space-y-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className="w-[18px] h-[18px] text-primary" />
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
+                          Convite de Sala
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-on-surface leading-snug">
+                        O trader <strong className="text-primary font-bold">{invite.senderName}</strong> convidou-te para fazer parte de sua sala <strong className="text-primary font-bold">"{invite.roomName}"</strong>.
+                      </p>
+                      <div className="flex gap-2 justify-end">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAcceptRoomInvite(invite);
+                          }}
+                          className="px-2.5 py-1 bg-primary text-on-primary text-[9px] font-bold rounded-lg uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer"
+                        >
+                          Aceitar
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeclineRoomInvite(invite);
+                          }}
+                          className="px-2.5 py-1 bg-error/10 text-error text-[9px] font-bold rounded-lg uppercase tracking-wider hover:bg-error/20 active:scale-95 transition-all cursor-pointer"
+                        >
+                          Recusar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {broadcasts.length === 0 && chatUnreads.length === 0 && friendRequests.length === 0 && roomInvites.length === 0 ? (
+                    <div className="text-center py-8 px-4 text-on-surface-variant text-xs italic">
+                      Nenhuma notificação por enquanto.
+                    </div>
+                  ) : (
+                    broadcasts.map((b) => {
+                      const isNew = !seenIds.includes(b.id);
+                      return (
+                        <div 
+                          key={b.id} 
+                          className={`p-3.5 rounded-xl border transition-colors ${
+                            isNew 
+                              ? 'bg-primary/5 border-primary/20 shadow-sm' 
+                              : 'bg-surface-container border-outline-variant/5'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Megaphone className="w-[18px] h-[18px] text-primary" />
+                            <span className="text-[10px] uppercase tracking-wider font-extrabold text-primary">
+                              {b.author || 'Admin'}
+                            </span>
+                            <span className="text-[9px] text-on-surface-variant ml-auto opacity-70">
+                              {b.createdAt ? new Date(b.createdAt.toDate ? b.createdAt.toDate() : b.createdAt).toLocaleDateString() : ''}
+                            </span>
+                          </div>
+                          <p className="text-xs text-on-surface font-medium leading-relaxed whitespace-pre-wrap">
+                            {b.message}
+                          </p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
 
-              {/* Botão para abrir a Central Completa de Notificações, Balanço Semanal e Faturamento */}
-              <div className="p-2 border-t border-outline-variant/10 bg-surface-container">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNotificationsOpen(false);
-                    setIsNotificationModalOpen(true);
-                  }}
-                  className="w-full py-2 bg-[#00f5a0]/15 hover:bg-[#00f5a0]/25 text-[#00f5a0] rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all border border-[#00f5a0]/30"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Abrir Central de Balanços & Push
-                </button>
+                {/* Botão para abrir a Central Completa de Notificações, Balanço Semanal e Faturamento */}
+                <div className="p-2.5 border-t border-outline-variant/10 bg-surface-container">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotificationsOpen(false);
+                      setIsNotificationModalOpen(true);
+                    }}
+                    className="w-full py-2.5 bg-[#00f5a0]/15 hover:bg-[#00f5a0]/25 text-[#00f5a0] rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all border border-[#00f5a0]/30 cursor-pointer active:scale-[0.98]"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Abrir Central de Balanços & Push
+                  </button>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
 
