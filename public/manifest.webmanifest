@@ -2,7 +2,7 @@
   "name": "C Profit - Diário de Negociações",
   "short_name": "C Profit",
   "description": "Terminal e Diário de Negociações de Alta Performance para Forex e Opções Binárias",
-  "id": "/?source=pwa",
+  "id": "/",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
@@ -40,13 +40,13 @@
       "src": "/c-profit.png",
       "sizes": "800x800",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "https://i.postimg.cc/v8qJ6KTk/C-profit.png",
+      "src": "/c-profit.png",
       "sizes": "800x800",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "maskable"
     }
   ]
 }

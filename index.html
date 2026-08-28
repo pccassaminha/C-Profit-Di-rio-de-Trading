@@ -7,7 +7,6 @@
     <title>C Profit - Diário de Negociações</title>
     
     <!-- PWA & Mobile Web App Manifest -->
-    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0a0e17" />
     <meta name="msapplication-TileColor" content="#0a0e17" />
@@ -19,17 +18,17 @@
     <meta name="application-name" content="C Profit" />
 
     <!-- Preconnect & Preload Official Logo for Instant Rendering -->
-    <link rel="preconnect" href="https://i.postimg.cc" crossorigin />
-    <link rel="dns-prefetch" href="https://i.postimg.cc" />
-    <link rel="preload" as="image" href="https://i.postimg.cc/v8qJ6KTk/C-profit.png" fetchpriority="high" />
+    <link rel="preload" as="image" href="/c-profit.png" fetchpriority="high" />
+    <link rel="preload" as="image" href="/icon-192.png" fetchpriority="high" />
 
-    <!-- Official Logos, Favicons & Touch Icons -->
-    <link rel="icon" type="image/png" href="https://i.postimg.cc/v8qJ6KTk/C-profit.png" />
-    <link rel="shortcut icon" href="https://i.postimg.cc/v8qJ6KTk/C-profit.png" />
-    <link rel="apple-touch-icon" href="https://i.postimg.cc/v8qJ6KTk/C-profit.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="https://i.postimg.cc/v8qJ6KTk/C-profit.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="https://i.postimg.cc/v8qJ6KTk/C-profit.png" />
-    <link rel="apple-touch-icon" sizes="512x512" href="https://i.postimg.cc/v8qJ6KTk/C-profit.png" />
+    <!-- Official Logos, Favicons & Touch Icons (Same-origin for mobile home screens) -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="shortcut icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
